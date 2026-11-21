@@ -50,12 +50,26 @@ type SettingsNavItem =
 
 export type SettingsNavGroup = { label: string; items: SettingsNavItem[] };
 
+// Sections that only worked through the original vendor's accounts and hosted
+// services (sign-in, billing, referrals, teams, cloud sync, cloud imports, CRM
+// and automations). Mirna is account-free, so they are not offered.
+const HIDDEN_SETTINGS_ITEMS = new Set([
+  "account",
+  "billing",
+  "referrals",
+  "team",
+  "sync",
+  "imports",
+  "crm",
+  "automations",
+]);
+
 export function useSettingsNavGroups(): SettingsNavGroup[] {
   const { i18n, t } = useLingui();
   const workspaces = useMyWorkspacesWithMirror();
   const hasExistingWorkspace = (workspaces.data?.length ?? 0) > 0;
 
-  return [
+  const groups: SettingsNavGroup[] = [
     {
       label: t`App`,
       items: [
@@ -305,4 +319,11 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
       ],
     },
   ];
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !HIDDEN_SETTINGS_ITEMS.has(item.id)),
+    }))
+    .filter((group) => group.items.length > 0);
 }

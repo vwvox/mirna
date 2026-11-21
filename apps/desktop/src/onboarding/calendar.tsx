@@ -26,6 +26,10 @@ import { useEnabledCalendars } from "~/calendar/hooks";
 import { usePermission } from "~/shared/hooks/usePermissions";
 import { openIntegrationUrl } from "~/shared/integration";
 
+// Google and Outlook calendars were synced through the vendor's hosted API and
+// required an account; Mirna only offers the on-device Apple Calendar.
+const SHOW_ACCOUNT_CALENDARS = false;
+
 const GOOGLE_PROVIDER = PROVIDERS.find((provider) => provider.id === "google");
 const OUTLOOK_PROVIDER = PROVIDERS.find(
   (provider) => provider.id === "outlook",
@@ -585,8 +589,12 @@ function CalendarSectionContent({
           />
         )}
 
-        <GoogleCalendarProvider onSignIn={onSignIn} />
-        <OutlookCalendarProvider onSignIn={onSignIn} />
+        {SHOW_ACCOUNT_CALENDARS && (
+          <>
+            <GoogleCalendarProvider onSignIn={onSignIn} />
+            <OutlookCalendarProvider onSignIn={onSignIn} />
+          </>
+        )}
       </div>
 
       {hasConnectedCalendar && (

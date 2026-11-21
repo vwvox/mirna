@@ -47,6 +47,8 @@ import {
   requestMainListenerControl,
 } from "~/stt/window-control";
 
+const SESSION_SHARING_ENABLED = false;
+
 export function OuterHeader({
   sessionId,
   currentView,
@@ -155,7 +157,8 @@ function HeaderMeetingControl({
     return null;
   }
 
-  if (meetingOver) {
+  // Sharing published notes through the vendor's servers; Mirna keeps notes local.
+  if (meetingOver && SESSION_SHARING_ENABLED) {
     return (
       <div className="relative mr-1 ml-1 flex min-w-0 shrink-0 items-center">
         <SessionShareButton

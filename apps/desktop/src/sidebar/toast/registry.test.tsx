@@ -65,42 +65,28 @@ describe("sidebar toast registry", () => {
     },
   );
 
-  it("suggests signing in before provider setup", () => {
-    const onSignIn = vi.fn();
+  it("asks for a usable transcription provider first", () => {
     const toast = showToast({
       isAuthenticated: false,
-      hasLLMConfigured: false,
-      hasSttConfigured: false,
-      onSignIn,
+      hasProSttConfigured: true,
     });
-
-    expect(toast?.id).toBe("sign-in-benefits");
-    toast?.primaryAction?.onClick();
-    expect(onSignIn).toHaveBeenCalledOnce();
-  });
-
-  it("asks for a usable transcription provider after sign-in is dismissed", () => {
-    const toast = showToast(
-      { isAuthenticated: false, hasProSttConfigured: true },
-      (toast) => toast.id === "sign-in-benefits",
-    );
 
     expect(toast?.id).toBe("missing-stt");
   });
 
-  it("promotes Pro after sign-in is dismissed, sharing one permanent dismissal", () => {
-    expect(
-      showToast(
-        { isAuthenticated: false },
-        (toast) => toast.id === "sign-in-benefits",
-      )?.id,
-    ).toBe("upgrade-to-pro");
+  it("never prompts to sign in or upgrade", () => {
     expect(
       showToast(
         { isAuthenticated: false },
         (toast) =>
-          toast.lifecycle.type === "persistent" &&
-          toast.lifecycle.dismissalId === "auth-promotion",
+          toast.id === "sign-in-benefits" || toast.id === "upgrade-to-pro",
+      ),
+    ).toBeNull();
+    expect(
+      showToast(
+        { isAuthenticated: false },
+        (toast) =>
+          toast.id !== "sign-in-benefits" && toast.id !== "upgrade-to-pro",
       ),
     ).toBeNull();
   });

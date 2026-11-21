@@ -9,14 +9,11 @@ export type OnboardingStep =
   | "imports"
   | "final";
 
-const STEPS_MACOS: OnboardingStep[] = [
-  "permissions",
-  "login",
-  "calendar",
-  "imports",
-  "final",
-];
-const STEPS_OTHER: OnboardingStep[] = ["login", "calendar", "imports", "final"];
+// Mirna has no accounts, so there is no sign-in step, and importing from
+// other meeting tools went through the vendor's servers. Steps that are not
+// listed here are hidden by OnboardingSection.
+const STEPS_MACOS: OnboardingStep[] = ["permissions", "calendar", "final"];
+const STEPS_OTHER: OnboardingStep[] = ["calendar", "final"];
 
 function getOnboardingSteps(): OnboardingStep[] {
   return platform() === "macos" ? STEPS_MACOS : STEPS_OTHER;

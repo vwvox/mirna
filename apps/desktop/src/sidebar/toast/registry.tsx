@@ -7,6 +7,9 @@ import type { DownloadProgress, ToastCondition, ToastType } from "./types";
 import type { DesktopUpdateControl } from "~/main/update-banner";
 import type { DevtoolsToastPreview } from "~/store/zustand/devtools-toast-preview";
 
+// Mirna has no accounts or paid plans, so sign-in and upgrade prompts never show.
+const ACCOUNT_PROMOTIONS_ENABLED = false;
+
 const ANARLOG_ICON_SRC = "/assets/anarlog-icon.png";
 const DESKTOP_UPDATE_TOAST_PREFIX = "desktop-update:";
 
@@ -158,7 +161,8 @@ export function createToastRegistry({
           dismissalId: "auth-promotion",
         },
       },
-      condition: () => !isAuthLoading && !isAuthenticated,
+      condition: () =>
+        ACCOUNT_PROMOTIONS_ENABLED && !isAuthLoading && !isAuthenticated,
     },
     {
       toast: {
@@ -203,6 +207,7 @@ export function createToastRegistry({
       },
       // suppress until auth resolves to avoid flash on startup
       condition: () =>
+        ACCOUNT_PROMOTIONS_ENABLED &&
         !isAuthLoading &&
         !isAuthenticated &&
         hasLLMConfigured &&

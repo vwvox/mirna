@@ -139,38 +139,50 @@ describe("SettingsNav", () => {
     mocks.updateSettingsTabState.mock.lastCall?.[1] as
       | { tab: string }
       | undefined;
-  const hasProLock = (name: string | RegExp) =>
-    Boolean(
-      screen
-        .getByRole("button", { name })
-        .querySelector("[aria-label='Requires Anarlog Pro']"),
-    );
 
-  it.each([
-    ["Permissions", "permissions"],
-    ["Account", "account"],
-    ["Billing", "billing"],
-  ])("opens %s inside settings", (label, tab) => {
+  it.each([["Permissions", "permissions"]])(
+    "opens %s inside settings",
+    (label, tab) => {
+      render(<SettingsNav />);
+
+      fireEvent.click(screen.getByRole("button", { name: label }));
+
+      expect(mocks.updateSettingsTabState).toHaveBeenCalledWith(
+        mocks.currentTab,
+        { tab },
+      );
+    },
+  );
+
+  it("does not offer account-only or hosted sections", () => {
     render(<SettingsNav />);
 
-    fireEvent.click(screen.getByRole("button", { name: label }));
-
-    expect(mocks.updateSettingsTabState).toHaveBeenCalledWith(
-      mocks.currentTab,
-      { tab },
-    );
+    for (const label of [
+      "Account",
+      "Billing",
+      "Invite friends",
+      "Teams",
+      "Sync",
+      "Imports",
+      "CRM",
+      "Automations",
+    ]) {
+      expect(
+        screen.queryByRole("button", { name: new RegExp(label) }),
+      ).toBeNull();
+    }
   });
 
-  it.each([
-    ["Calendar", "calendar"],
-    ["Automations", "automations"],
-  ])("opens the %s workspace in a new tab", (label, type) => {
-    render(<SettingsNav />);
+  it.each([["Calendar", "calendar"]])(
+    "opens the %s workspace in a new tab",
+    (label, type) => {
+      render(<SettingsNav />);
 
-    fireEvent.click(screen.getByRole("button", { name: label }));
+      fireEvent.click(screen.getByRole("button", { name: label }));
 
-    expect(mocks.openNew).toHaveBeenCalledWith({ type });
-  });
+      expect(mocks.openNew).toHaveBeenCalledWith({ type });
+    },
+  );
 
   it("offers Insights instead of Stats to free users, including via search", () => {
     mocks.isPro = false;
@@ -190,39 +202,9 @@ describe("SettingsNav", () => {
     mocks.isPro = false;
     render(<SettingsNav />);
 
-    expect(hasProLock(/Sync/)).toBe(true);
-
-    for (const [label, tab] of [
-      ["Sync", "sync"],
-      ["Dictionary", "dictionary"],
-      ["Teams", "team"],
-    ]) {
-      fireEvent.click(screen.getByRole("button", { name: new RegExp(label) }));
-      expect(openedSettingsTab()).toEqual({ tab });
-    }
-    fireEvent.click(screen.getByRole("button", { name: /Automations/ }));
-
-    expect(mocks.openNew).toHaveBeenCalledWith({ type: "automations" });
+    fireEvent.click(screen.getByRole("button", { name: /Dictionary/ }));
+    expect(openedSettingsTab()).toEqual({ tab: "dictionary" });
     expect(mocks.upgradeToPro).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["without a workspace", [], false, true],
-    [
-      "for members of an existing workspace",
-      [{ workspaceId: "ws-1" }],
-      false,
-      false,
-    ],
-    ["while workspaces are loading", undefined, true, false],
-  ])("locks Teams for free users only %s", (_, workspaces, loading, locked) => {
-    mocks.isPro = false;
-    mocks.workspaces = workspaces;
-    mocks.workspacesLoading = loading;
-
-    render(<SettingsNav />);
-
-    expect(hasProLock(/Teams/)).toBe(locked);
   });
 
   it("filters nav items by item or group label", () => {

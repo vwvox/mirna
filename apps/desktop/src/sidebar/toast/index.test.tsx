@@ -190,37 +190,16 @@ describe("ToastNotifications", () => {
     vi.useRealTimers();
   });
 
-  it("routes the sign-in suggestion through the shared toaster", () => {
+  it("never shows a sign-in suggestion", () => {
     render(<ToastNotifications />);
 
     act(() => vi.advanceTimersByTime(500));
 
-    expect(mocks.message).toHaveBeenCalledWith(
-      "Sign in to get the most out of Anarlog",
-      expect.objectContaining({
-        id: "sign-in-benefits",
-        duration: Infinity,
-        closeButton: true,
-        action: expect.objectContaining({ label: "Sign in" }),
-      }),
+    expect(mocks.message).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: "sign-in-benefits" }),
     );
-
-    const options = mocks.message.mock.calls[0][1];
-    options.action.onClick();
-    expect(mocks.signIn).toHaveBeenCalledOnce();
-
-    options.onDismiss();
-    expect(mocks.dismissToast).not.toHaveBeenCalled();
-  });
-
-  it("persists explicit toast dismissals", () => {
-    render(<ToastNotifications />);
-
-    act(() => vi.advanceTimersByTime(500));
-
-    const options = mocks.message.mock.calls[0][1];
-    options.onDismiss();
-    expect(mocks.dismissToast).toHaveBeenCalledWith("auth-promotion");
+    expect(mocks.signIn).not.toHaveBeenCalled();
   });
 
   it("lets users dismiss a model download toast until the next download", () => {

@@ -237,9 +237,9 @@ describe("OuterHeader", () => {
     ],
     ["post-meeting transcription", { mode: "running_batch", now: AFTER }, null],
     ["finalizing", { mode: "finalizing", event: scheduled(MEET_LINK) }, null],
-    ["inactive with transcript", { transcript: true }, "Share note"],
-    ["inactive with audio", { audio: true }, "Share note"],
-    ["meeting over", { event: scheduled(MEET_LINK), now: AFTER }, "Share note"],
+    ["inactive with transcript", { transcript: true }, "Record"],
+    ["inactive with audio", { audio: true }, "Record"],
+    ["meeting over", { event: scheduled(MEET_LINK), now: AFTER }, "Record"],
     [
       "recorded event without ended_at",
       {
@@ -247,7 +247,7 @@ describe("OuterHeader", () => {
         now: AFTER,
         transcript: true,
       },
-      "Share note",
+      "Record",
     ],
     ["meeting without a link", { event: scheduled() }, "Record"],
     [
