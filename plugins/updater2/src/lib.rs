@@ -53,15 +53,8 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
                 Err(err) => tracing::error!("failed to schedule legacy bundle rename: {}", err),
             }
 
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let mut install_at_open = true;
-                loop {
-                    install_at_open = check_and_download(&handle, install_at_open).await;
-                    tokio::time::sleep(std::time::Duration::from_secs(30 * 60)).await;
-                }
-            });
-
+            // Mirna does not phone home for updates; the background check loop
+            // that polled the hosted update feed is intentionally not started.
             Ok(())
         })
         .build()

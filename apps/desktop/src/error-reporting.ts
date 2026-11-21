@@ -213,8 +213,12 @@ export function sanitizeErrorEvent(event: ErrorEvent): ErrorEvent | null {
   return event;
 }
 
+// Mirna never sends crash reports to a hosted service. Flip this only if a
+// self-hosted, user-consented endpoint is ever added.
+const HOSTED_ERROR_REPORTING_ENABLED = false;
+
 export function initializeErrorReporting() {
-  if (!env.VITE_SENTRY_DSN) return;
+  if (!HOSTED_ERROR_REPORTING_ENABLED || !env.VITE_SENTRY_DSN) return;
 
   Sentry.init({
     dsn: env.VITE_SENTRY_DSN,

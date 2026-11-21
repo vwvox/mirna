@@ -51,7 +51,7 @@ afterEach(() => {
 });
 
 it.each([undefined, "https://api.anarlog.so"])(
-  "routes hosted providers with AI override %s while keeping the Core URL",
+  "never offers vendor-hosted providers, even with an AI override of %s",
   async (aiUrl) => {
     vi.resetModules();
     vi.doMock("~/env", () => ({
@@ -62,14 +62,8 @@ it.each([undefined, "https://api.anarlog.so"])(
     }));
     const { PROVIDERS: stt } = await import("~/settings/ai/stt/shared");
     const { PROVIDERS: llm } = await import("~/settings/ai/llm/shared");
-    const { env } = await import("~/env");
-    expect(stt.find((provider) => provider.id === "anarlog")?.baseUrl).toBe(
-      `${aiUrl ?? "http://localhost:3001"}/stt`,
-    );
-    expect(llm.find((provider) => provider.id === "anarlog")?.baseUrl).toBe(
-      `${aiUrl ?? "http://localhost:3001"}/llm`,
-    );
-    expect(env.VITE_API_URL).toBe("http://localhost:3001");
+    expect(stt.find((provider) => provider.id === "anarlog")).toBeUndefined();
+    expect(llm.find((provider) => provider.id === "anarlog")).toBeUndefined();
   },
   30_000,
 );

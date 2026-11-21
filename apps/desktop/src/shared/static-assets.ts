@@ -4,10 +4,13 @@ import manifest from "./static-assets.manifest.json";
 
 import { env } from "~/env";
 
+// Mirna serves every asset from the app bundle; nothing is loaded from a CDN.
+const LOAD_ASSETS_FROM_CDN = false;
+
 export function staticAssetUrl(localPath: string) {
   const object = manifest[localPath as keyof typeof manifest];
   const origin = env.VITE_STATIC_ASSETS_URL;
-  if (!origin || !object) return localPath;
+  if (!LOAD_ASSETS_FROM_CDN || !origin || !object) return localPath;
   return `${origin.replace(/\/$/, "")}/${object.split("/").map(encodeURIComponent).join("/")}`;
 }
 

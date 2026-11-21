@@ -1286,5 +1286,12 @@ const PROVIDER_ORDER = [
   "aquavoice",
 ] as const;
 
-export const PROVIDERS = sortProviders(_PROVIDERS, PROVIDER_ORDER);
+// Speech-to-text run by the original vendor's own servers. Mirna only offers
+// on-device engines and cloud providers the user connects with their own key.
+const VENDOR_HOSTED_PROVIDER_IDS = new Set(["anarlog"]);
+
+export const PROVIDERS = sortProviders(
+  _PROVIDERS.filter((provider) => !VENDOR_HOSTED_PROVIDER_IDS.has(provider.id)),
+  PROVIDER_ORDER,
+);
 export type ProviderId = (typeof _PROVIDERS)[number]["id"];

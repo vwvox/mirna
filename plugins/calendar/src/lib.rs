@@ -67,17 +67,10 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
 }
 
 fn get_api_base_url() -> String {
-    #[cfg(not(debug_assertions))]
-    {
-        env!("VITE_API_URL").to_string()
-    }
-
-    #[cfg(debug_assertions)]
-    {
-        option_env!("VITE_API_URL")
-            .unwrap_or("http://localhost:3001")
-            .to_string()
-    }
+    // Google/Outlook calendars and Linear/GitHub tasks were proxied through the
+    // original vendor's hosted API. Mirna has no such service, so there is no
+    // base URL and those connected-account features stay unavailable.
+    String::new()
 }
 
 #[cfg(test)]

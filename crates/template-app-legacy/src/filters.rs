@@ -20,16 +20,11 @@ pub fn transcript(segments: Value) -> Result<String, minijinja::Error> {
     Ok(output)
 }
 
-pub fn url(v: Value) -> Result<String, minijinja::Error> {
-    let url = v.as_str().unwrap_or_default();
-
-    let html = reqwest::blocking::get(url)
-        .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()))?
-        .text()
-        .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()))?;
-
-    let md = htmd::convert(&html)
-        .map_err(|e| minijinja::Error::new(ErrorKind::InvalidOperation, e.to_string()))?;
-
-    Ok(md)
+// Templates used to be able to pull any web page into a prompt with `| url`.
+// Mirna never fetches remote content while rendering a template.
+pub fn url(_v: Value) -> Result<String, minijinja::Error> {
+    Err(minijinja::Error::new(
+        ErrorKind::InvalidOperation,
+        "the url filter is disabled: Mirna does not fetch web pages from templates",
+    ))
 }

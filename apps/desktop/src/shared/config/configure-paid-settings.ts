@@ -4,7 +4,13 @@ import { getStoredAiProvider } from "~/settings/providers";
 import { getStoredSettingValues, setSettingValues } from "~/settings/queries";
 import type { SettingValues } from "~/settings/schema";
 
+// The original app switched paying users onto its hosted transcription and AI.
+// Mirna never selects a vendor-hosted provider on the user's behalf.
+const AUTO_SELECT_HOSTED_PROVIDERS = false;
+
 export async function configurePaidSettings(): Promise<void> {
+  if (!AUTO_SELECT_HOSTED_PROVIDERS) return;
+
   const { values } = await getStoredSettingValues();
   const updates: SettingValues = {};
 

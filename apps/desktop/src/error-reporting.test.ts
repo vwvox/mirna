@@ -321,85 +321,18 @@ describe("archived operational noise", () => {
   });
 });
 
-describe("session replay consent", () => {
-  it("broadcasts revocation and stops the local replay", async () => {
+describe("hosted error reporting", () => {
+  it("never starts Sentry or session replay, even with a DSN in the build", async () => {
     vi.resetModules();
-    const {
-      initializeErrorReporting,
-      setErrorReportingEnabled,
-      setSessionReplayAnalyticsEnabled,
-    } = await import("./error-reporting");
-
-    initializeErrorReporting();
-    setSessionReplayAnalyticsEnabled(true);
-    await vi.waitFor(() => expect(mocks.addIntegration).toHaveBeenCalledOnce());
-
-    await setErrorReportingEnabled(false);
-
-    expect(mocks.stopReplay).toHaveBeenCalledWith({
-      forceFlush: false,
-      reason: "consent_revoked",
-    });
-    expect(mocks.publicStopReplay).not.toHaveBeenCalled();
-    expect(mocks.setCrashReportingEnabled).toHaveBeenCalledWith(false);
-    expect(mocks.emit).toHaveBeenCalledWith(
-      "anlg:error-reporting-consent-changed",
-      { enabled: false },
-    );
-  });
-
-  it("stops replay when another webview revokes consent", async () => {
-    vi.resetModules();
+    const Sentry = await import("@sentry/react");
     const { initializeErrorReporting, setSessionReplayAnalyticsEnabled } =
       await import("./error-reporting");
 
     initializeErrorReporting();
     setSessionReplayAnalyticsEnabled(true);
-    await vi.waitFor(() => expect(mocks.addIntegration).toHaveBeenCalledOnce());
-
-    mocks.listener?.({ payload: { enabled: false } });
-
-    expect(mocks.stopReplay).toHaveBeenCalledOnce();
-  });
-
-  it("restarts replay when Sentry consent is restored", async () => {
-    vi.resetModules();
-    const {
-      initializeErrorReporting,
-      setErrorReportingEnabled,
-      setSessionReplayAnalyticsEnabled,
-    } = await import("./error-reporting");
-
-    initializeErrorReporting();
-    setSessionReplayAnalyticsEnabled(true);
-    await vi.waitFor(() => expect(mocks.addIntegration).toHaveBeenCalledOnce());
-
-    await setErrorReportingEnabled(false);
-    await setErrorReportingEnabled(true);
-
-    expect(mocks.startReplay).toHaveBeenCalledOnce();
-  });
-
-  it("does not attach replay when revocation races with consent loading", async () => {
-    vi.resetModules();
-    let resolveConsent!: (value: { status: "ok"; data: boolean }) => void;
-    mocks.isCrashReportingEnabled.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveConsent = resolve;
-      }),
-    );
-    const { initializeErrorReporting, setSessionReplayAnalyticsEnabled } =
-      await import("./error-reporting");
-
-    initializeErrorReporting();
-    setSessionReplayAnalyticsEnabled(true);
-    await vi.waitFor(() =>
-      expect(mocks.isCrashReportingEnabled).toHaveBeenCalledOnce(),
-    );
-    mocks.listener?.({ payload: { enabled: false } });
-    resolveConsent({ status: "ok", data: true });
-
     await Promise.resolve();
+
+    expect(Sentry.init).not.toHaveBeenCalled();
     expect(mocks.addIntegration).not.toHaveBeenCalled();
   });
 });

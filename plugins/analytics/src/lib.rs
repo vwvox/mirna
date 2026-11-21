@@ -58,28 +58,9 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
     tauri::plugin::Builder::new(PLUGIN_NAME)
         .invoke_handler(specta_builder.invoke_handler())
         .setup(|app, _api| {
-            let posthog_key = {
-                #[cfg(not(debug_assertions))]
-                {
-                    let v = env!("POSTHOG_API_KEY");
-                    assert!(v.starts_with("phc_"));
-                    Some(v)
-                }
-
-                #[cfg(debug_assertions)]
-                {
-                    option_env!("POSTHOG_API_KEY")
-                }
-            };
-
-            let client = {
-                let mut builder = anlg_analytics::AnalyticsClientBuilder::default();
-                if let Some(key) = posthog_key {
-                    builder = builder.with_posthog(key);
-                }
-
-                builder.build()
-            };
+            // Mirna sends no product analytics: the client is built without a
+            // PostHog backend, so every event call is a local no-op.
+            let client = anlg_analytics::AnalyticsClientBuilder::default().build();
 
             assert!(app.manage(ManagedState::new(client)));
             Ok(())

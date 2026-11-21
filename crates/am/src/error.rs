@@ -26,4 +26,7 @@ pub enum Error {
 
     #[error("Tar file not found")]
     TarFileNotFound,
+
+    #[error("This model was only distributed through the original vendor's servers and is not available in Mirna")]
+    HostedModelUnavailable,
 }

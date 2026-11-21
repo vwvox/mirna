@@ -717,5 +717,12 @@ const PROVIDER_ORDER = [
   "apple_foundation",
 ] as const;
 
-export const PROVIDERS: Provider[] = sortProviders(_PROVIDERS, PROVIDER_ORDER);
+// Providers run by the original vendor's own servers. Mirna only offers local
+// models and cloud providers the user connects with their own key.
+const VENDOR_HOSTED_PROVIDER_IDS = new Set(["anarlog"]);
+
+export const PROVIDERS: Provider[] = sortProviders(
+  _PROVIDERS.filter((provider) => !VENDOR_HOSTED_PROVIDER_IDS.has(provider.id)),
+  PROVIDER_ORDER,
+);
 export type ProviderId = (typeof _PROVIDERS)[number]["id"];

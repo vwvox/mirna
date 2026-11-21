@@ -94,14 +94,11 @@ impl AmModel {
         Ok(has_files)
     }
 
+    // These Argmax bundles were only ever served from the original vendor's
+    // CDN (and need a paid Argmax key). Mirna never contacts that CDN, so there
+    // is no download URL; `download` refuses instead of reaching out.
     pub fn tar_url(&self) -> &str {
-        match self {
-            AmModel::ParakeetV2 => "https://models.anarlog.so/v0/nvidia_parakeet-v2_476MB.tar",
-            AmModel::ParakeetV3 => "https://models.anarlog.so/v0/nvidia_parakeet-v3_494MB.tar",
-            AmModel::WhisperLargeV3 => {
-                "https://models.anarlog.so/v0/openai_whisper-large-v3-v20240930_626MB.tar"
-            }
-        }
+        ""
     }
 
     pub fn tar_checksum(&self) -> u32 {
@@ -131,7 +128,11 @@ impl AmModel {
         output_path: impl AsRef<std::path::Path>,
         progress_callback: F,
     ) -> Result<(), crate::Error> {
-        anlg_file::download_file_parallel(self.tar_url(), output_path, progress_callback).await?;
+        let url = self.tar_url();
+        if url.is_empty() {
+            return Err(crate::Error::HostedModelUnavailable);
+        }
+        anlg_file::download_file_parallel(url, output_path, progress_callback).await?;
         Ok(())
     }
 }
