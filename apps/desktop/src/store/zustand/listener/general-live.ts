@@ -47,6 +47,7 @@ import {
   type TranscriptState,
 } from "./transcript";
 
+import { warmLocalLlm } from "~/ai/local-llm-warmup";
 import { prepareSessionPeaks } from "~/audio-player/waveform";
 import { runMeetingCompletedAutomations } from "~/automations/engine";
 import { syncCloudApiSnapshotBestEffort } from "~/cloud-api/client";
@@ -354,6 +355,7 @@ const createSessionEventHandlers = <T extends LiveStore>(
 
     if (payload.type === "finalizing") {
       void stopSpeakerContextCapture(targetSessionId);
+      void warmLocalLlm();
       setLiveState(set, (live) => {
         if (live.sessionId === targetSessionId) {
           clearLiveInterval(live.intervalId);
