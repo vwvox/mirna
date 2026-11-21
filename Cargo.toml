@@ -404,3 +404,8 @@ rustls = { version = "0.23", default-features = false }
 sqlx = { version = "=0.9.0-alpha.1", default-features = false }
 sys-locale = "0.3.2"
 sysinfo = "0.38"
+
+# Local fork patches. swift-rs: force SwiftPM's native build system so the
+# library lands where swift-rs links it from (Xcode 27 changed the default).
+[patch."https://github.com/Brendonovich/swift-rs"]
+swift-rs = { path = "vendor/swift-rs" }

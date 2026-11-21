@@ -580,11 +580,26 @@ fn build_mlx_metallib() {
 }
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(soniqo_disabled)");
+
     #[cfg(target_os = "macos")]
     {
         if !target_is_macos_apple_silicon() {
             println!(
                 "cargo:warning=Soniqo speech-swift linking is only available on macOS Apple Silicon"
+            );
+            return;
+        }
+
+        // The Swift package (MLX) needs Xcode's Metal Toolchain, which is a
+        // separate download that some networks block. SONIQO_DISABLE=1 builds
+        // the crate with the unsupported-platform stubs instead, so the rest of
+        // the app still compiles and Soniqo reports itself as unavailable.
+        println!("cargo:rerun-if-env-changed=SONIQO_DISABLE");
+        if env::var_os("SONIQO_DISABLE").is_some_and(|value| value == "1") {
+            println!("cargo:rustc-cfg=soniqo_disabled");
+            println!(
+                "cargo:warning=SONIQO_DISABLE=1: Soniqo (Parakeet) transcription is not included in this build"
             );
             return;
         }

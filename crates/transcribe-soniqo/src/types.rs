@@ -72,7 +72,7 @@ pub enum TranscriptSource {
 }
 
 impl TranscriptSource {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64", not(soniqo_disabled)))]
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Microphone => "microphone",
