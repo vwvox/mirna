@@ -9,9 +9,8 @@ debug = false
 
 [workspace]
 resolver = "2"
-exclude = ["apps/desktop-gpui", "crates/tiptap/vendor/mdast_util_to_markdown"]
+exclude = ["crates/tiptap/vendor/mdast_util_to_markdown"]
 members = [
-  "apps/api",
   "apps/cli",
   "apps/desktop/src-tauri",
   "crates/*",
