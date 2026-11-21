@@ -138,3 +138,6 @@ windows-registry = "0.5.3"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+regex = { workspace = true }
+url = { workspace = true }
+urlpattern = "0.3"

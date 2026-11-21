@@ -777,6 +777,71 @@ mod test {
         }
     }
 
+    // Mirrors tauri-plugin-http's scope parsing. A single invalid pattern makes
+    // Tauri reject the whole scope, which silently blocks local models too.
+    #[test]
+    fn http_scope_allows_local_models_and_blocks_vendor_hosts() {
+        use urlpattern::{UrlPattern, UrlPatternInit, UrlPatternMatchInput};
+
+        fn parse(pattern: &str) -> UrlPattern {
+            let mut init =
+                UrlPatternInit::parse_constructor_string::<regex::Regex>(pattern, None)
+                    .unwrap_or_else(|e| panic!("invalid http scope pattern `{pattern}`: {e}"));
+            if init.search.as_ref().is_none_or(|p| p.is_empty()) {
+                init.search = Some("*".to_string());
+            }
+            if init.hash.as_ref().is_none_or(|p| p.is_empty()) {
+                init.hash = Some("*".to_string());
+            }
+            if init.pathname.as_ref().is_none_or(|p| p.is_empty() || p == "/") {
+                init.pathname = Some("*".to_string());
+            }
+            UrlPattern::parse(init, Default::default())
+                .unwrap_or_else(|e| panic!("invalid http scope pattern `{pattern}`: {e}"))
+        }
+
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        let http = capability["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|permission| permission["identifier"] == "http:default")
+            .expect("http:default permission");
+        let patterns = |key: &str| -> Vec<UrlPattern> {
+            http[key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| parse(entry["url"].as_str().unwrap()))
+                .collect()
+        };
+        let (allow, deny) = (patterns("allow"), patterns("deny"));
+        let allowed = |raw: &str| {
+            let url = url::Url::parse(raw).unwrap();
+            let matches = |p: &UrlPattern| {
+                p.test(UrlPatternMatchInput::Url(url.clone()))
+                    .unwrap_or_default()
+            };
+            !deny.iter().any(matches) && allow.iter().any(matches)
+        };
+
+        for url in [
+            "http://127.0.0.1:11434/v1/chat/completions",
+            "http://localhost:11434/api/generate",
+            "https://api.anthropic.com/v1/messages",
+        ] {
+            assert!(allowed(url), "should be allowed: {url}");
+        }
+        for url in [
+            "https://anarlog.so/api/templates",
+            "https://api.anarlog.so/llm",
+            "https://example.com/",
+        ] {
+            assert!(!allowed(url), "should be blocked: {url}");
+        }
+    }
+
     #[test]
     fn export_types() {
         const OUTPUT_FILE: &str = "../src/types/tauri.gen.ts";

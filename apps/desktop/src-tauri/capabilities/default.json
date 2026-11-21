@@ -98,19 +98,191 @@
     "dictation:default",
     {
       "identifier": "http:default",
-      "deny": [],
       "allow": [
         {
           "url": "http://localhost:*/**"
         },
         {
-          "url": "http://*.*.*.*:*/**"
+          "url": "https://localhost:*/**"
         },
         {
-          "url": "https://**"
+          "url": "http://127.0.0.1:*/**"
         },
         {
-          "url": "http://**"
+          "url": "https://127.0.0.1:*/**"
+        },
+        {
+          "url": "http://192.168.*.*:*/**"
+        },
+        {
+          "url": "http://10.*.*.*:*/**"
+        },
+        {
+          "url": "http://172.*.*.*:*/**"
+        },
+        {
+          "url": "http://100.*.*.*:*/**"
+        },
+        {
+          "url": "http://*.local:*/**"
+        },
+        {
+          "url": "http://*.ts.net:*/**"
+        },
+        {
+          "url": "https://*.ts.net/**"
+        },
+        {
+          "url": "https://*.api.aws/**"
+        },
+        {
+          "url": "https://*.cognitiveservices.azure.com/**"
+        },
+        {
+          "url": "https://*.googleapis.com/**"
+        },
+        {
+          "url": "https://*.openai.azure.com/**"
+        },
+        {
+          "url": "https://*.services.ai.azure.com/**"
+        },
+        {
+          "url": "https://*.speechmatics.com/**"
+        },
+        {
+          "url": "https://api.anthropic.com/**"
+        },
+        {
+          "url": "https://api.aquavoice.com/**"
+        },
+        {
+          "url": "https://api.assemblyai.com/**"
+        },
+        {
+          "url": "https://api.cartesia.ai/**"
+        },
+        {
+          "url": "https://api.cerebras.ai/**"
+        },
+        {
+          "url": "https://api.cloudflare.com/**"
+        },
+        {
+          "url": "https://api.cohere.ai/**"
+        },
+        {
+          "url": "https://api.cohere.com/**"
+        },
+        {
+          "url": "https://api.deepgram.com/**"
+        },
+        {
+          "url": "https://api.deepseek.com/**"
+        },
+        {
+          "url": "https://api.elevenlabs.io/**"
+        },
+        {
+          "url": "https://api.fireworks.ai/**"
+        },
+        {
+          "url": "https://api.gladia.io/**"
+        },
+        {
+          "url": "https://api.gradium.ai/**"
+        },
+        {
+          "url": "https://api.groq.com/**"
+        },
+        {
+          "url": "https://api.inworld.ai/**"
+        },
+        {
+          "url": "https://api.meta.ai/**"
+        },
+        {
+          "url": "https://api.mistral.ai/**"
+        },
+        {
+          "url": "https://api.moonshot.ai/**"
+        },
+        {
+          "url": "https://api.narilabs.com/**"
+        },
+        {
+          "url": "https://api.openai.com/**"
+        },
+        {
+          "url": "https://api.pyannote.ai/**"
+        },
+        {
+          "url": "https://api.rev.ai/**"
+        },
+        {
+          "url": "https://api.siliconflow.com/**"
+        },
+        {
+          "url": "https://api.smallest.ai/**"
+        },
+        {
+          "url": "https://api.soniox.com/**"
+        },
+        {
+          "url": "https://api.together.xyz/**"
+        },
+        {
+          "url": "https://api.venice.ai/**"
+        },
+        {
+          "url": "https://api.x.ai/**"
+        },
+        {
+          "url": "https://api.z.ai/**"
+        },
+        {
+          "url": "https://asr.alebex.ai/**"
+        },
+        {
+          "url": "https://dashscope-intl.aliyuncs.com/**"
+        },
+        {
+          "url": "https://openrouter.ai/**"
+        },
+        {
+          "url": "https://platform-api.wisprflow.ai/**"
+        },
+        {
+          "url": "https://platform.modulate.ai/**"
+        }
+      ],
+      "deny": [
+        {
+          "url": "https://anarlog.so/**"
+        },
+        {
+          "url": "https://*.anarlog.so/**"
+        },
+        {
+          "url": "https://*.supabase.co/**"
+        },
+        {
+          "url": "https://*.posthog.com/**"
+        },
+        {
+          "url": "https://*.sentry.io/**"
+        },
+        {
+          "url": "https://gravatar.com/**"
+        },
+        {
+          "url": "https://*.gravatar.com/**"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/**"
+        },
+        {
+          "url": "https://api.github.com/**"
         }
       ]
     }
