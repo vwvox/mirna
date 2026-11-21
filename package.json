@@ -10,7 +10,6 @@
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.61.0",
-    "@infisical/cli": "^0.43.72",
     "@tanstack/eslint-plugin-query": "^5.99.0",
     "braces": "3.0.3",
     "decode-uri-component": "0.5.1",
