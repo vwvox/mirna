@@ -1,6 +1,6 @@
 import type { defaultSettingsMiddleware } from "ai";
 
-const REASONING_EFFORTS = ["default", "low", "medium", "high"] as const;
+const REASONING_EFFORTS = ["default", "off", "low", "medium", "high"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export const normalizeReasoningEffort = (value: unknown): ReasoningEffort =>
@@ -13,6 +13,24 @@ export const normalizeReasoningEffort = (value: unknown): ReasoningEffort =>
 export const supportsReasoningEffort = (providerId: string): boolean =>
   providerId !== "anarlog" && providerId !== "apple_foundation";
 
+const LOCAL_PROVIDERS = new Set(["ollama", "lmstudio", "unsloth"]);
+
+// Small local models that think by default (e.g. Qwen 3.5 on Ollama) spend
+// minutes on hidden reasoning before a summary, so local providers treat
+// Default as Off. Cloud providers keep their own defaults.
+export const supportsReasoningOff = (providerId: string): boolean =>
+  LOCAL_PROVIDERS.has(providerId);
+
+const effectiveReasoningEffort = (
+  providerId: string,
+  effort: ReasoningEffort,
+): ReasoningEffort => {
+  if (!supportsReasoningOff(providerId)) {
+    return effort === "off" ? "default" : effort;
+  }
+  return effort === "default" ? "off" : effort;
+};
+
 type ProviderOptions = NonNullable<
   Parameters<typeof defaultSettingsMiddleware>[0]["settings"]["providerOptions"]
 >;
@@ -23,7 +41,7 @@ const GEMINI_THINKING_BUDGET = { low: 1024, medium: 8192, high: 24576 };
 // older generations reject thinkingConfig outright, so unknown ids send nothing.
 const geminiThinkingConfig = (
   modelId: string,
-  effort: Exclude<ReasoningEffort, "default">,
+  effort: Exclude<ReasoningEffort, "default" | "off">,
 ) => {
   const version = /gemini-(\d+)(?:\.(\d+))?/.exec(modelId);
   if (!version) {
@@ -43,10 +61,17 @@ const geminiThinkingConfig = (
 export const reasoningProviderOptions = (
   providerId: string,
   modelId: string,
-  effort: ReasoningEffort,
+  requestedEffort: ReasoningEffort,
 ): ProviderOptions | null => {
+  const effort = effectiveReasoningEffort(providerId, requestedEffort);
   if (effort === "default" || !supportsReasoningEffort(providerId)) {
     return null;
+  }
+
+  if (effort === "off") {
+    // Local servers speak the OpenAI-compatible API, where "none" disables
+    // thinking (Ollama maps it to think=false).
+    return { [providerId]: { reasoningEffort: "none" } };
   }
 
   switch (providerId) {

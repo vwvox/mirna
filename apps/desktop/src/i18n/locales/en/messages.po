@@ -3069,6 +3069,10 @@ msgstr "Hours transcribed"
 msgid "How much the model thinks before answering. Default leaves it to the provider."
 msgstr "How much the model thinks before answering. Default leaves it to the provider."
 
+#: src/settings/ai/llm/select.tsx
+msgid "How much the model thinks before answering. Default turns thinking off for local models, which is much faster."
+msgstr "How much the model thinks before answering. Default turns thinking off for local models, which is much faster."
+
 #: src/settings/ai/llm/subscriptions/connect.tsx
 msgid "How to get a Kimi Code key"
 msgstr "How to get a Kimi Code key"
@@ -4301,6 +4305,10 @@ msgstr "Now"
 #: src/templates/template-icon-picker.tsx
 msgid "Objects"
 msgstr "Objects"
+
+#: src/settings/ai/llm/select.tsx
+msgid "Off"
+msgstr "Off"
 
 #: src/settings/general/storage/legacy-cleanup.tsx
 msgid "Older files that differ from your current data were kept as recovery copies. No action is required."

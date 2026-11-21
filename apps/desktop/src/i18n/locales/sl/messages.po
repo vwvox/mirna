@@ -3069,6 +3069,10 @@ msgstr ""
 msgid "How much the model thinks before answering. Default leaves it to the provider."
 msgstr ""
 
+#: src/settings/ai/llm/select.tsx
+msgid "How much the model thinks before answering. Default turns thinking off for local models, which is much faster."
+msgstr ""
+
 #: src/settings/ai/llm/subscriptions/connect.tsx
 msgid "How to get a Kimi Code key"
 msgstr ""
@@ -4300,6 +4304,10 @@ msgstr ""
 
 #: src/templates/template-icon-picker.tsx
 msgid "Objects"
+msgstr ""
+
+#: src/settings/ai/llm/select.tsx
+msgid "Off"
 msgstr ""
 
 #: src/settings/general/storage/legacy-cleanup.tsx

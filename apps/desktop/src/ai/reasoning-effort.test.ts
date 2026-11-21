@@ -8,6 +8,7 @@ import {
 describe("normalizeReasoningEffort", () => {
   it("normalizes unknown or missing levels to default", () => {
     expect(normalizeReasoningEffort("high")).toBe("high");
+    expect(normalizeReasoningEffort("off")).toBe("off");
     expect(normalizeReasoningEffort(undefined)).toBe("default");
     expect(normalizeReasoningEffort("")).toBe("default");
     expect(normalizeReasoningEffort("xhigh")).toBe("default");
@@ -49,6 +50,15 @@ describe("reasoningProviderOptions", () => {
     ],
     ["google_generative_ai", "gemini-2.0-flash", "high", null],
     ["ollama", "gpt-oss:20b", "low", { ollama: { reasoningEffort: "low" } }],
+    [
+      "ollama",
+      "qwen3.5:4b",
+      "default",
+      { ollama: { reasoningEffort: "none" } },
+    ],
+    ["lmstudio", "qwen3.5-4b", "off", { lmstudio: { reasoningEffort: "none" } }],
+    ["openai", "gpt-5", "off", null],
+    ["deepseek", "deepseek-v4-pro", "default", null],
   ] as const)(
     "maps %s/%s with %s reasoning effort",
     (providerId, modelId, effort, expected) => {

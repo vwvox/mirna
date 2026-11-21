@@ -28,6 +28,7 @@ import {
 import {
   normalizeReasoningEffort,
   supportsReasoningEffort,
+  supportsReasoningOff,
 } from "~/ai/reasoning-effort";
 import { useAuth } from "~/auth";
 import { useBillingAccess } from "~/auth/billing-context";
@@ -464,10 +465,17 @@ export function SelectProviderAndModel() {
         <SettingRow
           title={<Trans>Reasoning effort</Trans>}
           description={
-            <Trans>
-              How much the model thinks before answering. Default leaves it to
-              the provider.
-            </Trans>
+            supportsReasoningOff(effectiveSelection.provider) ? (
+              <Trans>
+                How much the model thinks before answering. Default turns
+                thinking off for local models, which is much faster.
+              </Trans>
+            ) : (
+              <Trans>
+                How much the model thinks before answering. Default leaves it to
+                the provider.
+              </Trans>
+            )
           }
         >
           {(labelProps) => (
@@ -484,6 +492,11 @@ export function SelectProviderAndModel() {
                 <SelectItem value="default">
                   <Trans>Default</Trans>
                 </SelectItem>
+                {supportsReasoningOff(effectiveSelection.provider) ? (
+                  <SelectItem value="off">
+                    <Trans>Off</Trans>
+                  </SelectItem>
+                ) : null}
                 <SelectItem value="low">
                   <Trans>Low</Trans>
                 </SelectItem>
