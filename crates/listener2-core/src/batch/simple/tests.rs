@@ -900,3 +900,103 @@ fn collect_soniqo_channel_transcripts_errors_when_all_channels_fail() {
 
     assert_eq!(error, "Soniqo failed to transcribe all 2 audio channel(s).");
 }
+
+fn prediction(code: &str, probability: f32) -> Option<anlg_transcribe_soniqo::LanguagePrediction> {
+    Some(anlg_transcribe_soniqo::LanguagePrediction {
+        code: code.to_string(),
+        probability,
+    })
+}
+
+#[test]
+fn soniqo_routes_a_mandarin_recording_to_qwen3() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    // Teacher speaks Mandarin on Mac audio; the student mostly speaks English.
+    let routing = soniqo_recording_route(
+        SoniqoModel::ParakeetBatch,
+        vec![prediction("en", 0.7), prediction("zh", 0.82)],
+        true,
+    );
+    assert_eq!(routing.model, SoniqoModel::Qwen3Small);
+    assert_eq!(routing.requested_model, SoniqoModel::ParakeetBatch);
+    assert!(!routing.qwen3_suggested);
+    // The language that rerouted it, not the more common one on the mic.
+    assert_eq!(routing.language(), Some("zh"));
+}
+
+#[test]
+fn soniqo_keeps_parakeet_for_european_or_unclear_speech() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    for languages in [
+        vec![prediction("en", 0.96), prediction("pt", 0.9)],
+        vec![None, prediction("zh", 0.2)],
+        vec![None, None],
+    ] {
+        let routing = soniqo_recording_route(SoniqoModel::ParakeetBatch, languages.clone(), true);
+        assert_eq!(routing.model, SoniqoModel::ParakeetBatch);
+        assert_eq!(
+            routing.language(),
+            languages
+                .iter()
+                .flatten()
+                .max_by(|a, b| a.probability.total_cmp(&b.probability))
+                .map(|p| p.code.as_str())
+        );
+        assert!(!routing.qwen3_suggested);
+    }
+}
+
+#[test]
+fn soniqo_suggests_qwen3_when_it_is_not_downloaded() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    let routing = soniqo_recording_route(
+        SoniqoModel::ParakeetBatch,
+        vec![None, prediction("ja", 0.9)],
+        false,
+    );
+    assert_eq!(routing.model, SoniqoModel::ParakeetBatch);
+    assert!(routing.qwen3_suggested);
+}
+
+#[test]
+fn soniqo_language_id_listens_only_to_speech() {
+    let silence = vec![0.0_f32; SONIQO_LANGUAGE_ID_BLOCK_SAMPLES];
+    assert!(!soniqo_block_has_speech(&silence));
+
+    let tone = (0..SONIQO_LANGUAGE_ID_BLOCK_SAMPLES)
+        .map(|i| (i as f32 * 0.05).sin() * 0.2)
+        .collect::<Vec<_>>();
+    assert!(soniqo_block_has_speech(&tone));
+
+    // One loud second in three isn't enough to count the block as speech.
+    let mut mostly_silent = silence.clone();
+    mostly_silent[..TARGET_SAMPLE_RATE as usize]
+        .copy_from_slice(&tone[..TARGET_SAMPLE_RATE as usize]);
+    assert!(!soniqo_block_has_speech(&mostly_silent));
+}
+
+#[test]
+fn soniqo_language_id_samples_speech_across_the_recording() {
+    assert_eq!(pick_language_id_blocks(&[4, 9]), None);
+    assert_eq!(pick_language_id_blocks(&[1, 2, 3]), Some(vec![1, 2, 3]));
+
+    let speech = (0..400).collect::<Vec<_>>();
+    let picked = pick_language_id_blocks(&speech).unwrap();
+    assert_eq!(picked.len(), SONIQO_LANGUAGE_ID_MAX_BLOCKS);
+    assert_eq!(picked.first(), Some(&0));
+    assert!(*picked.last().unwrap() >= 380);
+    assert!(picked.windows(2).all(|pair| pair[0] < pair[1]));
+}
+
+#[test]
+fn qwen3_detects_the_language_instead_of_taking_the_app_language() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    assert!(soniqo_detects_language(SoniqoModel::Qwen3Small));
+    assert!(soniqo_detects_language(SoniqoModel::Qwen3Large));
+    assert!(!soniqo_detects_language(SoniqoModel::ParakeetBatch));
+    assert!(!soniqo_detects_language(SoniqoModel::Omnilingual));
+}

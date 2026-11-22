@@ -12,6 +12,8 @@ use crate::render::{
 struct Source {
     offset_ms: i64,
     transcript_index: usize,
+    /// The stored transcript row the word came from, before chunk splitting.
+    row: usize,
     legacy_run: Option<usize>,
     timing: Option<SyntheticTiming>,
 }
@@ -40,8 +42,11 @@ pub(crate) fn render_segments(
     }
 
     let mut transcripts = Vec::new();
-    for transcript in request.transcripts {
-        transcripts.extend(split_synthetic_transcript(transcript));
+    let mut row_of_split = Vec::new();
+    for (row, transcript) in request.transcripts.into_iter().enumerate() {
+        let parts = split_synthetic_transcript(transcript);
+        row_of_split.extend(std::iter::repeat_n(row, parts.len()));
+        transcripts.extend(parts);
     }
 
     let base_started_at = transcripts
@@ -87,6 +92,7 @@ pub(crate) fn render_segments(
                 Source {
                     offset_ms,
                     transcript_index,
+                    row: row_of_split[transcript_index],
                     legacy_run,
                     timing,
                 },
@@ -121,7 +127,71 @@ pub(crate) fn render_segments(
                 .then_with(|| left.start_ms.cmp(&right.start_ms))
         });
     }
-    segments
+    merge_consecutive_speaker_blocks(segments, &source_by_id)
+}
+
+/// Engines that cut speech into short pieces (Qwen3-ASR, one per sentence)
+/// would otherwise show each sentence as its own block with its own speaker
+/// label. Consecutive blocks from the same speaker read as one, the way
+/// accurately timed words already do (`collect_segments` merges gaps up to 3 s).
+const SYNTHETIC_BLOCK_MERGE_GAP_MS: i64 = 3_000;
+
+fn merge_consecutive_speaker_blocks(
+    segments: Vec<RenderedTranscriptSegment>,
+    source_by_id: &HashMap<String, Source>,
+) -> Vec<RenderedTranscriptSegment> {
+    // Only chunked engine output from one recording: accurately timed words
+    // and older rows keep the boundaries they already have.
+    let chunk_row = |segment: &RenderedTranscriptSegment| -> Option<usize> {
+        let mut rows = segment.words.iter().map(|word| {
+            let source = source_by_id.get(word.id.as_deref()?)?;
+            source.timing?.chunk_start_ms?;
+            Some(source.row)
+        });
+        let first = rows.next()??;
+        rows.all(|row| row == Some(first)).then_some(first)
+    };
+    let mut merged: Vec<RenderedTranscriptSegment> = Vec::with_capacity(segments.len());
+    for mut segment in segments {
+        if let Some(last) = merged.last_mut()
+            && chunk_row(last).is_some()
+            && chunk_row(last) == chunk_row(&segment)
+            && last.key == segment.key
+            && last.speaker_label == segment.speaker_label
+            && last.provisional_speaker == segment.provisional_speaker
+            && segment.start_ms >= last.start_ms
+            && segment.start_ms - last.end_ms <= SYNTHETIC_BLOCK_MERGE_GAP_MS
+        {
+            if let Some(first) = segment.words.first_mut()
+                && needs_space_between(&last.text, &first.text)
+            {
+                first.text.insert(0, ' ');
+            }
+            let separator = if needs_space_between(&last.text, &segment.text) {
+                " "
+            } else {
+                ""
+            };
+            last.text = format!("{}{separator}{}", last.text, segment.text);
+            last.end_ms = last.end_ms.max(segment.end_ms);
+            last.words.append(&mut segment.words);
+            last.id = crate::render::stable_segment_id(&last.key, &last.words);
+            continue;
+        }
+        merged.push(segment);
+    }
+    merged
+}
+
+/// Chinese, Japanese and Korean run on without spaces; everything else gets one.
+fn needs_space_between(before: &str, after: &str) -> bool {
+    let (Some(end), Some(start)) = (before.chars().last(), after.chars().next()) else {
+        return false;
+    };
+    if start.is_whitespace() || end.is_whitespace() {
+        return false;
+    }
+    !(crate::render::is_cjk(end) && crate::render::is_cjk(start))
 }
 
 pub fn synthetic_timing_from_metadata(metadata: Option<&Value>) -> Option<SyntheticTiming> {
@@ -398,6 +468,31 @@ mod tests {
         assert_eq!(segments[1].speaker_label, "Guest");
         assert_eq!(segments[3].key.speaker_human_id.as_deref(), Some("guest"));
         assert_eq!(segments[1].words[1].start_ms, 400);
+    }
+
+    #[test]
+    fn short_chunks_from_one_speaker_read_as_one_block() {
+        // Qwen3-ASR cuts at each pause: the teacher's sentences arrive as
+        // separate chunks, with the student's reply in between.
+        let mut words = vec![
+            stored_word("t1", 1_000, 1, synthetic(Some(1_000))),
+            stored_word("t2", 2_400, 1, synthetic(Some(2_400))),
+            stored_word("t3", 4_000, 1, synthetic(Some(4_000))),
+            stored_word("s1", 6_000, 0, synthetic(Some(6_000))),
+            stored_word("t4", 8_000, 1, synthetic(Some(8_000))),
+            stored_word("t5", 20_000, 1, synthetic(Some(20_000))),
+        ];
+        words[0].text = Some(" 你出差了。".into());
+        words[1].text = Some(" 出差。".into());
+        words[2].text = Some(" Past tense.".into());
+        let segments = render_rows(vec![(Some(0), words, vec![])], request());
+
+        assert_eq!(
+            word_ids(&segments),
+            vec![vec!["t1", "t2", "t3"], vec!["s1"], vec!["t4"], vec!["t5"]]
+        );
+        assert_eq!(segments[0].text, "你出差了。出差。 Past tense.");
+        assert_eq!(segments[0].end_ms, 4_400);
     }
 
     #[test]

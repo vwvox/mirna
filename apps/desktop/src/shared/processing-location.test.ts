@@ -19,6 +19,30 @@ describe("processing location", () => {
     });
   });
 
+  it("tells the on-device Soniqo models apart", () => {
+    expect(describeTranscription("soniqo", "soniqo-parakeet-batch")).toEqual({
+      label: "Parakeet",
+      local: true,
+    });
+    expect(describeTranscription("soniqo", "soniqo-qwen3-small")?.label).toBe(
+      "Qwen3-ASR",
+    );
+    expect(describeTranscription("soniqo", "soniqo-qwen3-large")?.label).toBe(
+      "Qwen3-ASR Large",
+    );
+  });
+
+  it("reads the batch provider a saved transcript recorded", () => {
+    expect(describeTranscription("whispercpp", "local-file")).toEqual({
+      label: "Whisper",
+      local: true,
+    });
+    expect(describeTranscription("applespeech", "apple-speech")).toEqual({
+      label: "Apple Speech",
+      local: true,
+    });
+  });
+
   it("names cloud engines by provider and marks them not local", () => {
     expect(describeNotesModel("deepseek", "deepseek-flash")).toEqual({
       label: "DeepSeek",

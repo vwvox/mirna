@@ -422,7 +422,19 @@ impl AecAlignment {
             Self::None | Self::DelayMic(_) => 0,
         }
     }
+
+    /// Speaker delay as a signed lag: positive delays the speaker, negative the mic.
+    fn lag_samples(self) -> isize {
+        self.speaker_delay_samples() as isize - self.mic_delay_samples() as isize
+    }
+
+    fn is_close_to(self, other: Self) -> bool {
+        (self.lag_samples() - other.lag_samples()).abs() <= AEC_ALIGNMENT_TOLERANCE_SAMPLES
+    }
 }
+
+/// 2 ms at 16 kHz: closer locks keep the current alignment.
+const AEC_ALIGNMENT_TOLERANCE_SAMPLES: isize = 32;
 
 impl AecReferenceAligner {
     fn new(sample_rate: u32) -> Self {
@@ -506,9 +518,20 @@ impl AecReferenceAligner {
         let next_alignment = if self.placed {
             self.placed_alignment(locked, snapshot.stable_lag_samples)
         } else if locked {
-            AecAlignment::from_lag_samples(snapshot.stable_lag_samples)
+            let measured = AecAlignment::from_lag_samples(snapshot.stable_lag_samples);
+            // A lock a sample or two off isn't worth resetting the canceller for.
+            if measured.is_close_to(self.last_alignment) {
+                self.last_alignment
+            } else {
+                measured
+            }
         } else {
-            AecAlignment::None
+            // The probe loses its lock whenever one side goes quiet or both talk at
+            // once, but the path from the speakers to the mic hasn't changed. Keep
+            // compensating for it: dropping to no delay resets the echo canceller,
+            // and echo leaks into the saved mic while it learns again. A new lock
+            // at a different delay still replaces this one.
+            self.last_alignment
         };
 
         if next_alignment != self.last_alignment {
@@ -1067,6 +1090,51 @@ mod tests {
         let alignment = detected_alignment(&speaker, &mic);
 
         assert_eq!(alignment, AecAlignment::DelayMic(7_200));
+    }
+
+    #[test]
+    fn aec_reference_aligner_keeps_its_lock_through_a_quiet_stretch() {
+        let mic = test_signal(16_000 * 5);
+        let speaker = delayed(&mic, 7_200);
+        let mut aligner = AecReferenceAligner::new(16_000);
+        for (speaker, mic) in speaker.chunks(1_600).zip(mic.chunks(1_600)) {
+            aligner.align(speaker, mic);
+        }
+        assert_eq!(aligner.last_alignment, AecAlignment::DelayMic(7_200));
+
+        // The other side stops talking for ten seconds: the probe loses its lock,
+        // but the canceller keeps its delay and is never reset.
+        let silence = vec![0.0; 16_000 * 10];
+        let mut changed = false;
+        for chunk in silence.chunks(1_600) {
+            changed |= aligner.align(chunk, chunk).alignment_changed;
+        }
+        assert!(!changed);
+        assert_eq!(aligner.last_alignment, AecAlignment::DelayMic(7_200));
+
+        // When they talk again at the same delay, nothing changes either.
+        for (speaker, mic) in speaker.chunks(1_600).zip(mic.chunks(1_600)) {
+            changed |= aligner.align(speaker, mic).alignment_changed;
+        }
+        assert!(!changed);
+        assert_eq!(aligner.last_alignment, AecAlignment::DelayMic(7_200));
+    }
+
+    #[test]
+    fn aec_reference_aligner_follows_a_new_delay() {
+        let mic = test_signal(16_000 * 5);
+        let mut aligner = AecReferenceAligner::new(16_000);
+        for (speaker, mic) in delayed(&mic, 7_200).chunks(1_600).zip(mic.chunks(1_600)) {
+            aligner.align(speaker, mic);
+        }
+        let speaker = test_signal(16_000 * 8);
+        for (speaker, mic) in speaker
+            .chunks(1_600)
+            .zip(delayed(&speaker, 4_000).chunks(1_600))
+        {
+            aligner.align(speaker, mic);
+        }
+        assert_eq!(aligner.last_alignment, AecAlignment::DelaySpeaker(4_000));
     }
 
     #[test]

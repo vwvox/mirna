@@ -7,8 +7,10 @@ use std::{
     time::SystemTime,
 };
 
+// Qwen3-ASR's CoreML decoder calls macOS 15 APIs (MLState), and Mirna itself
+// requires macOS 15 (`minimumSystemVersion` in tauri.conf.json).
 #[cfg(target_os = "macos")]
-const SONIQO_SWIFT_MACOS_DEPLOYMENT_TARGET: &str = "14.2";
+const SONIQO_SWIFT_MACOS_DEPLOYMENT_TARGET: &str = "15.0";
 #[cfg(target_os = "macos")]
 const SONIQO_METALLIB_MACOS_DEPLOYMENT_TARGET: &str = "15.0";
 
@@ -252,10 +254,13 @@ fn patch_speech_swift_manifest(swift_build_dir: &Path) {
         return;
     }
 
-    let patched = contents.replace(".macOS(\"15.0\")", &target);
+    // Earlier builds lowered the checkout to 14.2; accept either declaration.
+    let patched = [".macOS(\"15.0\")", ".macOS(\"14.2\")"]
+        .iter()
+        .fold(contents.clone(), |text, known| text.replace(known, &target));
     if patched == contents {
         panic!(
-            "failed to patch Soniqo speech-swift manifest {}; expected macOS 15.0 platform declaration",
+            "failed to patch Soniqo speech-swift manifest {}; expected a macOS platform declaration",
             manifest.display()
         );
     }

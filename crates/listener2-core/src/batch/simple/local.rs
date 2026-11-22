@@ -28,6 +28,12 @@ pub(super) const SONIQO_DIRECT_MIC_MIN_RMS: f64 = 0.0008;
 pub(super) const MAX_LOCAL_BATCH_CHANNELS: usize = 8;
 const SONIQO_SPEECH_REDEMPTION_TIME: Duration = Duration::from_millis(150);
 pub(super) const LOCAL_BATCH_CANCELLED: &str = "Local transcription was cancelled.";
+/// Language identification listens to 3-second blocks of speech, at most 60 s
+/// per channel spread across the recording, and needs at least 9 s of speech.
+pub(super) const SONIQO_LANGUAGE_ID_BLOCK_SAMPLES: usize = TARGET_SAMPLE_RATE as usize * 3;
+pub(super) const SONIQO_LANGUAGE_ID_MIN_BLOCKS: usize = 3;
+pub(super) const SONIQO_LANGUAGE_ID_MAX_BLOCKS: usize = 20;
+const SONIQO_LANGUAGE_ID_SILENCE_RMS: f64 = 0.005;
 
 #[derive(Debug)]
 pub(in crate::batch) struct ResampledChannelFile {
@@ -314,7 +320,11 @@ pub(in crate::batch) async fn run_soniqo_batch(
 
         let session_id = params.session_id.clone();
         let async_runtime = tokio::runtime::Handle::current();
-        let transcribed = tokio::task::spawn_blocking(move || {
+        let SoniqoFileTranscription {
+            transcripts: transcribed,
+            routing,
+            echo,
+        } = tokio::task::spawn_blocking(move || {
             let progress = SoniqoProgressReporter {
                 runtime,
                 session_id,
@@ -352,13 +362,19 @@ pub(in crate::batch) async fn run_soniqo_batch(
 
         tracing::info!(
             anarlog.stt.provider.name = "soniqo",
-            anarlog.stt.model = %model,
+            anarlog.stt.model = %routing.model,
+            anarlog.stt.requested_model = %model,
             elapsed_ms = started_at.elapsed().as_millis() as u64,
             transcript.channel_count = transcribed.len(),
             "soniqo_batch_completed"
         );
 
-        let response = anlg_transcribe_soniqo::batch_response_from_channels(model, transcribed);
+        let mut response =
+            anlg_transcribe_soniqo::batch_response_from_channels(routing.model, transcribed);
+        response.metadata["soniqo_routing"] = routing.to_json();
+        if let Some(echo) = echo {
+            response.metadata["mic_echo"] = echo.to_json();
+        }
 
         Ok(BatchRunOutput {
             session_id: params.session_id,
@@ -377,7 +393,7 @@ fn transcribe_soniqo_file(
     num_speakers: Option<u32>,
     progress: Option<&SoniqoProgressReporter>,
     async_runtime: &tokio::runtime::Handle,
-) -> std::result::Result<Vec<anlg_transcribe_soniqo::FileTranscript>, String> {
+) -> std::result::Result<SoniqoFileTranscription, String> {
     ensure_local_batch_running(progress)?;
     let source = anlg_audio_utils::source_from_path(file_path).map_err(|e| e.to_string())?;
     let channel_count = u16::from(source.channels()).max(1) as usize;
@@ -398,7 +414,7 @@ fn transcribe_soniqo_file(
     );
 
     let resample_started_at = Instant::now();
-    let channel_files = resample_audio_to_channel_files_until(file_path, source, || {
+    let mut channel_files = resample_audio_to_channel_files_until(file_path, source, || {
         local_batch_is_cancelled(progress)
     })?;
     ensure_local_batch_running(progress)?;
@@ -452,6 +468,46 @@ fn transcribe_soniqo_file(
         progress.emit(soniqo_batch_progress(0, transcribed_channel_count));
     }
 
+    // Mic first, Mac audio second: silence what the mic heard from the speakers.
+    let echo = if channel_files.len() == 2 {
+        ensure_local_batch_running(progress)?;
+        let started_at = Instant::now();
+        match super::echo::remove_mic_echo(&channel_files[0], &channel_files[1]) {
+            Ok((cleaned, report)) => {
+                tracing::info!(
+                    mic_speech_seconds = report.mic_speech_seconds,
+                    removed_seconds = report.removed_seconds,
+                    removed_windows = report.removed_windows,
+                    usual_delay_ms = report.usual_delay_ms.unwrap_or_default(),
+                    elapsed_ms = started_at.elapsed().as_millis() as u64,
+                    "soniqo_mic_echo_checked"
+                );
+                if let Some(cleaned) = cleaned {
+                    channel_files[0] = cleaned;
+                }
+                Some(report)
+            }
+            Err(error) => {
+                tracing::warn!(error = %error, "soniqo_mic_echo_check_failed");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let routing = route_soniqo_recording(model, &channel_files, progress)?;
+    let transcription_model = routing.model;
+    // Mirna's language setting is usually the app's language, not the
+    // meeting's. Qwen3-ASR detects each sentence's language itself (and handles
+    // people switching between languages), so a hint would only force, say, a
+    // Mandarin lesson into English.
+    let transcription_language = if soniqo_detects_language(transcription_model) {
+        None
+    } else {
+        language
+    };
+
     let mut channel_results = Vec::with_capacity(transcribed_channel_count);
     let mut channel_speaker_segments = Vec::with_capacity(transcribed_channel_count);
     for (channel_index, channel) in channel_files.into_iter().enumerate() {
@@ -471,13 +527,18 @@ fn transcribe_soniqo_file(
             None => Vec::new(),
         };
         let plan = soniqo_channel_plan(
-            model,
+            transcription_model,
             channel_index,
             channel,
             transcribed_channel_count == 2 && channel_index == 0,
         );
-        let channel_result =
-            transcribe_soniqo_channel_chunks(model, plan, language, progress, async_runtime);
+        let channel_result = transcribe_soniqo_channel_chunks(
+            transcription_model,
+            plan,
+            transcription_language,
+            progress,
+            async_runtime,
+        );
         ensure_local_batch_running(progress)?;
         channel_results.push(channel_result);
         channel_speaker_segments.push(speaker_segments);
@@ -497,7 +558,244 @@ fn transcribe_soniqo_file(
     {
         transcript.speaker_segments = speaker_segments;
     }
-    Ok(transcripts)
+    Ok(SoniqoFileTranscription {
+        transcripts,
+        routing,
+        echo,
+    })
+}
+
+pub(super) struct SoniqoFileTranscription {
+    transcripts: Vec<anlg_transcribe_soniqo::FileTranscript>,
+    routing: SoniqoRouting,
+    echo: Option<super::echo::EchoReport>,
+}
+
+pub(super) fn soniqo_detects_language(model: anlg_transcribe_soniqo::SoniqoModel) -> bool {
+    matches!(
+        model,
+        anlg_transcribe_soniqo::SoniqoModel::Qwen3Small
+            | anlg_transcribe_soniqo::SoniqoModel::Qwen3Large
+    )
+}
+
+/// Which engine transcribed a recording, and why.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct SoniqoRouting {
+    pub(super) requested_model: anlg_transcribe_soniqo::SoniqoModel,
+    pub(super) model: anlg_transcribe_soniqo::SoniqoModel,
+    /// Top language per channel, when that channel had enough speech to tell.
+    pub(super) languages_by_channel: Vec<Option<anlg_transcribe_soniqo::LanguagePrediction>>,
+    /// A language Parakeet doesn't know was heard, but Qwen3-ASR isn't downloaded.
+    pub(super) qwen3_suggested: bool,
+}
+
+impl SoniqoRouting {
+    fn unrouted(model: anlg_transcribe_soniqo::SoniqoModel) -> Self {
+        Self {
+            requested_model: model,
+            model,
+            languages_by_channel: Vec::new(),
+            qwen3_suggested: false,
+        }
+    }
+
+    /// The language that decided the engine: the one that rerouted the
+    /// recording, otherwise the most confident one heard.
+    pub(super) fn language(&self) -> Option<&str> {
+        let heard = self.languages_by_channel.iter().flatten();
+        let rerouting = heard.clone().find(|prediction| {
+            anlg_transcribe_soniqo::route_batch_model(
+                self.requested_model,
+                std::slice::from_ref(prediction),
+            ) != self.requested_model
+        });
+        rerouting
+            .or_else(|| heard.max_by(|a, b| a.probability.total_cmp(&b.probability)))
+            .map(|prediction| prediction.code.as_str())
+    }
+
+    fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "requested_model": self.requested_model.to_string(),
+            "model": self.model.to_string(),
+            "language": self.language(),
+            "languages_by_channel": self.languages_by_channel.iter().map(|prediction| {
+                prediction.as_ref().map(|prediction| serde_json::json!({
+                    "code": prediction.code,
+                    "probability": prediction.probability,
+                }))
+            }).collect::<Vec<_>>(),
+            "qwen3_suggested": self.qwen3_suggested,
+        })
+    }
+}
+
+/// Picks the engine for the whole recording. Parakeet only knows 25 European
+/// languages, so when any channel is clearly speaking another language (a
+/// Mandarin lesson, say), the recording goes to Qwen3-ASR, which also handles
+/// the English around it. One engine per recording keeps both sides of a
+/// conversation consistent.
+pub(super) fn soniqo_recording_route(
+    model: anlg_transcribe_soniqo::SoniqoModel,
+    languages_by_channel: Vec<Option<anlg_transcribe_soniqo::LanguagePrediction>>,
+    qwen3_downloaded: bool,
+) -> SoniqoRouting {
+    let wants_qwen3 = languages_by_channel.iter().flatten().any(|prediction| {
+        anlg_transcribe_soniqo::route_batch_model(model, std::slice::from_ref(prediction)) != model
+    });
+    let mut routing = SoniqoRouting {
+        languages_by_channel,
+        ..SoniqoRouting::unrouted(model)
+    };
+    if wants_qwen3 {
+        if qwen3_downloaded {
+            routing.model = anlg_transcribe_soniqo::SoniqoModel::Qwen3Small;
+        } else {
+            routing.qwen3_suggested = true;
+        }
+    }
+    routing
+}
+
+fn route_soniqo_recording(
+    model: anlg_transcribe_soniqo::SoniqoModel,
+    channel_files: &[ResampledChannelFile],
+    progress: Option<&SoniqoProgressReporter>,
+) -> std::result::Result<SoniqoRouting, String> {
+    if model != anlg_transcribe_soniqo::SoniqoModel::ParakeetBatch {
+        return Ok(SoniqoRouting::unrouted(model));
+    }
+
+    let mut languages_by_channel = Vec::with_capacity(channel_files.len());
+    for (channel_index, channel) in channel_files.iter().enumerate() {
+        ensure_local_batch_running(progress)?;
+        languages_by_channel.push(identify_soniqo_channel_language(channel_index, channel));
+    }
+
+    let qwen3_downloaded = anlg_transcribe_soniqo::is_model_downloaded(
+        anlg_transcribe_soniqo::SoniqoModel::Qwen3Small,
+    )
+    .unwrap_or(false);
+    let routing = soniqo_recording_route(model, languages_by_channel, qwen3_downloaded);
+    tracing::info!(
+        anarlog.stt.provider.name = "soniqo",
+        anarlog.stt.requested_model = %routing.requested_model,
+        anarlog.stt.model = %routing.model,
+        languages = ?routing
+            .languages_by_channel
+            .iter()
+            .map(|prediction| prediction.as_ref().map(|p| (p.code.as_str(), p.probability)))
+            .collect::<Vec<_>>(),
+        qwen3_suggested = routing.qwen3_suggested,
+        "soniqo_recording_routed"
+    );
+    Ok(routing)
+}
+
+fn identify_soniqo_channel_language(
+    channel_index: usize,
+    channel: &ResampledChannelFile,
+) -> Option<anlg_transcribe_soniqo::LanguagePrediction> {
+    let started_at = Instant::now();
+    let excerpt = match soniqo_language_id_excerpt(channel.file.path()) {
+        Ok(Some(excerpt)) => excerpt,
+        Ok(None) => return None,
+        Err(error) => {
+            tracing::warn!(channel.index = channel_index, error = %error, "soniqo_language_id_read_failed");
+            return None;
+        }
+    };
+    match anlg_transcribe_soniqo::identify_language(&excerpt) {
+        Ok(predictions) => {
+            let top = predictions.into_iter().next();
+            tracing::info!(
+                channel.index = channel_index,
+                excerpt.seconds = excerpt.len() as f64 / TARGET_SAMPLE_RATE as f64,
+                language = top.as_ref().map(|p| p.code.as_str()).unwrap_or("unknown"),
+                probability = top.as_ref().map(|p| p.probability).unwrap_or_default(),
+                elapsed_ms = started_at.elapsed().as_millis() as u64,
+                "soniqo_language_identified"
+            );
+            top
+        }
+        Err(error) => {
+            tracing::warn!(channel.index = channel_index, error = %error, "soniqo_language_id_failed");
+            None
+        }
+    }
+}
+
+/// Up to a minute of a channel's speech, sampled evenly across the recording,
+/// read in two passes so long recordings never sit in memory whole.
+fn soniqo_language_id_excerpt(path: &Path) -> std::result::Result<Option<Vec<f32>>, String> {
+    let mut speech_blocks = Vec::new();
+    for_each_soniqo_block(path, SONIQO_LANGUAGE_ID_BLOCK_SAMPLES, |index, block| {
+        if soniqo_block_has_speech(block) {
+            speech_blocks.push(index);
+        }
+    })?;
+    let Some(picked) = pick_language_id_blocks(&speech_blocks) else {
+        return Ok(None);
+    };
+    let mut excerpt = Vec::with_capacity(picked.len() * SONIQO_LANGUAGE_ID_BLOCK_SAMPLES);
+    for_each_soniqo_block(path, SONIQO_LANGUAGE_ID_BLOCK_SAMPLES, |index, block| {
+        if picked.binary_search(&index).is_ok() {
+            excerpt.extend_from_slice(block);
+        }
+    })?;
+    Ok(Some(excerpt))
+}
+
+fn for_each_soniqo_block(
+    path: &Path,
+    block_samples: usize,
+    mut visit: impl FnMut(usize, &[f32]),
+) -> std::result::Result<(), String> {
+    let mut reader = hound::WavReader::open(path).map_err(|e| e.to_string())?;
+    let mut block = Vec::with_capacity(block_samples);
+    let mut index = 0;
+    for sample in reader.samples::<f32>() {
+        block.push(sample.map_err(|e| e.to_string())?);
+        if block.len() == block_samples {
+            visit(index, &block);
+            block.clear();
+            index += 1;
+        }
+    }
+    Ok(())
+}
+
+/// A block counts as speech when at least half of its 100 ms frames are above
+/// the silence floor. The saved mic is zeroed between utterances, so this
+/// skips the gaps.
+pub(super) fn soniqo_block_has_speech(block: &[f32]) -> bool {
+    let frame = TARGET_SAMPLE_RATE as usize / 10;
+    let frames = block.len().div_ceil(frame);
+    if frames == 0 {
+        return false;
+    }
+    let loud = block
+        .chunks(frame)
+        .filter(|frame| audio_rms(frame) >= SONIQO_LANGUAGE_ID_SILENCE_RMS)
+        .count();
+    loud * 2 >= frames
+}
+
+/// Indices of the speech blocks to listen to, spread evenly, or None when
+/// there's too little speech to tell the language.
+pub(super) fn pick_language_id_blocks(speech_blocks: &[usize]) -> Option<Vec<usize>> {
+    if speech_blocks.len() < SONIQO_LANGUAGE_ID_MIN_BLOCKS {
+        return None;
+    }
+    if speech_blocks.len() <= SONIQO_LANGUAGE_ID_MAX_BLOCKS {
+        return Some(speech_blocks.to_vec());
+    }
+    Some(
+        (0..SONIQO_LANGUAGE_ID_MAX_BLOCKS)
+            .map(|i| speech_blocks[i * speech_blocks.len() / SONIQO_LANGUAGE_ID_MAX_BLOCKS])
+            .collect(),
+    )
 }
 
 struct SoniqoProgressReporter {

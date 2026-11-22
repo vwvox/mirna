@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import { useCallback } from "react";
 
 import { useRegenerateTranscript } from "./actions";
+import { TranscriptEngineNote } from "./engine-note";
 import { TranscriptViewer } from "./renderer";
 import { BatchState } from "./screens/batch";
 import { TranscriptEmptyState } from "./screens/empty";
@@ -103,6 +104,9 @@ function TranscriptContent({
           onUploadAudio={uploadAudio}
           onUploadTranscript={uploadTranscript}
         />
+      )}
+      {screen.kind === "ready" && !screen.currentActive && (
+        <TranscriptEngineNote sessionId={sessionId} />
       )}
       {screen.kind === "ready" && (
         <TranscriptViewer

@@ -313,11 +313,11 @@ const displayModelId = (model: string): string => {
   }
 
   if (model === "soniqo-qwen3-small") {
-    return "Qwen3 ASR 0.6B";
+    return "Qwen3-ASR";
   }
 
   if (model === "soniqo-qwen3-large") {
-    return "Qwen3 ASR 1.7B";
+    return "Qwen3-ASR Large";
   }
 
   if (model === "parakeet-tdt-0.6b-v3") {

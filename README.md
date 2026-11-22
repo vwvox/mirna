@@ -7,7 +7,7 @@
 ## What it does
 
 - **Records without a meeting bot.** It captures your microphone and the computer's audio, so it works with Zoom, Meet, Teams, WhatsApp, or a conversation in the room.
-- **Transcribes on your Mac** with Whisper (whisper.cpp). Parakeet is also available on machines with Xcode's Metal toolchain.
+- **Transcribes on your Mac** with Parakeet, or Qwen3-ASR when it hears a language Parakeet doesn't know (Chinese, say). Whisper (whisper.cpp) is also available. Without headphones, Mirna takes what your mic picked up from your speakers out of your side of the transcript.
 - **Writes notes from your rough notes and the transcript**, using a local model through Ollama, LM Studio or Apple Intelligence, or a cloud model you connect with your own API key.
 - **Answers questions** about a meeting with the same model.
 
@@ -23,7 +23,7 @@ Mirna is built to keep recordings, transcripts and notes on your device.
   - the API hosts of AI and speech providers you connect with your own key
 
   Everything else is refused.
-- **Model downloads** (Whisper and GGUF) come from Hugging Face when you start them.
+- **Model downloads** (Parakeet, Qwen3-ASR, Whisper and GGUF) come from Hugging Face when you start them. The small language-identification model Mirna uses to pick an engine downloads the first time Parakeet transcribes.
 
 ## Run it (development)
 
@@ -37,9 +37,9 @@ Requirements:
 
 ```bash
 pnpm install
-export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0 SONIQO_DISABLE=1
+export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
-  --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}}}'
+  --config '{"bundle":{"createUpdaterArtifacts":false}}'
 APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
 xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
 codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
@@ -47,7 +47,7 @@ open "$APP"
 ```
 
 - **Why a bundle:** run it as a real `.app` like this, rather than with `tauri dev`, so that macOS can grant microphone, system-audio and Accessibility permissions to the app itself.
-- **`SONIQO_DISABLE=1`:** builds without Parakeet. Drop it once `xcodebuild -downloadComponent MetalToolchain` has succeeded.
+- **Parakeet needs Xcode's Metal Toolchain** (`xcodebuild -downloadComponent MetalToolchain`). Without it, add `SONIQO_DISABLE=1` to the exports and `"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}` to the `bundle` config.
 - **More detail:** [CONTRIBUTING.md](CONTRIBUTING.md) explains the build quirks.
 
 In the app:

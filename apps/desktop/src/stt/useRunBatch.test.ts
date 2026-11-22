@@ -544,6 +544,40 @@ describe("useRunBatch", () => {
     );
   });
 
+  test("saves the engine that actually ran, the language it heard and the echo removed", async () => {
+    startTranscriptionMock.mockImplementation(async (_params, options) => {
+      options.handlePersist(
+        [{ text: "出差", start_ms: 0, end_ms: 400, channel: 1 }],
+        [],
+        {
+          mode: "replace",
+          info: {
+            model: "soniqo-qwen3-small",
+            language: "zh",
+            metadata: { mic_echo: { removed_seconds: 7.7 } },
+          },
+        },
+      );
+    });
+
+    const { result } = renderHook(() => useRunBatch("session-1"));
+
+    await act(async () => {
+      await result.current("/tmp/session.wav", {
+        provider: "soniqo",
+        model: "soniqo-parakeet-batch",
+      });
+    });
+
+    expect(saveBatchTranscriptMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "soniqo-qwen3-small",
+        language: "zh",
+        metadata_json: JSON.stringify({ mic_echo: { removed_seconds: 7.7 } }),
+      }),
+    );
+  });
+
   test("capture repair saves its original interval while deferring audio finalization", async () => {
     startTranscriptionMock.mockImplementation(async (_params, options) => {
       options.handlePersist(

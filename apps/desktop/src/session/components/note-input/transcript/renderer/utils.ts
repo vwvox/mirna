@@ -16,6 +16,17 @@ type SegmentColorVars = CSSProperties & {
   "--segment-color-dark": string;
 };
 
+// Chinese, Japanese and Korean characters and punctuation run on without spaces.
+const CJK =
+  /[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff00-\uffef]/u;
+
+/** The space between two words as displayed, or none between CJK text. */
+export function wordSeparator(before: string, after: string): string {
+  const end = before.trimEnd().slice(-1);
+  const start = after.trimStart().slice(0, 1);
+  return end && start && CJK.test(end) && CJK.test(start) ? "" : " ";
+}
+
 export function groupWordsIntoLines(words: SegmentWord[]): SentenceLine[] {
   if (words.length === 0) return [];
 

@@ -33,6 +33,10 @@ pub(crate) fn transcribe_file(
     Err(Error::UnsupportedPlatform)
 }
 
+pub(crate) fn identify_language(_samples: &[f32]) -> Result<Vec<crate::LanguagePrediction>> {
+    Err(Error::UnsupportedPlatform)
+}
+
 pub(crate) fn diarize_samples(
     _model: SoniqoModel,
     _samples: &[f32],

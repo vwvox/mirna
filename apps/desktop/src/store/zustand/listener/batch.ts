@@ -9,6 +9,7 @@ import type {
 import type { BatchPersistCallback } from "./transcript";
 import { transformWordEntries, type WordEntry } from "./utils";
 
+import { batchTranscriptInfo } from "~/stt/batch-transcript-info";
 import { type RuntimeSpeakerHint, type WordLike } from "~/stt/segment";
 import {
   createTranscriptTimingMetadata,
@@ -142,7 +143,10 @@ export const createBatchSlice = <T extends BatchState>(
       return false;
     }
 
-    persist?.(words, hints, { mode: "replace" });
+    persist?.(words, hints, {
+      mode: "replace",
+      info: batchTranscriptInfo(response),
+    });
 
     set((state) => {
       if (!state.batch[sessionId]) {
@@ -177,7 +181,13 @@ export const createBatchSlice = <T extends BatchState>(
     const { nextPreview, words, hints } = result;
 
     if (result.shouldPersist && words.length > 0) {
-      persist?.(words, hints, { mode: "replace" });
+      persist?.(words, hints, {
+        mode: "replace",
+        info:
+          event.type === "result"
+            ? batchTranscriptInfo(event.response)
+            : undefined,
+      });
     }
 
     set((state) => ({

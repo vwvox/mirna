@@ -14,6 +14,7 @@ import {
 import { toast } from "@anlg/ui/components/ui/toast";
 
 import { BatchResponseProcessingError } from "./batch-response-processing-error";
+import type { BatchTranscriptInfo } from "./batch-transcript-info";
 import { completeCaptureTranscript } from "./capture-completion";
 import { useListener } from "./contexts";
 import { persistTranscriptWrite } from "./persist-retry";
@@ -459,10 +460,12 @@ export const useRunBatch = (sessionId: string) => {
         options?.handlePersist;
       let stagedWords: WordWithId[] = [];
       let stagedHints: SpeakerHintWithId[] = [];
+      let stagedInfo: BatchTranscriptInfo | undefined;
       const resetStagedTranscript = () => {
         transcriptId = null;
         stagedWords = [];
         stagedHints = [];
+        stagedInfo = undefined;
       };
 
       const persist =
@@ -523,6 +526,7 @@ export const useRunBatch = (sessionId: string) => {
             stagedWords = [];
             stagedHints = [];
           }
+          stagedInfo = persistOptions?.info ?? stagedInfo;
           stagedWords.push(...newWords);
           stagedHints.push(...newHints);
         });
@@ -634,7 +638,12 @@ export const useRunBatch = (sessionId: string) => {
                   started_at: startedAt,
                   memo: memoMd,
                   provider: target.provider,
-                  model: target.model,
+                  // The engine that actually ran, if the recording was rerouted.
+                  model: stagedInfo?.model ?? target.model,
+                  language: stagedInfo?.language ?? null,
+                  metadata_json: stagedInfo
+                    ? JSON.stringify(stagedInfo.metadata)
+                    : null,
                   words: stagedWords.map(toStoredTranscriptWord),
                   hints: stagedHints.map(toStoredSpeakerHint),
                   promotion: refinementPromotion,

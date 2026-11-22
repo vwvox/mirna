@@ -21,6 +21,8 @@ pub struct BatchTranscriptInsert {
     pub memo: String,
     pub provider: String,
     pub model: String,
+    pub language: String,
+    pub metadata_json: String,
     pub words_json: String,
     pub speaker_hints_json: String,
 }
@@ -145,8 +147,8 @@ pub async fn insert_batch_transcript(
          )
          SELECT ?, session.workspace_id,
                 COALESCE(NULLIF(?, ''), session.owner_user_id),
-                session.id, 'batch_transcription', ?, ?, '', ?, NULL, '',
-                ?, ?, ?, '{}', ?,
+                session.id, 'batch_transcription', ?, ?, ?, ?, NULL, '',
+                ?, ?, ?, ?, ?,
                 strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL
          FROM sessions AS session
          WHERE session.id = ? AND session.deleted_at IS NULL",
@@ -155,10 +157,12 @@ pub async fn insert_batch_transcript(
     .bind(&insert.owner_user_id)
     .bind(&insert.provider)
     .bind(&insert.model)
+    .bind(&insert.language)
     .bind(insert.started_at_ms)
     .bind(&insert.memo)
     .bind(&insert.words_json)
     .bind(&insert.speaker_hints_json)
+    .bind(&insert.metadata_json)
     .bind(&insert.created_at)
     .bind(&insert.session_id)
     .execute(&mut *conn)
@@ -272,6 +276,8 @@ mod tests {
             memo: "meeting memo".to_string(),
             provider: "soniox".to_string(),
             model: "stt-batch-v1".to_string(),
+            language: "zh".to_string(),
+            metadata_json: r#"{"mic_echo":{"removed_seconds":28.4}}"#.to_string(),
             words_json: "[]".to_string(),
             speaker_hints_json: "[]".to_string(),
         };
@@ -325,12 +331,15 @@ mod tests {
         assert_eq!(new.get::<String, _>("workspace_id"), "workspace-1");
         assert_eq!(new.get::<String, _>("owner_user_id"), "session-owner");
         assert_eq!(new.get::<String, _>("source"), "batch_transcription");
-        assert_eq!(new.get::<String, _>("language"), "");
+        assert_eq!(new.get::<String, _>("language"), "zh");
         assert_eq!(new.get::<i64, _>("started_at_ms"), 2000);
         assert_eq!(new.get::<Option<i64>, _>("ended_at_ms"), None);
         assert_eq!(new.get::<String, _>("audio_attachment_id"), "");
         assert_eq!(new.get::<String, _>("memo"), "meeting memo");
-        assert_eq!(new.get::<String, _>("metadata_json"), "{}");
+        assert_eq!(
+            new.get::<String, _>("metadata_json"),
+            r#"{"mic_echo":{"removed_seconds":28.4}}"#
+        );
         assert_eq!(new.get::<String, _>("created_at"), insert.created_at);
         assert!(new.get::<String, _>("updated_at").ends_with('Z'));
         assert_eq!(new.get::<Option<String>, _>("deleted_at"), None);

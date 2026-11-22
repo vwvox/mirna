@@ -2,7 +2,15 @@ import { PROVIDERS as LLM_PROVIDERS } from "~/settings/ai/llm/shared";
 import { PROVIDERS as STT_PROVIDERS } from "~/settings/ai/stt/shared";
 import { useConfigValue } from "~/shared/config";
 
-const LOCAL_STT_PROVIDERS = new Set(["local_file", "soniqo", "apple_speech"]);
+// Settings use "local_file" and "apple_speech"; saved transcripts record the
+// batch provider that ran, "whispercpp" and "applespeech".
+const LOCAL_STT_PROVIDERS = new Set([
+  "local_file",
+  "whispercpp",
+  "soniqo",
+  "apple_speech",
+  "applespeech",
+]);
 const LOCAL_LLM_PROVIDERS = new Set(["ollama", "lmstudio", "unsloth"]);
 
 export type ProcessingStep = {
@@ -24,9 +32,20 @@ export function describeTranscription(
 ): ProcessingStep | null {
   if (!provider) return null;
   const local = LOCAL_STT_PROVIDERS.has(provider);
-  if (provider === "local_file") return { label: "Whisper", local };
-  if (provider === "soniqo") return { label: "Parakeet", local };
-  if (provider === "apple_speech") return { label: "Apple Speech", local };
+  if (provider === "local_file" || provider === "whispercpp") {
+    return { label: "Whisper", local };
+  }
+  if (provider === "soniqo") {
+    if (model?.includes("qwen3-large")) {
+      return { label: "Qwen3-ASR Large", local };
+    }
+    if (model?.includes("qwen3")) return { label: "Qwen3-ASR", local };
+    if (model?.includes("omnilingual")) return { label: "Omnilingual", local };
+    return { label: "Parakeet", local };
+  }
+  if (provider === "apple_speech" || provider === "applespeech") {
+    return { label: "Apple Speech", local };
+  }
   const name = STT_PROVIDERS.find(
     (entry) => entry.id === provider,
   )?.displayName;

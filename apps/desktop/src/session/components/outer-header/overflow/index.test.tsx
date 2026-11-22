@@ -145,6 +145,28 @@ vi.mock("./listening", () => ({
   ),
 }));
 
+vi.mock("./transcribe-again", () => ({
+  TranscribeAgain: ({
+    onTranscribe,
+  }: {
+    onTranscribe: (engine?: { provider: string; model: string }) => void;
+  }) => (
+    <>
+      <button type="button" onClick={() => onTranscribe()}>
+        Transcribe again
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onTranscribe({ provider: "soniqo", model: "soniqo-qwen3-small" })
+        }
+      >
+        With Qwen3-ASR
+      </button>
+    </>
+  ),
+}));
+
 vi.mock("./lock-note", () => ({
   LockNote: () => <button type="button">Lock Note</button>,
 }));
@@ -240,7 +262,7 @@ const ACTIONS = [
   "Upload transcript",
   "Start listening",
   "Resume listening",
-  "Re-transcribe",
+  "Transcribe again",
   "Show Audio in Finder",
   "Show Audio in Explorer",
   "Show Audio in Folder",
@@ -349,7 +371,7 @@ describe("OverflowButton", () => {
       {},
       [
         "Resume listening",
-        "Re-transcribe",
+        "Transcribe again",
         "Show Audio in Finder",
         "Open in New Window",
         "Delete note",
@@ -418,13 +440,18 @@ describe("OverflowButton", () => {
     expect(uploadTranscriptMock).toHaveBeenCalledTimes(1);
   });
 
-  it("re-transcribes recorded audio", () => {
+  it("transcribes recorded audio again, with settings or a chosen engine", () => {
     arrange({ transcript: false, audio: true });
     renderOverflow();
 
-    fireEvent.click(screen.getByRole("button", { name: "Re-transcribe" }));
+    fireEvent.click(screen.getByRole("button", { name: "Transcribe again" }));
+    expect(regenerateTranscriptMock).toHaveBeenLastCalledWith(undefined);
 
-    expect(regenerateTranscriptMock).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "With Qwen3-ASR" }));
+    expect(regenerateTranscriptMock).toHaveBeenLastCalledWith({
+      provider: "soniqo",
+      model: "soniqo-qwen3-small",
+    });
   });
 
   it.each(["macos", "linux"])(

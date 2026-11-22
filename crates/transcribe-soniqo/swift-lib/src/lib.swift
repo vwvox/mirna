@@ -4,6 +4,8 @@ import Foundation
 import OmnilingualASR
 import ParakeetASR
 import ParakeetStreamingASR
+import Qwen3ASR
+import SpeechLanguageID
 import SpeechVAD
 import SwiftRs
 
@@ -178,7 +180,13 @@ private enum SpeechModelKind: String, CaseIterable {
         )
       )
     case .qwen3Small, .qwen3Large:
-      throw SoniqoBridgeError.message("\(label) requires macOS 15 or newer.")
+      return .qwen3(
+        try await Qwen3ASRModel.fromPretrained(
+          modelId: repo,
+          offlineMode: offlineMode,
+          progressHandler: progressHandler
+        )
+      )
     }
   }
 
@@ -334,6 +342,7 @@ private enum LoadedSpeechModel {
   case streaming(ParakeetStreamingASRModel)
   case parakeetBatch(ParakeetASRModel, Community1DiarizationPipeline)
   case omnilingual(OmnilingualASRModel)
+  case qwen3(Qwen3ASRModel)
 
   func asStreamingModel() throws -> ParakeetStreamingASRModel {
     guard case .streaming(let model) = self else {
@@ -364,6 +373,10 @@ private enum LoadedSpeechModel {
       return try model.transcribeAudio(audio, sampleRate: sampleRate, language: languageHint)
     case .omnilingual(let model):
       return try model.transcribeAudio(audio, sampleRate: sampleRate)
+    case .qwen3(let model):
+      // No hint by default: Qwen3-ASR detects the language itself and copes with
+      // speakers switching between languages, which a single hint would fight.
+      return model.transcribe(audio: audio, sampleRate: sampleRate, language: languageHint)
     }
   }
 }
@@ -378,6 +391,17 @@ private struct ModelDownloadPayload: Codable {
   var currentFile: String?
   var progressPercent: Int?
   var localPath: String
+  var error: String?
+}
+
+private struct LanguageIDPayload: Codable {
+  struct Prediction: Codable {
+    var code: String
+    var probability: Float
+  }
+
+  var predictions: [Prediction]
+  var analyzedSeconds: Double
   var error: String?
 }
 
@@ -838,6 +862,40 @@ private actor SoniqoBridge {
         partials: [],
         source: source,
         error: error.localizedDescription
+      )
+    }
+  }
+
+  private var languageIdentifier: SpeechLanguageIdentifier?
+
+  /// Ranks the spoken language of 16 kHz mono samples, as {"predictions":[{code,probability}],...}.
+  func identifyLanguageJSON(samplesData: Data) async -> String {
+    do {
+      let samples = try decodeFloatSamples(from: samplesData)
+      let identifier: SpeechLanguageIdentifier
+      if let cached = languageIdentifier {
+        identifier = cached
+      } else {
+        identifier = try await SpeechLanguageIdentifier.fromPretrained(engine: .mlx)
+        languageIdentifier = identifier
+      }
+      let result = try identifier.identify(
+        audio: samples,
+        sampleRate: soniqoFileTranscriptionSampleRate,
+        topK: 3
+      )
+      return encodeJSON(
+        LanguageIDPayload(
+          predictions: result.predictions.map {
+            LanguageIDPayload.Prediction(code: $0.label.code, probability: $0.probability)
+          },
+          analyzedSeconds: result.analyzedDuration,
+          error: nil
+        )
+      )
+    } catch {
+      return encodeJSON(
+        LanguageIDPayload(predictions: [], analyzedSeconds: 0, error: error.localizedDescription)
       )
     }
   }
@@ -1324,6 +1382,14 @@ public func _soniqo_diarize_audio(
         samplesData: Data(samples.toArray()),
         exactSpeakers: exactSpeakers.toString()
       )
+    })
+}
+
+@_cdecl("_soniqo_identify_language")
+public func _soniqo_identify_language(samples: SRData) -> SRString {
+  SRString(
+    waitForValue {
+      await SoniqoBridge.shared.identifyLanguageJSON(samplesData: Data(samples.toArray()))
     })
 }
 

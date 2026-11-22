@@ -1,4 +1,5 @@
 mod direct;
+mod echo;
 mod google_cloud;
 mod local;
 
@@ -20,11 +21,13 @@ use direct::{
 #[cfg(test)]
 use local::{
     FixedSoniqoFileChunkIterator, LOCAL_BATCH_CANCELLED, MAX_LOCAL_BATCH_CHANNELS,
-    SONIQO_DIARIZATION_MAX_SAMPLES, SONIQO_DIRECT_MIC_MIN_RMS, SONIQO_PARAKEET_MAX_CHUNK_SAMPLES,
-    SONIQO_PROGRESS_MAX, SONIQO_PROGRESS_PLANNED, SoniqoChunkStrategy, audio_rms,
-    collect_soniqo_channel_transcripts, ensure_soniqo_diarization_within_limit,
-    resample_audio_to_channel_files, soniqo_batch_progress, soniqo_chunk_strategy,
-    soniqo_diarization_plan_within_limit, soniqo_diarization_speaker_count, soniqo_language_hint,
+    SONIQO_DIARIZATION_MAX_SAMPLES, SONIQO_DIRECT_MIC_MIN_RMS, SONIQO_LANGUAGE_ID_BLOCK_SAMPLES,
+    SONIQO_LANGUAGE_ID_MAX_BLOCKS, SONIQO_PARAKEET_MAX_CHUNK_SAMPLES, SONIQO_PROGRESS_MAX,
+    SONIQO_PROGRESS_PLANNED, SoniqoChunkStrategy, audio_rms, collect_soniqo_channel_transcripts,
+    ensure_soniqo_diarization_within_limit, pick_language_id_blocks,
+    resample_audio_to_channel_files, soniqo_batch_progress, soniqo_block_has_speech,
+    soniqo_chunk_strategy, soniqo_detects_language, soniqo_diarization_plan_within_limit,
+    soniqo_diarization_speaker_count, soniqo_language_hint, soniqo_recording_route,
 };
 
 #[cfg(test)]

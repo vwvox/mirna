@@ -210,6 +210,10 @@ msgstr "3 days"
 msgid "30 days"
 msgstr "30 days"
 
+#: src/session/components/outer-header/overflow/transcribe-again.tsx
+msgid "52 languages, including Chinese."
+msgstr "52 languages, including Chinese."
+
 #: src/settings/stats/date-range.tsx
 msgid "7 days"
 msgstr "7 days"
@@ -1934,6 +1938,10 @@ msgstr "Couldn’t check availability. You can still try Save."
 msgid "Couldn't copy the invite link. Try again."
 msgstr "Couldn't copy the invite link. Try again."
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Couldn't download Qwen3-ASR"
+msgstr "Couldn't download Qwen3-ASR"
+
 #: src/settings/stats/badge-collection.tsx
 msgid "Couldn't load your badges. Reopen this page to try again."
 msgstr "Couldn't load your badges. Reopen this page to try again."
@@ -2318,6 +2326,10 @@ msgstr "Done"
 msgid "Download"
 msgstr "Download"
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Download Qwen3-ASR"
+msgstr "Download Qwen3-ASR"
+
 #: src/settings/general/e2ee-setup.tsx
 msgid "Download recovery key (.txt)"
 msgstr "Download recovery key (.txt)"
@@ -2637,6 +2649,10 @@ msgstr "Failed to load pull request"
 #: src/settings/stats/badge-collection.tsx
 msgid "Familiar Face"
 msgstr "Familiar Face"
+
+#: src/session/components/outer-header/overflow/transcribe-again.tsx
+msgid "Fast. 25 European languages."
+msgstr "Fast. 25 European languages."
 
 #: src/templates/details.tsx
 msgid "Favorite template"
@@ -3238,6 +3254,10 @@ msgstr "Invited to join"
 #: src/settings/referrals.tsx
 msgid "Invites remaining"
 msgstr "Invites remaining"
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
+msgstr "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 
 #: src/crm/enrich-contact.tsx
 msgid "job title"
@@ -3999,6 +4019,10 @@ msgstr "More"
 #: src/settings/crm/index.tsx
 msgid "More options"
 msgstr "More options"
+
+#: src/session/components/outer-header/overflow/transcribe-again.tsx
+msgid "Most accurate. Slower."
+msgstr "Most accurate. Slower."
 
 #: src/settings/stats/insights.tsx
 msgid "Most conversations: {busiestDay}"
@@ -4895,6 +4919,10 @@ msgstr "Protect cloud sync"
 msgid "Public on the web"
 msgstr "Public on the web"
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Qwen3-ASR is downloading"
+msgstr "Qwen3-ASR is downloading"
+
 #: src/session/components/note-input/transcript/screens/empty.tsx
 msgid "Re-transcribe"
 msgstr "Re-transcribe"
@@ -5152,6 +5180,10 @@ msgstr "Remove repository"
 #: src/settings/team/index.tsx
 msgid "Remove workspace logo"
 msgstr "Remove workspace logo"
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Removed {echoSeconds} s where your mic picked up your speakers. Headphones avoid this."
+msgstr "Removed {echoSeconds} s where your mic picked up your speakers. Headphones avoid this."
 
 #: src/sidebar/folder-materials.tsx
 msgid "Rename"
@@ -6684,6 +6716,22 @@ msgstr "Tomorrow"
 msgid "Transcribe"
 msgstr "Transcribe"
 
+#: src/session/components/outer-header/overflow/transcribe-again.tsx
+msgid "Transcribe again"
+msgstr "Transcribe again"
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Transcribed in the cloud by {engine}."
+msgstr "Transcribed in the cloud by {engine}."
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Transcribed on this Mac with {engine}, because it heard {language}."
+msgstr "Transcribed on this Mac with {engine}, because it heard {language}."
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Transcribed on this Mac with {engine}."
+msgstr "Transcribed on this Mac with {engine}."
+
 #: src/session/components/outer-header/record-control.tsx
 #: src/sidebar/timeline/item.tsx
 msgid "Transcribing"
@@ -7205,6 +7253,10 @@ msgstr "What's new in {version}?"
 msgid "When I say"
 msgstr "When I say"
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "When it's done, choose Transcribe again › Qwen3-ASR in the … menu."
+msgstr "When it's done, choose Transcribe again › Qwen3-ASR in the … menu."
+
 #: src/settings/general/camera-watermark.tsx
 msgid "When Mirna records a call in {switchApps}, switch its camera to Mirna Camera."
 msgstr "When Mirna records a call in {switchApps}, switch its camera to Mirna Camera."
@@ -7228,6 +7280,10 @@ msgstr "whisper.cpp models"
 #: src/settings/dictation-engine.tsx
 msgid "With text selected in another app, say how to change it. The selection is sent to your selected AI model and is left unchanged if editing fails."
 msgstr "With text selected in another app, say how to change it. The selection is sent to your selected AI model and is left unchanged if editing fails."
+
+#: src/session/components/outer-header/overflow/transcribe-again.tsx
+msgid "With your settings"
+msgstr "With your settings"
 
 #: src/settings/dictionary/replacements.tsx
 msgid "Words you fixed after dictating. Add them so dictation spells them right next time."

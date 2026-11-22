@@ -6,7 +6,6 @@ import { commands as fsSyncCommands } from "@anlg/plugin-fs-sync";
 import { commands as openerCommands } from "@anlg/plugin-opener2";
 import {
   AppWindow,
-  ArrowsClockwise,
   CalendarBlank,
   ClockCounterClockwise,
   DotsThree,
@@ -38,6 +37,7 @@ import { DeleteNote } from "./delete";
 import { ExportModal } from "./export-modal";
 import { Listening } from "./listening";
 import { LockNote } from "./lock-note";
+import { TranscribeAgain } from "./transcribe-again";
 
 import { useAudioPlayer } from "~/audio-player";
 import { DEVICE_AUTH_REASON } from "~/lock/auth";
@@ -45,7 +45,10 @@ import { isLockedFlag } from "~/lock/flag";
 import { useAppLock } from "~/lock/store";
 import { openFloatingMeetingPanel } from "~/meeting-float/host";
 import { isFloatingBarSupported } from "~/meeting-float/support";
-import { useRegenerateTranscript } from "~/session/components/note-input/transcript/actions";
+import {
+  type TranscriptEngineChoice,
+  useRegenerateTranscript,
+} from "~/session/components/note-input/transcript/actions";
 import {
   useCurrentNoteHasContent,
   useHasTranscript,
@@ -136,9 +139,9 @@ export function OverflowButton({
     setOpen(false);
     uploadTranscript();
   };
-  const handleRetranscribe = () => {
+  const handleRetranscribe = (engine?: TranscriptEngineChoice) => {
     setOpen(false);
-    void regenerateTranscript();
+    void regenerateTranscript(engine);
   };
   const handleShowAudioInFolder = async () => {
     setOpen(false);
@@ -221,13 +224,7 @@ export function OverflowButton({
               />
             )}
             {showRetranscribeAction && (
-              <DropdownMenuItem
-                onClick={handleRetranscribe}
-                className="cursor-pointer"
-              >
-                <ArrowsClockwise />
-                <span>Re-transcribe</span>
-              </DropdownMenuItem>
+              <TranscribeAgain onTranscribe={handleRetranscribe} />
             )}
             {showUploadActions && (
               <>

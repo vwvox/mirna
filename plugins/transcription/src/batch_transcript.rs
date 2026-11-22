@@ -22,6 +22,12 @@ pub struct SaveBatchTranscriptRequest {
     pub memo: String,
     pub provider: String,
     pub model: String,
+    /// Language the engine detected, as a base code ("zh"), when it knows.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// How the transcript was made (engine routing, echo removed), as JSON.
+    #[serde(default)]
+    pub metadata_json: Option<String>,
     pub words: Vec<StoredTranscriptWord>,
     pub hints: Vec<StoredSpeakerHint>,
     pub promotion: BatchTranscriptPromotion,
@@ -49,6 +55,8 @@ pub async fn save_batch_transcript(
         memo,
         provider,
         model,
+        language,
+        metadata_json,
         words,
         hints,
         promotion,
@@ -133,6 +141,12 @@ pub async fn save_batch_transcript(
                 memo,
                 provider,
                 model,
+                language: language.unwrap_or_default(),
+                metadata_json: metadata_json
+                    .filter(|json| {
+                        serde_json::from_str::<serde_json::Value>(json).is_ok_and(|v| v.is_object())
+                    })
+                    .unwrap_or_else(|| "{}".to_string()),
                 words_json: serialize_batch_transcript_words(&words)
                     .map_err(|error| error.to_string())?,
                 speaker_hints_json: serialize_batch_transcript_hints(&speaker_hints)
@@ -258,6 +272,8 @@ mod tests {
             memo: "new memo".to_string(),
             provider: "soniox".to_string(),
             model: "batch-v1".to_string(),
+            language: None,
+            metadata_json: None,
             words: vec![stored_word(
                 "new-word",
                 "replacement".to_string(),
@@ -412,6 +428,45 @@ mod tests {
             serde_json::from_str::<Value>(&audio_metadata(&db).await).unwrap()["transcript_status"],
             "complete"
         );
+    }
+
+    #[tokio::test]
+    async fn keeps_the_detected_language_and_how_the_transcript_was_made() {
+        let db = test_db().await;
+        let mut saved = request(BatchTranscriptPromotion::WholeSession);
+        saved.model = "soniqo-qwen3-small".to_string();
+        saved.language = Some("zh".to_string());
+        saved.metadata_json =
+            Some(r#"{"mic_echo":{"removed_seconds":28.4},"soniqo_routing":{"model":"soniqo-qwen3-small"}}"#.to_string());
+        save_batch_transcript(db.pool(), saved).await.unwrap();
+
+        let (model, language, metadata): (String, String, String) = sqlx::query_as(
+            "SELECT model, language, metadata_json FROM transcripts WHERE id = 'transcript-new'",
+        )
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+        assert_eq!(model, "soniqo-qwen3-small");
+        assert_eq!(language, "zh");
+        assert_eq!(
+            serde_json::from_str::<Value>(&metadata).unwrap()["mic_echo"]["removed_seconds"],
+            28.4
+        );
+    }
+
+    #[tokio::test]
+    async fn ignores_metadata_that_is_not_a_json_object() {
+        let db = test_db().await;
+        let mut saved = request(BatchTranscriptPromotion::WholeSession);
+        saved.metadata_json = Some("[1, 2".to_string());
+        save_batch_transcript(db.pool(), saved).await.unwrap();
+
+        let metadata: String =
+            sqlx::query_scalar("SELECT metadata_json FROM transcripts WHERE id = 'transcript-new'")
+                .fetch_one(db.pool())
+                .await
+                .unwrap();
+        assert_eq!(metadata, "{}");
     }
 
     #[tokio::test]

@@ -10,6 +10,7 @@ tauri-event = ["specta", "dep:tauri-specta"]
 
 [dependencies]
 anlg-audio-chunking = { workspace = true }
+anlg-audio-sync = { workspace = true }
 anlg-audio-utils = { workspace = true }
 anlg-embedding = { workspace = true }
 anlg-language = { workspace = true }

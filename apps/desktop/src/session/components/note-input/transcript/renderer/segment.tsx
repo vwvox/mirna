@@ -18,6 +18,7 @@ import {
   getActiveLineIndex,
   groupWordsIntoLines,
   type HighlightSegment,
+  wordSeparator,
 } from "./utils";
 import { WordSpan } from "./word-span";
 
@@ -164,10 +165,24 @@ export const SegmentRenderer = memo(
                     isCurrentLine && "bg-yellow-100/50 dark:bg-yellow-900/30",
                   ])}
                 >
-                  {lineIdx > 0 ? " " : null}
+                  {lineIdx > 0
+                    ? wordSeparator(
+                        getWordDisplayText(
+                          lines[lineIdx - 1]!.words[
+                            lines[lineIdx - 1]!.words.length - 1
+                          ]!,
+                        ),
+                        getWordDisplayText(line.words[0]!),
+                      )
+                    : null}
                   {line.words.map((word, idx) => (
                     <Fragment key={word.id ?? `${word.start_ms}-${idx}`}>
-                      {idx > 0 ? " " : null}
+                      {idx > 0
+                        ? wordSeparator(
+                            getWordDisplayText(line.words[idx - 1]!),
+                            getWordDisplayText(word),
+                          )
+                        : null}
                       <WordSpan
                         word={word}
                         displayText={getWordDisplayText(word)}

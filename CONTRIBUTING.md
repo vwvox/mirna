@@ -3,9 +3,9 @@
 ## Prerequisites (macOS, Apple Silicon)
 
 - **Xcode:** full Xcode, with the license accepted (`sudo xcodebuild -license accept`).
-- **Metal Toolchain, optional:** `xcodebuild -downloadComponent MetalToolchain`, needed for Parakeet (Soniqo).
+- **Metal Toolchain:** `xcodebuild -downloadComponent MetalToolchain`, needed for the on-device Soniqo models (Parakeet, Qwen3-ASR). The first build compiles MLX's Metal kernels, about 8 minutes.
   - This download comes from `mesu.apple.com`, which some networks block.
-  - Without it, build with `SONIQO_DISABLE=1`.
+  - Without it, build with `SONIQO_DISABLE=1` and add `"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}` to the `bundle` config.
 - **Rust:** Rust via rustup (`brew install rustup`). Mirna builds with **stable** Rust (1.100+); see the toolchain note below.
 - **Node and pnpm:** Node 24 and pnpm (the repo pins its pnpm version).
 - **cmake:** `brew install cmake`.
@@ -15,9 +15,9 @@
 
 ```bash
 pnpm install
-export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0 SONIQO_DISABLE=1
+export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
-  --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}}}'
+  --config '{"bundle":{"createUpdaterArtifacts":false}}'
 APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
 xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
 codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"

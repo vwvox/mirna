@@ -36,7 +36,7 @@ Package names still use the `anlg`/`anarlog` prefixes. Renaming them is part of 
 - **Lint:** `pnpm exec oxlint --quiet` (run in `apps/desktop`).
 - **Format:** `pnpm exec dprint fmt --allow-no-files <files>`.
 - **Rust:**
-  - Export `RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0 SONIQO_DISABLE=1`.
+  - Export `RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0` (add `SONIQO_DISABLE=1` only on a Mac without the Metal Toolchain).
   - Run `cargo test -p <crate>` or `cargo build -p desktop --no-default-features --features direct-distribution,dev`.
 - **Run the app:** build and sign a debug `.app` as shown in the README. `tauri dev` cannot obtain the system-audio and Accessibility permissions.
 - **See and drive the UI yourself:** with the debug app running, start `pnpm -F desktop dev` and open `http://localhost:1423/app/main` in your browser tool. The relay connects it to the real app (see CONTRIBUTING.md). Use it to check visual changes instead of asking for screenshots.

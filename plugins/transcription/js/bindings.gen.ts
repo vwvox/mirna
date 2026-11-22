@@ -1334,6 +1334,14 @@ export type SaveBatchTranscriptRequest = {
   memo: string;
   provider: string;
   model: string;
+  /**
+   * Language the engine detected, as a base code ("zh"), when it knows.
+   */
+  language?: string | null;
+  /**
+   * How the transcript was made (engine routing, echo removed), as JSON.
+   */
+  metadata_json?: string | null;
   words: StoredTranscriptWord[];
   hints: StoredSpeakerHint[];
   promotion: BatchTranscriptPromotion;

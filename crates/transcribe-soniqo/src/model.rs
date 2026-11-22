@@ -67,6 +67,8 @@ impl SoniqoModel {
         Self::ParakeetStreaming,
         Self::ParakeetBatch,
         Self::Omnilingual,
+        Self::Qwen3Small,
+        Self::Qwen3Large,
     ];
 
     const KNOWN: &'static [Self] = &[
@@ -77,7 +79,12 @@ impl SoniqoModel {
         Self::Qwen3Large,
     ];
 
-    const SELECTABLE: &'static [Self] = &[Self::ParakeetStreaming, Self::ParakeetBatch];
+    const SELECTABLE: &'static [Self] = &[
+        Self::ParakeetBatch,
+        Self::ParakeetStreaming,
+        Self::Qwen3Small,
+        Self::Qwen3Large,
+    ];
 
     pub const fn all() -> &'static [Self] {
         Self::ALL
@@ -112,8 +119,8 @@ impl SoniqoModel {
             Self::ParakeetStreaming => "Parakeet Streaming",
             Self::ParakeetBatch => "Parakeet Batch",
             Self::Omnilingual => "Omnilingual ASR",
-            Self::Qwen3Small => "Qwen3 ASR 0.6B",
-            Self::Qwen3Large => "Qwen3 ASR 1.7B",
+            Self::Qwen3Small => "Qwen3-ASR",
+            Self::Qwen3Large => "Qwen3-ASR Large",
         }
     }
 
@@ -124,8 +131,12 @@ impl SoniqoModel {
                 "Batch transcription with on-device speaker labels for 25 European languages."
             }
             Self::Omnilingual => "Multilingual batch transcription.",
-            Self::Qwen3Small => "Multilingual batch transcription.",
-            Self::Qwen3Large => "Multilingual batch transcription.",
+            Self::Qwen3Small => {
+                "Batch transcription for 52 languages, including Chinese, and for speakers who switch languages."
+            }
+            Self::Qwen3Large => {
+                "The most accurate Qwen3-ASR for 52 languages. Slower, and needs more memory."
+            }
         }
     }
 
@@ -147,8 +158,10 @@ impl SoniqoModel {
         cfg!(all(target_os = "macos", target_arch = "aarch64")) && !self.requires_macos_15()
     }
 
+    /// The Swift bridge is built for macOS 15, Mirna's minimum, so Qwen3-ASR
+    /// runs wherever Mirna does.
     pub(crate) const fn requires_macos_15(self) -> bool {
-        matches!(self, Self::Qwen3Small | Self::Qwen3Large)
+        false
     }
 
     pub const fn supports_live_on_current_platform(self) -> bool {

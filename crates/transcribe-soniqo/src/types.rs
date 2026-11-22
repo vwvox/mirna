@@ -12,6 +12,13 @@ pub struct ModelDownloadState {
     pub error: Option<String>,
 }
 
+/// One ranked guess from spoken-language identification; `code` is ISO 639-1 (e.g. "zh").
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LanguagePrediction {
+    pub code: String,
+    pub probability: f32,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileTranscript {

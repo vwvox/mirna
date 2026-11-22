@@ -1,8 +1,11 @@
 pub use anlg_local_model::{AmModel, AppleSpeechModel, LocalModel, SoniqoModel, WhisperModel};
 
 pub static SUPPORTED_MODELS: &[LocalModel] = &[
-    LocalModel::Soniqo(SoniqoModel::ParakeetStreaming),
+    // Parakeet Batch first: it's what choosing Soniqo picks by default.
     LocalModel::Soniqo(SoniqoModel::ParakeetBatch),
+    LocalModel::Soniqo(SoniqoModel::ParakeetStreaming),
+    LocalModel::Soniqo(SoniqoModel::Qwen3Small),
+    LocalModel::Soniqo(SoniqoModel::Qwen3Large),
     LocalModel::AppleSpeech(AppleSpeechModel::Default),
     LocalModel::Am(AmModel::ParakeetV2),
     LocalModel::Am(AmModel::ParakeetV3),

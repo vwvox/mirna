@@ -4,8 +4,8 @@ use swift_rs::{Bool, SRData, SRString, swift};
 
 use crate::download_error::user_facing_download_error;
 use crate::{
-    DiarizationSegment, Error, FileTranscript, LivePartial, ModelDownloadState, Result,
-    SoniqoModel, TranscriptSource,
+    DiarizationSegment, Error, FileTranscript, LanguagePrediction, LivePartial, ModelDownloadState,
+    Result, SoniqoModel, TranscriptSource,
 };
 
 swift!(fn _soniqo_model_cache_dir(model_id: &SRString) -> SRString);
@@ -23,6 +23,7 @@ swift!(fn _soniqo_diarize_audio(
     samples: &SRData,
     exact_speakers: &SRString
 ) -> SRString);
+swift!(fn _soniqo_identify_language(samples: &SRData) -> SRString);
 swift!(fn _soniqo_live_start(model_id: &SRString) -> SRString);
 swift!(fn _soniqo_live_append(
     session_token: &SRString,
@@ -144,6 +145,25 @@ pub(crate) fn transcribe_file(
         chunks: Vec::new(),
         speaker_segments: Vec::new(),
     })
+}
+
+#[derive(serde::Deserialize)]
+struct LanguageIdPayload {
+    #[serde(default)]
+    predictions: Vec<LanguagePrediction>,
+    error: Option<String>,
+}
+
+pub(crate) fn identify_language(samples: &[f32]) -> Result<Vec<LanguagePrediction>> {
+    let samples = floats_to_sr_data(samples);
+    let payload = unsafe { _soniqo_identify_language(&samples) };
+    let result: LanguageIdPayload = serde_json::from_str(payload.as_str())?;
+
+    if let Some(error) = result.error {
+        return Err(Error::Bridge(user_facing_download_error(&error)));
+    }
+
+    Ok(result.predictions)
 }
 
 pub(crate) fn diarize_samples(

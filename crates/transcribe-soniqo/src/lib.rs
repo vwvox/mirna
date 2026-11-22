@@ -21,9 +21,35 @@ pub use responses::{
     batch_response_from_channels, batch_response_from_text, stream_response_from_text,
 };
 pub use types::{
-    DiarizationSegment, FileTranscript, FileTranscriptChunk, LivePartial, ModelDownloadState,
-    TranscriptSource,
+    DiarizationSegment, FileTranscript, FileTranscriptChunk, LanguagePrediction, LivePartial,
+    ModelDownloadState, TranscriptSource,
 };
+
+/// Below this, a language guess is too unsure to move a recording off Parakeet.
+pub const LANGUAGE_ROUTING_MIN_PROBABILITY: f32 = 0.4;
+
+/// Ranks the spoken language of 16 kHz mono samples, most likely first.
+pub fn identify_language(samples: &[f32]) -> Result<Vec<LanguagePrediction>> {
+    ensure_supported_platform(SoniqoModel::ParakeetBatch)?;
+    platform::identify_language(samples)
+}
+
+/// Parakeet covers 25 European languages. When the identified language is
+/// another one (Chinese, Japanese, Arabic…), Qwen3-ASR transcribes it instead.
+pub fn route_batch_model(model: SoniqoModel, predictions: &[LanguagePrediction]) -> SoniqoModel {
+    if model != SoniqoModel::ParakeetBatch {
+        return model;
+    }
+    match predictions.first() {
+        Some(top)
+            if top.probability >= LANGUAGE_ROUTING_MIN_PROBABILITY
+                && !anlg_language::PARAKEET_TDT_V3_LANGUAGE_CODES.contains(&top.code.as_str()) =>
+        {
+            SoniqoModel::Qwen3Small
+        }
+        _ => model,
+    }
+}
 
 fn ensure_supported_platform(model: SoniqoModel) -> Result<()> {
     if !cfg!(all(target_os = "macos", target_arch = "aarch64")) {
@@ -229,3 +255,49 @@ impl Drop for LiveTranscriptionSession {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+
+    fn guess(code: &str, probability: f32) -> Vec<LanguagePrediction> {
+        vec![LanguagePrediction {
+            code: code.to_string(),
+            probability,
+        }]
+    }
+
+    #[test]
+    fn mandarin_moves_parakeet_batch_to_qwen3() {
+        assert_eq!(
+            route_batch_model(SoniqoModel::ParakeetBatch, &guess("zh", 0.82)),
+            SoniqoModel::Qwen3Small
+        );
+    }
+
+    #[test]
+    fn parakeet_keeps_its_own_languages_and_unsure_guesses() {
+        for code in ["en", "pt", "de"] {
+            assert_eq!(
+                route_batch_model(SoniqoModel::ParakeetBatch, &guess(code, 0.9)),
+                SoniqoModel::ParakeetBatch
+            );
+        }
+        assert_eq!(
+            route_batch_model(SoniqoModel::ParakeetBatch, &guess("zh", 0.2)),
+            SoniqoModel::ParakeetBatch
+        );
+        assert_eq!(
+            route_batch_model(SoniqoModel::ParakeetBatch, &[]),
+            SoniqoModel::ParakeetBatch
+        );
+    }
+
+    #[test]
+    fn a_model_the_user_chose_is_never_rerouted() {
+        assert_eq!(
+            route_batch_model(SoniqoModel::Qwen3Large, &guess("en", 0.99)),
+            SoniqoModel::Qwen3Large
+        );
+    }
+}

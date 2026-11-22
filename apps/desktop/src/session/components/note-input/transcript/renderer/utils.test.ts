@@ -5,6 +5,7 @@ import {
   getActiveLineIndex,
   getSegmentColor,
   getSegmentColorVars,
+  wordSeparator,
 } from "./utils";
 
 import type { SegmentKey, SegmentWord } from "~/stt/live-segment";
@@ -110,3 +111,17 @@ function createWord(
     is_final: true,
   };
 }
+
+describe("wordSeparator", () => {
+  it("runs Chinese, Japanese and Korean text together", () => {
+    expect(wordSeparator("两个宝子。", "巧。")).toBe("");
+    expect(wordSeparator("你好", "世界")).toBe("");
+    expect(wordSeparator("こんにちは", "世界")).toBe("");
+  });
+
+  it("keeps spaces around everything else", () => {
+    expect(wordSeparator("right.", "两个宝子。")).toBe(" ");
+    expect(wordSeparator("出差。", "Verb")).toBe(" ");
+    expect(wordSeparator("hello", "world")).toBe(" ");
+  });
+});

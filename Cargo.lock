@@ -9346,6 +9346,7 @@ dependencies = [
  "aspasia",
  "async-stream",
  "audio-chunking",
+ "audio-sync",
  "audio-utils",
  "axum",
  "data",

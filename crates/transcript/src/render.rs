@@ -260,14 +260,31 @@ fn earliest_started_at(transcripts: &[RenderTranscriptInput]) -> i64 {
 }
 
 pub fn normalize_rendered_segment_words(words: Vec<SegmentWord>) -> Vec<SegmentWord> {
+    let mut previous_end: Option<char> = None;
     words
         .into_iter()
         .enumerate()
         .map(|(index, mut word)| {
-            word.text = normalized_rendered_word_text(&word.text, index == 0);
+            let runs_on = previous_end.is_some_and(is_cjk)
+                && word.text.trim_start().chars().next().is_some_and(is_cjk);
+            word.text = normalized_rendered_word_text(&word.text, index == 0 || runs_on);
+            if let Some(end) = word.text.chars().last() {
+                previous_end = Some(end);
+            }
             word
         })
         .collect()
+}
+
+/// Chinese, Japanese and Korean characters and punctuation, which run on
+/// without spaces between them.
+pub(crate) fn is_cjk(c: char) -> bool {
+    matches!(c,
+        '\u{3000}'..='\u{30ff}'
+        | '\u{3400}'..='\u{4dbf}'
+        | '\u{4e00}'..='\u{9fff}'
+        | '\u{ac00}'..='\u{d7af}'
+        | '\u{ff00}'..='\u{ffef}')
 }
 
 pub fn stable_segment_id(key: &SegmentKey, words: &[SegmentWord]) -> String {
@@ -419,6 +436,31 @@ mod tests {
         assert_eq!(segments[0].text, "hello");
         assert_eq!(segments[1].speaker_label, "Bob");
         assert_eq!(segments[1].text, "world");
+    }
+
+    #[test]
+    fn chinese_sentences_run_on_without_spaces() {
+        let words = normalize_rendered_segment_words(
+            [" 你出差了。", " 出差。", " Verb", " plus", " le.", " 好。"]
+                .iter()
+                .enumerate()
+                .map(|(index, text)| SegmentWord {
+                    text: text.to_string(),
+                    start_ms: index as i64 * 100,
+                    end_ms: index as i64 * 100 + 90,
+                    channel: ChannelProfile::RemoteParty,
+                    is_final: true,
+                    id: None,
+                })
+                .collect(),
+        );
+        assert_eq!(
+            words
+                .iter()
+                .map(|word| word.text.as_str())
+                .collect::<String>(),
+            "你出差了。出差。 Verb plus le. 好。"
+        );
     }
 
     #[test]
