@@ -662,9 +662,11 @@ const SessionItem = memo(
           stop: state.stop,
           amplitude: sessionMode === "active" ? state.live.amplitude : null,
           liveSeconds: sessionMode === "active" ? state.live.seconds : 0,
+          // Stored as a 0–1 fraction; rows show a percentage.
           batchPercent:
-            sessionMode === "running_batch"
-              ? (state.batch[sessionId]?.percentage ?? null)
+            sessionMode === "running_batch" &&
+            typeof state.batch[sessionId]?.percentage === "number"
+              ? state.batch[sessionId]!.percentage! * 100
               : null,
         };
       });

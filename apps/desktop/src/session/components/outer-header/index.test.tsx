@@ -110,7 +110,7 @@ vi.mock("~/stt/contexts", () => ({
         amplitude: { mic: 0.4, speaker: 0.2 },
         captureHealth: { mic: true, speaker: true, unavailable: false },
       },
-      batch: { "session-1": { percentage: 64 } },
+      batch: { "session-1": { percentage: 0.64 } },
     }),
   ),
 }));

@@ -158,11 +158,13 @@ export function ProcessingStatus({
   sessionMode: string;
 }) {
   const { t } = useLingui();
-  const percent = useListener((state) =>
+  const fraction = useListener((state) =>
     sessionMode === "running_batch"
       ? (state.batch[sessionId]?.percentage ?? null)
       : null,
   );
+  // Batch progress is stored as a 0–1 fraction, like the transcript view reads it.
+  const percent = fraction === null ? null : fraction * 100;
   const label =
     sessionMode === "running_batch" ? t`Transcribing` : t`Finishing up`;
 
