@@ -262,7 +262,9 @@
     os_type: env.platform,
     family: env.isWindows ? "windows" : "unix",
     version: navigator.userAgent,
-    arch: "x86_64",
+    // Filled in by the dev server, which runs on the same machine as the app;
+    // on-device transcription checks it to know this is Apple silicon.
+    arch: "__RELAY_ARCH__".indexOf("__") === 0 ? "x86_64" : "__RELAY_ARCH__",
     eol: env.isWindows ? "\r\n" : "\n",
     exe_extension: env.isWindows ? "exe" : "",
   };

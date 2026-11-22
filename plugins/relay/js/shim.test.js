@@ -5,7 +5,7 @@ import vm from "node:vm";
 
 const shim = readFileSync(new URL("./shim.js", import.meta.url), "utf8");
 
-function loadShim() {
+function loadShim(source = shim) {
   const timers = [];
   const sockets = [];
   let reloads = 0;
@@ -34,7 +34,7 @@ function loadShim() {
       },
     },
   };
-  vm.runInNewContext(shim, {
+  vm.runInNewContext(source, {
     clearTimeout() {},
     console: { info() {} },
     navigator: { userAgent: "test" },
@@ -153,3 +153,12 @@ for (const [outcome, settle, expected] of [
     assert.equal(relay.window[`_${callbackId}`], undefined);
   });
 }
+
+test("reports the architecture the dev server filled in", () => {
+  assert.equal(
+    loadShim(shim.replaceAll("__RELAY_ARCH__", "aarch64")).window
+      .__TAURI_OS_PLUGIN_INTERNALS__.arch,
+    "aarch64",
+  );
+  assert.equal(loadShim().window.__TAURI_OS_PLUGIN_INTERNALS__.arch, "x86_64");
+});
