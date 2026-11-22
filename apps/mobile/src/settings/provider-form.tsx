@@ -6,11 +6,10 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Linking } from "react-native";
 
-import { ProRequiredError } from "@/auth/billing";
 import { useAuth } from "@/auth/context";
 import { FieldGroup } from "@/settings/field-group";
 import { Button, ListItem, Text, TextInput } from "@/settings/fields";
@@ -76,8 +75,6 @@ function ProviderForm({
   config: ProviderConfig;
 }) {
   const Colors = useColors();
-  const auth = useAuth();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const definitions = providersFor(kind).filter(({ id }) => id !== "anarlog");
   const setups = useQueries({
@@ -98,7 +95,7 @@ function ProviderForm({
     ),
   );
   const providerOptions = providersFor(kind).filter(
-    ({ id }) => id === "anarlog" || configuredIds.has(id),
+    ({ id }) => id !== "anarlog" && configuredIds.has(id),
   );
   const visibleProvider = providerOptions.some(
     ({ id }) => id === selectedProvider,
@@ -114,8 +111,6 @@ function ProviderForm({
       provider: string;
       model?: string;
     }) => {
-      if (provider === "anarlog" && !auth.billing.isPro && !auth.bypass)
-        throw new ProRequiredError();
       const setup = await readProviderSetup(account, kind, provider);
       const save =
         selectedProviderRef.current === provider
@@ -133,13 +128,6 @@ function ProviderForm({
       await queryClient.invalidateQueries({
         queryKey: ["provider-setup", account, kind],
       });
-    },
-    onError: (error) => {
-      if (error instanceof ProRequiredError) {
-        selectedProviderRef.current = config.provider;
-        setSelectedProvider(config.provider);
-        router.push("/settings/pro");
-      }
     },
   });
   return (
@@ -207,9 +195,7 @@ function ProviderForm({
           >
             {select.error instanceof Error
               ? select.error.message
-              : selectedProvider === "anarlog"
-                ? "Included with your Pro trial or subscription. No API key needed."
-                : "Choose your model here. Configure connections below."}
+              : "Choose your model here. Configure connections below."}
           </Text>
         </FieldGroup.SectionFooter>
       </FieldGroup.Section>

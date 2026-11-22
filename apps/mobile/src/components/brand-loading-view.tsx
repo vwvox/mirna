@@ -1,5 +1,4 @@
-import { Image } from "expo-image";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, useColorScheme, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -12,21 +11,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
+import { Colors, DarkColors, Typography } from "@/constants/theme";
 import { useMountEffect } from "@/lib/use-mount-effect";
-import { createStyleHook } from "@/settings/theme-provider";
 
-const WORDMARK_WIDTH = 200;
-const WORDMARK_HEIGHT = 56;
-const WORDMARK_SOURCE_WIDTH = 1_205;
-const WORDMARK_SCALE = WORDMARK_WIDTH / WORDMARK_SOURCE_WIDTH;
-const REVEAL_STEPS = [154, 357, 538, 714, 786, 1_006, 1_205].map(
-  (width) => width * WORDMARK_SCALE,
-);
-const FIRST_REVEAL = REVEAL_STEPS[0];
-const CURSOR_GAP = 166.49 * WORDMARK_SCALE - FIRST_REVEAL;
-const LOGO_SHIFT = -(WORDMARK_WIDTH - FIRST_REVEAL) / 2;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
+// The native splash shows the app icon; this view follows it with the "mirna"
+// wordmark alone, so the icon and wordmark never appear together.
 export function BrandLoadingView({
   animated = false,
   onAnimationComplete,
@@ -34,166 +25,67 @@ export function BrandLoadingView({
   animated?: boolean;
   onAnimationComplete?: () => void;
 }) {
-  const styles = useStyles();
+  // Follows the system appearance, like the native splash screen before it.
+  const palette = useColorScheme() === "dark" ? DarkColors : Colors;
   const reducedMotion = useReducedMotion();
   const shouldAnimate = animated && !reducedMotion;
-  const logoOpacity = useSharedValue(shouldAnimate ? 1 : 0);
-  const logoScale = useSharedValue(1);
-  const logoTranslateX = useSharedValue(0);
-  const revealWidth = useSharedValue(
-    shouldAnimate ? FIRST_REVEAL : WORDMARK_WIDTH,
-  );
-  const wordmarkOpacity = useSharedValue(shouldAnimate ? 0 : 1);
-  const cursorOpacity = useSharedValue(0);
+  const opacity = useSharedValue(shouldAnimate ? 0 : 1);
+  const translateY = useSharedValue(shouldAnimate ? 6 : 0);
 
   useMountEffect(() => {
-    if (!animated || reducedMotion) {
+    if (!shouldAnimate) {
       onAnimationComplete?.();
       return;
     }
 
-    logoScale.set(
-      withDelay(160, withTiming(0.6, { duration: 200, easing: EASE_OUT })),
-    );
-    logoTranslateX.set(
-      withDelay(
-        160,
-        withTiming(LOGO_SHIFT, { duration: 200, easing: EASE_OUT }),
-      ),
-    );
-    logoOpacity.set(
-      withDelay(320, withTiming(0, { duration: 100, easing: EASE_OUT })),
-    );
-    wordmarkOpacity.set(
-      withDelay(400, withTiming(1, { duration: 100, easing: EASE_OUT })),
-    );
-    revealWidth.set(
+    translateY.set(withTiming(0, { duration: 420, easing: EASE_OUT }));
+    opacity.set(
       withSequence(
-        ...REVEAL_STEPS.slice(1).map((width, index) =>
-          withDelay(index === 0 ? 560 : 90, withTiming(width, { duration: 1 })),
+        withTiming(1, { duration: 420, easing: EASE_OUT }),
+        // Hold the wordmark briefly before the app appears.
+        withDelay(
+          280,
+          withTiming(1, { duration: 1 }, (finished) => {
+            if (finished && onAnimationComplete) {
+              scheduleOnRN(onAnimationComplete);
+            }
+          }),
         ),
-      ),
-    );
-    cursorOpacity.set(
-      withSequence(
-        withDelay(400, withTiming(1, { duration: 100, easing: EASE_OUT })),
-        withDelay(650, withTiming(1, { duration: 1 })),
-        withTiming(0, { duration: 100 }),
-        withTiming(1, { duration: 100 }),
-        withTiming(0, { duration: 100 }, (finished) => {
-          if (finished && onAnimationComplete) {
-            scheduleOnRN(onAnimationComplete);
-          }
-        }),
       ),
     );
 
     return () => {
-      cancelAnimation(cursorOpacity);
-      cancelAnimation(logoOpacity);
-      cancelAnimation(logoScale);
-      cancelAnimation(logoTranslateX);
-      cancelAnimation(revealWidth);
-      cancelAnimation(wordmarkOpacity);
+      cancelAnimation(opacity);
+      cancelAnimation(translateY);
     };
   });
 
-  const logoStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.get(),
-    transform: [
-      { translateX: logoTranslateX.get() },
-      { scale: logoScale.get() },
-    ],
-  }));
   const wordmarkStyle = useAnimatedStyle(() => ({
-    opacity: wordmarkOpacity.get(),
-  }));
-  const coverStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: revealWidth.get() }],
-  }));
-  const cursorStyle = useAnimatedStyle(() => ({
-    opacity: cursorOpacity.get(),
-    transform: [{ translateX: revealWidth.get() + CURSOR_GAP }],
+    opacity: opacity.get(),
+    transform: [{ translateY: translateY.get() }],
   }));
 
   return (
     <View
       accessible
-      accessibilityLabel="Loading Anarlog"
+      accessibilityLabel="Loading Mirna"
       accessibilityRole="progressbar"
-      style={styles.container}
+      style={[styles.container, { backgroundColor: palette.brandBackgroundTop }]}
     >
-      <View style={styles.animationFrame}>
-        <Animated.View style={[styles.mark, logoStyle]}>
-          <Image
-            contentFit="contain"
-            source={require("../../assets/images/splash-icon.png")}
-            style={StyleSheet.absoluteFill}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.wordmark, wordmarkStyle]}>
-          <View style={styles.wordmarkClip}>
-            <Image
-              contentFit="contain"
-              source={require("../../assets/images/anarlog-wordmark.png")}
-              style={StyleSheet.absoluteFill}
-            />
-            <Animated.View style={[styles.wordmarkCover, coverStyle]} />
-          </View>
-          <Animated.View style={[styles.cursor, cursorStyle]}>
-            <Image
-              contentFit="contain"
-              source={require("../../assets/images/anarlog-underscore.svg")}
-              style={styles.cursorImage}
-            />
-          </Animated.View>
-        </Animated.View>
-      </View>
+      <Animated.Text
+        style={[styles.wordmark, { color: palette.primary }, wordmarkStyle]}
+      >
+        mirna
+      </Animated.Text>
     </View>
   );
 }
 
-const useStyles = createStyleHook((Colors) => ({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.brandBackgroundTop,
   },
-  animationFrame: {
-    width: WORDMARK_WIDTH,
-    height: WORDMARK_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mark: {
-    position: "absolute",
-    width: 76,
-    height: 76,
-  },
-  wordmark: {
-    position: "absolute",
-    width: WORDMARK_WIDTH,
-    height: WORDMARK_HEIGHT,
-  },
-  wordmarkClip: {
-    width: WORDMARK_WIDTH,
-    height: WORDMARK_HEIGHT,
-    overflow: "hidden",
-  },
-  wordmarkCover: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: Colors.brandBackgroundTop,
-  },
-  cursor: {
-    position: "absolute",
-    top: (WORDMARK_HEIGHT - 334 * WORDMARK_SCALE) / 2 + 221.65 * WORDMARK_SCALE,
-    left: 0,
-    width: 64.37 * WORDMARK_SCALE,
-    height: 35.46 * WORDMARK_SCALE,
-  },
-  cursorImage: {
-    flex: 1,
-    tintColor: Colors.ink,
-  },
-}));
+  wordmark: Typography.wordmark,
+});

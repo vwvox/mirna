@@ -28,7 +28,7 @@ import {
   type LiveTranscriptionStatus,
 } from "@/data/live-transcription";
 import { generateSummaryAfterTranscription } from "@/data/summarize";
-import { transcribeSession } from "@/data/transcribe";
+import { sendRecordingsToMac } from "@/mac-link/sender";
 import { captureAnalytics } from "@/lib/analytics";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { useMountEffect } from "@/lib/use-mount-effect";
@@ -394,23 +394,22 @@ export function useSessionRecorder(
         contentType: "audio/wav",
       });
       const liveComplete = await (live?.stop() ?? Promise.resolve(false));
-      let transcriptionMode = liveComplete ? "live" : "batch_fallback";
+      // The Mac transcribes and summarizes every recording. A live transcript
+      // (only with the user's own cloud key) stays on the phone as a preview.
+      const transcriptionMode = liveComplete ? "live" : "mac";
       if (liveComplete) {
         await markSessionAudioTranscribed(sessionId)
           .then(() => {
             generateSummaryAfterTranscription(sessionId);
           })
           .catch((error) => {
-            transcriptionMode = "batch_fallback";
             captureOperationalError(error, {
               operation: "transcription_live_mark_complete",
               tags: { mode: "live" },
             });
-            void transcribeSession(sessionId);
           });
-      } else {
-        void transcribeSession(sessionId);
       }
+      void sendRecordingsToMac();
       if (!completionTrackedRef.current) {
         completionTrackedRef.current = true;
         const properties = {

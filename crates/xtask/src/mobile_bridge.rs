@@ -30,12 +30,14 @@ fn bundle_ios_cloudsync() -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn mobile_bridge_android() -> Result<()> {
+/// Extra arguments (for example `--release --targets arm64-v8a`) go straight
+/// to `ubrn build android`.
+pub(crate) fn mobile_bridge_android(extra: &[String]) -> Result<()> {
     let sh = setup_package_shell()?;
     let ubrn = ubrn_path();
     cmd!(
         sh,
-        "{ubrn} build android --config ubrn.config.yaml --and-generate"
+        "{ubrn} build android --config ubrn.config.yaml --and-generate {extra...}"
     )
     .run()?;
     let root = crate::repo_root();

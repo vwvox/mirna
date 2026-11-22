@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 
 import { MarkdownView } from "@/components/markdown-view";
@@ -15,6 +14,8 @@ import {
   useSessionSummaryState,
 } from "@/data/summarize";
 import { transcribeSession, useTranscriptionState } from "@/data/transcribe";
+import { usePairedMac } from "@/mac-link/pairing";
+import { describeMacLink, useMacLinkStatus } from "@/mac-link/status";
 import { createStyleHook } from "@/settings/theme-provider";
 import { useProviderAccess } from "@/settings/use-provider-access";
 
@@ -38,11 +39,12 @@ export function NoteSummary({
   onBeforeGenerate: () => Promise<void> | void;
 }) {
   const styles = useStyles();
-  const router = useRouter();
   const canTranscribe = useProviderAccess("stt");
   const canSummarize = useProviderAccess("llm");
   const summaryState = useSessionSummaryState(sessionId);
   const transcription = useTranscriptionState(sessionId);
+  const { mac } = usePairedMac();
+  const macLink = useMacLinkStatus(sessionId);
   useQuery(
     summaryRecoveryOptions(
       sessionId,
@@ -82,28 +84,26 @@ export function NoteSummary({
               ? "Generating summary…"
               : transcription === "running"
                 ? "Finishing transcription. Your summary will follow automatically."
+                : needsTranscription && mac && macLink && !canTranscribe
+                  ? macLink.state === "failed"
+                    ? describeMacLink(macLink, mac.mac_name)
+                    : `${describeMacLink(macLink, mac.mac_name)}. The summary will appear here when the Mac has made it.`
                 : needsTranscription
-                  ? "Your recording is saved. Finish transcription to get your summary."
+                  ? canTranscribe
+                    ? "Your recording is saved. Finish transcription to get your summary."
+                    : "Your recording is saved on this phone. Pair with your Mac in Settings › Mac and it will be transcribed there."
                   : "Your meeting summary will appear here. Your memos are in the Memos tab."}
         </Text>
       )}
       {!active && needsTranscription && transcription !== "running" && (
         <>
           {!audio.availableLocally && <RemoteAudioCard {...audio.restore} />}
-          {audio.availableLocally && (
+          {audio.availableLocally && canTranscribe && (
             <Button
-              label={
-                canTranscribe
-                  ? "Retry transcription"
-                  : "Choose transcription provider"
-              }
+              label="Retry transcription"
               variant="ghost"
               size="small"
-              onPress={() =>
-                canTranscribe
-                  ? void transcribeSession(sessionId)
-                  : router.push("/settings/transcription-provider")
-              }
+              onPress={() => void transcribeSession(sessionId)}
             />
           )}
         </>
@@ -115,27 +115,24 @@ export function NoteSummary({
       )}
       {!active &&
         !needsTranscription &&
-        (!canSummarize || summaryError || summary || hasTranscript) && (
+        canSummarize &&
+        (summaryError || summary || hasTranscript) && (
           <Button
             label={
-              !canSummarize
-                ? "Choose summary provider"
-                : summaryError && !summarySkipped
-                  ? "Retry summary"
-                  : summary
-                    ? "Regenerate summary"
-                    : "Generate summary"
+              summaryError && !summarySkipped
+                ? "Retry summary"
+                : summary
+                  ? "Regenerate summary"
+                  : "Generate summary"
             }
             loading={summaryPending}
             disabled={transcription === "running"}
             variant="ghost"
             size="small"
             onPress={() =>
-              canSummarize
-                ? void summarizeSession(sessionId, {
-                    beforeGenerate: onBeforeGenerate,
-                  }).catch((error) => notifySummarySkipped(sessionId, error))
-                : router.push("/settings/summary-provider")
+              void summarizeSession(sessionId, {
+                beforeGenerate: onBeforeGenerate,
+              }).catch((error) => notifySummarySkipped(sessionId, error))
             }
           />
         )}

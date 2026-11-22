@@ -8,6 +8,7 @@ import ReanimatedSwipeable, {
 
 import { CornerCurve, Radius, Spacing, Typography } from "@/constants/theme";
 import { relativeLabel, type TimelineSession } from "@/data/timeline";
+import { describeMacLink, type MacLinkStatus } from "@/mac-link/status";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
 const DELETE_ACTIONS: MenuAction[] = [
@@ -22,6 +23,8 @@ const DELETE_ACTIONS: MenuAction[] = [
 const SWIPE_ACTION_WIDTH = 88;
 
 export function SessionCard({
+  macStatus,
+  macName,
   session,
   showFolder,
   showTags,
@@ -29,6 +32,9 @@ export function SessionCard({
   onDelete,
   variant = "card",
 }: {
+  /** Where the recording is on its way to the Mac; absent when not paired. */
+  macStatus?: MacLinkStatus;
+  macName?: string;
   session: TimelineSession;
   showFolder: boolean;
   showTags: boolean;
@@ -83,6 +89,17 @@ export function SessionCard({
         {title}
       </Text>
       <Text style={styles.subtitle}>{relativeLabel(session.startedAt)}</Text>
+      {macStatus && macStatus.state !== "done" && (
+        <Text
+          style={[
+            styles.macStatus,
+            macStatus.state === "failed" && styles.macStatusFailed,
+          ]}
+          numberOfLines={1}
+        >
+          {describeMacLink(macStatus, macName)}
+        </Text>
+      )}
       {tags && (
         <Text style={styles.tags} numberOfLines={1}>
           {tags}
@@ -153,6 +170,12 @@ export function SessionCard({
 }
 
 const useStyles = createStyleHook((Colors) => ({
+  macStatus: {
+    ...Typography.caption,
+    color: Colors.muted,
+    marginTop: Spacing.xs,
+  },
+  macStatusFailed: { color: Colors.destructive },
   row: {
     alignSelf: "stretch",
     marginBottom: Spacing.sm,

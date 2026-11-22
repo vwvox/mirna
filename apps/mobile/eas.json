@@ -31,10 +31,6 @@
   },
   "submit": {
     "stable": {
-      "ios": {
-        "appleId": "john@fastrepl.com",
-        "ascAppId": "6807350358"
-      },
       "android": {
         "track": "production",
         "releaseStatus": "completed"

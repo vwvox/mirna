@@ -2,7 +2,7 @@ import { File, FileMode, Paths } from "expo-file-system";
 
 import { recoverableWav, WAV_HEADER_BYTES, wavHeader } from "@/audio/pcm-wav";
 import { catalogSessionAudio } from "@/data/audio-catalog";
-import { transcribeSession } from "@/data/transcribe";
+import { sendRecordingsToMac } from "@/mac-link/sender";
 import { execute } from "@/db";
 import { captureAnalytics } from "@/lib/analytics";
 import { captureOperationalError } from "@/lib/error-reporting";
@@ -94,9 +94,8 @@ export async function recoverInterruptedRecordings(
     captureAnalytics("recording_recovered", {
       recording_count: recoveredSessionIds.length,
     });
-    for (const sessionId of recoveredSessionIds) {
-      void transcribeSession(sessionId);
-    }
+    // Recovered recordings go to the Mac like any other.
+    void sendRecordingsToMac();
   }
   return recoveredSessionIds.length;
 }

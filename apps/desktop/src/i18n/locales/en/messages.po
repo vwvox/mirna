@@ -624,6 +624,10 @@ msgstr "Analyzing structure..."
 msgid "Anarlog Pro coordinates recording across your devices."
 msgstr "Anarlog Pro coordinates recording across your devices."
 
+#: src/sidebar/settings-nav-groups.ts
+msgid "Android"
+msgstr "Android"
+
 #: src/templates/template-icon-picker.tsx
 msgid "Animals & Nature"
 msgstr "Animals & Nature"
@@ -964,6 +968,7 @@ msgstr "Can view"
 #: src/settings/dictionary/index.tsx
 #: src/settings/general/e2ee-setup.tsx
 #: src/settings/general/storage/legacy-cleanup.tsx
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 #: src/settings/team/index.tsx
 #: src/settings/todo/github.tsx
@@ -1737,6 +1742,10 @@ msgstr "Copy link"
 #: src/chat/components/message/normal.tsx
 msgid "Copy message"
 msgstr "Copy message"
+
+#: src/settings/phone/index.tsx
+msgid "Copy pairing link"
+msgstr "Copy pairing link"
 
 #: src/settings/general/e2ee-setup.tsx
 msgid "Copy recovery key"
@@ -3259,6 +3268,10 @@ msgstr "Invites remaining"
 msgid "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 msgstr "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 
+#: src/settings/phone/index.tsx
+msgid "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
+msgstr "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
+
 #: src/crm/enrich-contact.tsx
 msgid "job title"
 msgstr "job title"
@@ -3394,6 +3407,8 @@ msgid "Last run failed {relative}: {0}"
 msgstr "Last run failed {relative}: {0}"
 
 #. placeholder {0}: formatDistanceToNow(new Date(device.lastSeenAt))
+#. placeholder {0}: formatDistanceToNow(new Date(phone.last_seen_ms), { addSuffix: true })
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 msgid "Last seen {0}"
 msgstr "Last seen {0}"
@@ -3478,6 +3493,11 @@ msgstr "List action items so far."
 #: src/chat/components/body/empty.tsx
 msgid "List action items."
 msgstr "List action items."
+
+#. placeholder {0}: status.data.addresses.join(", ") || "this Mac"
+#: src/settings/phone/index.tsx
+msgid "Listening for your phone at {0}."
+msgstr "Listening for your phone at {0}."
 
 #: src/settings/dictation.tsx
 msgid "Listening…"
@@ -3951,6 +3971,10 @@ msgstr "Mirna needs access to your microphone and system audio to record and tra
 msgid "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
 msgstr "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
 
+#: src/settings/phone/index.tsx
+msgid "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+msgstr "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+
 #. placeholder {0}: statuses[0].displayName
 #: src/settings/developers/skills.tsx
 msgid "Mirna skill added to {0}"
@@ -4285,6 +4309,10 @@ msgstr "No people"
 msgid "No people in this organization"
 msgstr "No people in this organization"
 
+#: src/settings/phone/index.tsx
+msgid "No phone is paired yet."
+msgstr "No phone is paired yet."
+
 #: src/settings/ai/llm/configure.tsx
 #: src/settings/ai/llm/select.tsx
 #: src/settings/ai/stt/configure.tsx
@@ -4373,6 +4401,10 @@ msgstr "Not installed"
 msgid "Not invited"
 msgstr "Not invited"
 
+#: src/settings/phone/index.tsx
+msgid "Not listening: no phone is paired."
+msgstr "Not listening: no phone is paired."
+
 #: src/billing/trial-payment-reminder-dialog.tsx
 msgid "Not now"
 msgstr "Not now"
@@ -4380,6 +4412,10 @@ msgstr "Not now"
 #: src/settings/developers/webhooks.tsx
 msgid "not receiving events"
 msgstr "not receiving events"
+
+#: src/settings/phone/index.tsx
+msgid "Not seen yet"
+msgstr "Not seen yet"
 
 #: src/resource-sharing/share-dialog.tsx
 msgid "Not shared with a Team"
@@ -4557,6 +4593,10 @@ msgstr "Open Mirna from the menu bar."
 msgid "Open Mirna on an existing synced device signed in to the same account. This device will connect automatically."
 msgstr "Open Mirna on an existing synced device signed in to the same account. This device will connect automatically."
 
+#: src/settings/phone/index.tsx
+msgid "Open Mirna on your phone and scan this code"
+msgstr "Open Mirna on your phone and scan this code"
+
 #: src/task/resource-view.tsx
 msgid "Open on GitHub"
 msgstr "Open on GitHub"
@@ -4666,6 +4706,33 @@ msgstr "Ownership transfer Pending. Current ownership and permissions remain unc
 msgid "Page not found"
 msgstr "Page not found"
 
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Pair a phone"
+msgstr "Pair a phone"
+
+#: src/settings/phone/index.tsx
+msgid "Pair another phone"
+msgstr "Pair another phone"
+
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Paired phones"
+msgstr "Paired phones"
+
+#. placeholder {0}: event.payload.name
+#: src/settings/phone/index.tsx
+msgid "Paired with {0}"
+msgstr "Paired with {0}"
+
+#: src/settings/phone/index.tsx
+msgid "Pairing code"
+msgstr "Pairing code"
+
+#: src/settings/phone/index.tsx
+msgid "Pairing link copied. Paste it in Mirna on your phone."
+msgstr "Pairing link copied. Paste it in Mirna on your phone."
+
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/session/components/outer-header/overflow/export-modal.tsx
 msgid "Participants"
@@ -4765,6 +4832,8 @@ msgstr "phone"
 
 #: src/contacts/details.tsx
 #: src/settings/general/account-profile.tsx
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
 msgid "Phone"
 msgstr "Phone"
 
@@ -5035,6 +5104,10 @@ msgstr "Record"
 msgid "Record more"
 msgstr "Record more"
 
+#: src/settings/phone/index.tsx
+msgid "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
+msgstr "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
+
 #: src/settings/general/permissions.tsx
 msgid "Record other participants in meetings."
 msgstr "Record other participants in meetings."
@@ -5124,6 +5197,7 @@ msgstr "Remote MCP URL copied"
 
 #: src/resource-sharing/share-dialog.tsx
 #: src/session-sharing/access-management.tsx
+#: src/settings/phone/index.tsx
 #: src/sidebar/automations.tsx
 msgid "Remove"
 msgstr "Remove"

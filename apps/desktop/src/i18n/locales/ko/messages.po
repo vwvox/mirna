@@ -624,6 +624,10 @@ msgstr ""
 msgid "Anarlog Pro coordinates recording across your devices."
 msgstr ""
 
+#: src/sidebar/settings-nav-groups.ts
+msgid "Android"
+msgstr ""
+
 #: src/templates/template-icon-picker.tsx
 msgid "Animals & Nature"
 msgstr ""
@@ -964,6 +968,7 @@ msgstr ""
 #: src/settings/dictionary/index.tsx
 #: src/settings/general/e2ee-setup.tsx
 #: src/settings/general/storage/legacy-cleanup.tsx
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 #: src/settings/team/index.tsx
 #: src/settings/todo/github.tsx
@@ -1736,6 +1741,10 @@ msgstr "링크 복사"
 
 #: src/chat/components/message/normal.tsx
 msgid "Copy message"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Copy pairing link"
 msgstr ""
 
 #: src/settings/general/e2ee-setup.tsx
@@ -3259,6 +3268,10 @@ msgstr "남은 초대 횟수"
 msgid "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
+msgstr ""
+
 #: src/crm/enrich-contact.tsx
 msgid "job title"
 msgstr ""
@@ -3394,6 +3407,8 @@ msgid "Last run failed {relative}: {0}"
 msgstr ""
 
 #. placeholder {0}: formatDistanceToNow(new Date(device.lastSeenAt))
+#. placeholder {0}: formatDistanceToNow(new Date(phone.last_seen_ms), { addSuffix: true })
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 msgid "Last seen {0}"
 msgstr ""
@@ -3477,6 +3492,11 @@ msgstr ""
 
 #: src/chat/components/body/empty.tsx
 msgid "List action items."
+msgstr ""
+
+#. placeholder {0}: status.data.addresses.join(", ") || "this Mac"
+#: src/settings/phone/index.tsx
+msgid "Listening for your phone at {0}."
 msgstr ""
 
 #: src/settings/dictation.tsx
@@ -3951,6 +3971,10 @@ msgstr ""
 msgid "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+msgstr ""
+
 #. placeholder {0}: statuses[0].displayName
 #: src/settings/developers/skills.tsx
 msgid "Mirna skill added to {0}"
@@ -4285,6 +4309,10 @@ msgstr ""
 msgid "No people in this organization"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "No phone is paired yet."
+msgstr ""
+
 #: src/settings/ai/llm/configure.tsx
 #: src/settings/ai/llm/select.tsx
 #: src/settings/ai/stt/configure.tsx
@@ -4373,12 +4401,20 @@ msgstr ""
 msgid "Not invited"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Not listening: no phone is paired."
+msgstr ""
+
 #: src/billing/trial-payment-reminder-dialog.tsx
 msgid "Not now"
 msgstr ""
 
 #: src/settings/developers/webhooks.tsx
 msgid "not receiving events"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Not seen yet"
 msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
@@ -4557,6 +4593,10 @@ msgstr ""
 msgid "Open Mirna on an existing synced device signed in to the same account. This device will connect automatically."
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Open Mirna on your phone and scan this code"
+msgstr ""
+
 #: src/task/resource-view.tsx
 msgid "Open on GitHub"
 msgstr ""
@@ -4666,6 +4706,33 @@ msgstr ""
 msgid "Page not found"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Pair a phone"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pair another phone"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Paired phones"
+msgstr ""
+
+#. placeholder {0}: event.payload.name
+#: src/settings/phone/index.tsx
+msgid "Paired with {0}"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pairing code"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pairing link copied. Paste it in Mirna on your phone."
+msgstr ""
+
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/session/components/outer-header/overflow/export-modal.tsx
 msgid "Participants"
@@ -4765,6 +4832,8 @@ msgstr ""
 
 #: src/contacts/details.tsx
 #: src/settings/general/account-profile.tsx
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
 msgid "Phone"
 msgstr ""
 
@@ -5035,6 +5104,10 @@ msgstr ""
 msgid "Record more"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
+msgstr ""
+
 #: src/settings/general/permissions.tsx
 msgid "Record other participants in meetings."
 msgstr ""
@@ -5124,6 +5197,7 @@ msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
 #: src/session-sharing/access-management.tsx
+#: src/settings/phone/index.tsx
 #: src/sidebar/automations.tsx
 msgid "Remove"
 msgstr ""

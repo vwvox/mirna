@@ -40,15 +40,12 @@ export default function RecordingSettings() {
       </FieldGroup.Section>
       <FieldGroup.Section>
         <SettingsRow
-          title="Recording storage"
+          title="Saved recordings"
           description="View recordings saved on this device"
-          onPress={() => router.push("/settings/sync")}
+          onPress={() => router.push("/settings/recordings")}
         />
         <FieldGroup.SectionFooter>
-          <Text>
-            Recordings are saved on this device first. Keep Anarlog open to
-            finish backing them up.
-          </Text>
+          <Text>Recordings are saved on this device.</Text>
         </FieldGroup.SectionFooter>
       </FieldGroup.Section>
     </SettingsPage>

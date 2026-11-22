@@ -76,10 +76,10 @@ export function AudioChip({
     }
   };
 
-  const detail =
+  const playback =
     status.playing || status.currentTime > 0
       ? `${formatSeconds(status.currentTime)} / ${formatSeconds(status.duration)}`
-      : formatBytes(sizeBytes);
+      : null;
 
   return (
     <Pressable
@@ -92,7 +92,12 @@ export function AudioChip({
         color={Colors.accent}
       />
       <Text style={styles.label} numberOfLines={1}>
-        {filename} · {detail}
+        {filename} ·{" "}
+        {playback ? (
+          <Text style={styles.time}>{playback}</Text>
+        ) : (
+          formatBytes(sizeBytes)
+        )}
       </Text>
     </Pressable>
   );
@@ -121,5 +126,10 @@ const useStyles = createStyleHook((Colors) => ({
     ...Typography.captionStrong,
     color: Colors.ink,
     maxWidth: 180,
+  },
+  time: {
+    ...Typography.time,
+    fontSize: Typography.captionStrong.fontSize,
+    lineHeight: Typography.captionStrong.lineHeight,
   },
 }));

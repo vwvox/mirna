@@ -11,9 +11,12 @@ export function summaryRequest(
   provider: ProviderConfig & { apiKey: string; accountId?: string },
   system: string,
   source: string,
-  apiUrl: string,
-  task: "enhance" | "title" = "enhance",
+  // Kept for call-site compatibility; Mirna has no hosted summary endpoint.
+  _apiUrl = "",
+  _task: "enhance" | "title" = "enhance",
 ) {
+  if (provider.provider === "anarlog")
+    throw new Error("No summary provider is set up.");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -84,10 +87,6 @@ export function summaryRequest(
   if (provider.provider === "azure_ai") headers["api-key"] = provider.apiKey;
   if (provider.provider === "github_copilot")
     Object.assign(headers, COPILOT_HEADERS);
-  if (provider.provider === "anarlog") {
-    baseUrl = `${apiUrl}/llm`;
-    headers["x-char-task"] = task;
-  }
   return {
     url: `${baseUrl}/chat/completions`,
     headers,

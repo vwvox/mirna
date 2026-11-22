@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
-import { RefreshControl, Text, View } from "react-native";
+import { RefreshControl, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
   ReduceMotion,
@@ -29,9 +29,11 @@ import { IconButton } from "@/components/ui/icon-button";
 import { UserAvatarButton } from "@/components/user-avatar";
 import {
   LISTENING_CONTROL_HEIGHT,
+  Radius,
   Spacing,
   Typography,
 } from "@/constants/theme";
+import { importRecordingAsNewNote } from "@/data/import-voice-memo";
 import { createSession, deleteSession } from "@/data/session";
 import { useSidebarItemPreferences } from "@/data/sidebar-preferences";
 import { useTimelineSessions, type TimelineSession } from "@/data/timeline";
@@ -43,8 +45,10 @@ import {
   dismissActionButtonCard,
   useActionButtonSetup,
 } from "@/quick-actions/action-button-setup";
+import { usePairedMac } from "@/mac-link/pairing";
+import { sendRecordingsToMac } from "@/mac-link/sender";
+import { useMacLinkStatuses } from "@/mac-link/status";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
-import { syncMobileNow } from "@/sync/mobile-sync";
 
 export default function HomeScreen() {
   const styles = useStyles();
@@ -57,7 +61,21 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const [searching, setSearching] = useState(false);
-  const refresh = useMutation({ mutationFn: syncMobileNow });
+  const refresh = useMutation({ mutationFn: sendRecordingsToMac });
+  const { mac, loading: macLoading } = usePairedMac();
+  const macStatuses = useMacLinkStatuses();
+  const importRecording = useMutation({
+    mutationFn: () => importRecordingAsNewNote(auth.session?.user.id),
+    onSuccess: (sessionId) => {
+      if (sessionId) router.push(`/note/${sessionId}`);
+    },
+    onError: (error) => {
+      captureOperationalError(error, {
+        operation: "session_import",
+        tags: { entry_point: "mobile_home" },
+      });
+    },
+  });
   const actionButtonSetup = useActionButtonSetup();
   const showActionButtonCard =
     deviceHasActionButton &&
@@ -176,6 +194,12 @@ export default function HomeScreen() {
             onPress={() => void createAndOpen()}
           />
           <IconButton
+            accessibilityLabel="Import a recording"
+            disabled={importRecording.isPending}
+            icon="import"
+            onPress={() => importRecording.mutate()}
+          />
+          <IconButton
             accessibilityLabel="Search meetings"
             icon="search"
             onPress={() => setSearching(true)}
@@ -216,7 +240,21 @@ export default function HomeScreen() {
             />
           }
           ListHeaderComponent={
-            showActionButtonCard ? (
+            !macLoading && !mac ? (
+              <View style={styles.pairCard}>
+                <Text style={styles.pairTitle}>Pair with your Mac</Text>
+                <Text style={styles.pairBody}>
+                  Recordings made here are sent to Mirna on your Mac over
+                  Wi-Fi, which transcribes and summarizes them.
+                </Text>
+                <Button
+                  label="Pair"
+                  onPress={() => router.push("/settings/mac")}
+                  size="small"
+                  variant="outline"
+                />
+              </View>
+            ) : showActionButtonCard ? (
               <ActionButtonCard
                 onConfigure={() => router.push("/action-button")}
                 onDismiss={() => void dismissActionButtonCard()}
@@ -234,7 +272,7 @@ export default function HomeScreen() {
               </Text>
               {!isLoading && !error && (
                 <Text style={styles.emptyBody}>
-                  Start listening or create a new note.
+                  Start listening, or import a recording such as a call recorded by your phone.
                 </Text>
               )}
             </View>
@@ -261,6 +299,8 @@ export default function HomeScreen() {
             }
             return (
               <SessionCard
+                macStatus={mac ? macStatuses.get(item.session.id) : undefined}
+                macName={mac?.mac_name}
                 session={item.session}
                 showFolder={sidebarPreferences.showFolder}
                 showTags={sidebarPreferences.showTags}
@@ -303,6 +343,17 @@ export default function HomeScreen() {
 }
 
 const useStyles = createStyleHook((Colors) => ({
+  pairCard: {
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.card,
+    backgroundColor: Colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.border,
+  },
+  pairTitle: { ...Typography.section, color: Colors.ink },
+  pairBody: { ...Typography.body, color: Colors.muted },
   safeArea: {
     flex: 1,
     backgroundColor: Colors.background,

@@ -30,7 +30,6 @@ const fixture = (globalThis.mobileSettingsFixture = {
   db: null,
   keys: new Map(),
   storage: new Map(),
-  sentry: { starts: 0, closes: 0, client: null, nativeEnabled: false },
   session: null,
   requests: [],
   respond: () =>
@@ -97,13 +96,6 @@ const modules = {
   "expo-constants": `export default {expoConfig: {version: 'test'}};`,
   "expo-crypto": `export { randomUUID } from 'node:crypto';`,
   "react-native": `export const Platform = {OS: 'ios'}; export const AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };`,
-  "@sentry/react-native": `const state = globalThis.mobileSettingsFixture.sentry;
-    export function init(options) { state.starts++; state.nativeEnabled = true; state.client = { getOptions: () => options }; }
-    export function getClient() { return state.client; }
-    export function withScope(callback) { callback({setTag() {}, setContext() {}, setLevel() {}}); }
-    export function captureException() {}
-    export async function close() { state.closes++; state.nativeEnabled = false; }
-  `,
 };
 
 registerHooks({
@@ -271,7 +263,7 @@ test("provider availability follows saved device keys for transcription and summ
   for (const kind of ["stt", "llm"]) {
     for (const { id } of providersFor(kind)) {
       const status = await readProviderStatus("account-a", kind, id);
-      assert.equal(status.isConfigured, id === "anarlog", `${kind}/${id}`);
+      assert.equal(status.isConfigured, false, `${kind}/${id}`);
     }
     const config = defaultProviderConfig(kind, "openai");
     await saveProviderConnection("account-a", kind, config, "synthetic-key");
@@ -459,9 +451,11 @@ test("provider keys stay in device-only secure storage, separated by account and
   assert.equal(fixture.requests.length, 0);
 });
 
-test("hosted Anarlog Pro requires a session token", async () => {
+test("without a provider of the user's own there is nothing to call", async () => {
   fixture.session = null;
-  await assert.rejects(resolveProvider("stt"), /Sign in to use Anarlog Pro/);
+  assert.equal(await resolveProvider("stt"), null);
+  assert.equal(await resolveProvider("llm"), null);
+  assert.equal(fixture.requests.length, 0);
 });
 
 function chatgptCredential(overrides = {}) {
@@ -1160,7 +1154,7 @@ test("corrupt privacy JSON does not enable app lock", async () => {
   assert.equal(preferencesFromStoredValue('{"appLock":true}').appLock, true);
 });
 
-test("missing keys cannot activate a provider and selecting Pro uses only the account token", async () => {
+test("missing keys cannot activate a provider and a Pro account never selects hosted models", async () => {
   await assert.rejects(
     saveProviderConfig(null, "stt", defaultProviderConfig("stt", "openai")),
     /Enter an API key/,
@@ -1170,39 +1164,18 @@ test("missing keys cannot activate a provider and selecting Pro uses only the ac
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
-  assert.equal(
-    (await resolveProvider("stt")).apiKey,
-    fixture.session.access_token,
-  );
+  assert.equal(await resolveProvider("stt"), null);
+  assert.equal(await resolveProvider("llm"), null);
 });
 
-test("active trials use hosted models; expired trials cannot send STT or summary requests", async () => {
+test("summaries send nothing without a provider of the user's own, even on a Pro trial", async () => {
   createNote();
-  const trial = {
+  signedInWith({
     subscription_status: "trialing",
     trial_end: Date.now() / 1000 + 21 * 86400,
     entitlements: ["hyprnote_pro"],
-  };
-  signedInWith(trial);
-  assert.equal(
-    (await resolveProvider("stt")).apiKey,
-    fixture.session.access_token,
-  );
+  });
   await summarizeSession("note-1");
-  assert.equal(
-    fixture.requests[0].url,
-    "https://hosted.anarlog.test/llm/chat/completions",
-  );
-  fixture.requests = [];
-  signedInWith({ ...trial, trial_end: Date.now() / 1000 - 1 });
-  await assert.rejects(
-    resolveProvider("stt"),
-    /active Pro trial or subscription/,
-  );
-  await assert.rejects(
-    summarizeSession("note-1"),
-    /active Pro trial or subscription/,
-  );
   assert.equal(fixture.requests.length, 0);
   assert.match(
     fixture.db
@@ -1216,7 +1189,7 @@ test("active trials use hosted models; expired trials cannot send STT or summary
         "SELECT count(*) AS count FROM session_documents WHERE kind = 'summary'",
       )
       .get().count,
-    1,
+    0,
   );
 });
 
@@ -1476,66 +1449,45 @@ test("cancellation, concurrent auth, and backgrounding during authentication nev
   assert.equal(lock.getSnapshot().locked, true);
 });
 
-test("turning off error reports disables the native SDK and privacy writes preserve other choices", async () => {
+test("error reporting and analytics never send anything, and privacy writes preserve other choices", async () => {
   globalThis.__DEV__ = false;
-  const { initializeErrorReporting } =
+  const { captureOperationalError, initializeErrorReporting } =
     await import("../lib/error-reporting.ts");
+  const { captureAnalytics, initializeAnalytics } =
+    await import("../lib/analytics.ts");
   const { getPrivacyPreferences, setPrivacyPreference } =
     await import("./privacy-store.ts");
-  await initializeErrorReporting();
-  assert.equal(fixture.sentry.nativeEnabled, true);
-  await setPrivacyPreference("errorReports", false);
-  assert.equal(fixture.sentry.client.getOptions().enabled, false);
-  await new Promise(setImmediate);
-  assert.equal(fixture.sentry.nativeEnabled, false);
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    throw new Error("Unexpected request");
+  };
+  try {
+    await setPrivacyPreference("analytics", true);
+    await setPrivacyPreference("errorReports", true);
+    await initializeErrorReporting();
+    await initializeAnalytics();
+    captureAnalytics("settings_test");
+    captureOperationalError(new Error("synthetic failure"), {
+      operation: "settings_test",
+    });
+    await new Promise(setImmediate);
+    assert.equal(calls, 0);
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   await Promise.all([
     setPrivacyPreference("analytics", false),
     setPrivacyPreference("appLock", true),
   ]);
   assert.equal(getPrivacyPreferences().analytics, false);
   assert.equal(getPrivacyPreferences().appLock, true);
-  assert.equal(fixture.sentry.starts, 1);
-  await setPrivacyPreference("errorReports", true);
-  await new Promise(setImmediate);
-  assert.equal(fixture.sentry.starts, 2);
-  assert.equal(fixture.sentry.nativeEnabled, true);
   assert.equal(
     JSON.parse(fixture.storage.get("anarlog:device-privacy")).analytics,
     false,
   );
-});
-
-test("analytics opt-out aborts in-flight requests and prevents subsequent events", async () => {
-  globalThis.__DEV__ = false;
-  const { captureAnalytics } = await import("../lib/analytics.ts");
-  const { setPrivacyPreference } = await import("./privacy-store.ts");
-  await setPrivacyPreference("analytics", true);
-  const originalFetch = globalThis.fetch;
-  let signal;
-  let calls = 0;
-  let started;
-  const requestStarted = new Promise((resolve) => {
-    started = resolve;
-  });
-  globalThis.fetch = async (_url, options) => {
-    calls++;
-    signal = options.signal;
-    started();
-    return new Promise((_resolve, reject) =>
-      signal.addEventListener("abort", () => reject(new Error("aborted"))),
-    );
-  };
-  try {
-    captureAnalytics("settings_test");
-    await requestStarted;
-    await setPrivacyPreference("analytics", false);
-    assert.equal(signal.aborted, true);
-    captureAnalytics("must_not_send");
-    await new Promise(setImmediate);
-    assert.equal(calls, 1);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
 });
 
 test("every provider keeps its key on this device and restores its own setup", async () => {
@@ -2039,11 +1991,23 @@ test("Azure model discovery normalizes the configured endpoint", async () => {
   }
 });
 
+// Summaries need a provider set up with the user's own key; Mirna never
+// falls back to hosted models.
+async function useOwnSummaryProvider() {
+  await saveProviderConfig(
+    fixture.session?.user.id ?? null,
+    "llm",
+    { ...defaultProviderConfig("llm", "openai"), model: "test-model" },
+    "synthetic-llm-key",
+  );
+}
+
 test("mobile summaries persist generated titles without overwriting concurrent renames or partially saving", async () => {
   signedInWith({
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   for (const scenario of [
     "automatic",
     "manual",
@@ -2057,8 +2021,10 @@ test("mobile summaries persist generated titles without overwriting concurrent r
     fixture.db
       .prepare("UPDATE sessions SET title = '' WHERE id = 'note-1'")
       .run();
-    fixture.respond = (_url, options) => {
-      if (options.headers["x-char-task"] === "title") {
+    let summaryRequests = 0;
+    fixture.respond = () => {
+      // The title is requested after the summary.
+      if (++summaryRequests > 1) {
         if (scenario === "failed-title")
           throw new Error("Title request failed");
         if (scenario === "renamed")
@@ -2136,6 +2102,7 @@ test("automatic summaries preserve memos and never overwrite an existing summary
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   const memo = fixture.db
     .prepare("SELECT body FROM session_documents WHERE id = 'note-1'")
     .get().body;
@@ -2168,6 +2135,7 @@ test("summary recovery resumes persisted local work after restart but ignores a 
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   insertTranscript(
     Array.from({ length: 30 }, (_, index) => `planning-${index}`),
   );
@@ -2218,6 +2186,7 @@ test("automatic and manual summary requests share an in-flight generation", asyn
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   let release;
   fixture.respond = () =>
     new Promise((resolve) => {
@@ -2248,6 +2217,7 @@ test("completed transcription fills an empty desktop summary without creating a 
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   fixture.db
     .prepare("UPDATE sessions SET title = 'Planning' WHERE id = 'note-1'")
     .run();
@@ -2311,6 +2281,7 @@ test("automatic generation preserves a summary edited during generation even whe
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   fixture.db
     .prepare(
       "INSERT INTO session_documents (id, session_id, kind, body, updated_at) VALUES ('summary-1', 'note-1', 'summary', '', 'same-time')",
@@ -2345,6 +2316,7 @@ test("automatic summary failure is observable and can be retried without changin
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   const memo = fixture.db
     .prepare("SELECT body FROM session_documents WHERE id = 'note-1'")
     .get().body;
@@ -2382,6 +2354,7 @@ test("summaries read the full visible transcript, including uncompact live revis
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   fixture.db
     .prepare(
       "INSERT INTO humans (id, workspace_id, name) VALUES ('speaker-a', 'workspace-a', 'John')",
@@ -2513,6 +2486,7 @@ test("short transcripts skip summaries without a provider request and show a war
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   insertTranscript(["Cool."]);
   dismissToast();
 
@@ -2546,6 +2520,7 @@ test("a preparation error is replaced by the next successful automatic summary s
     subscription_status: "active",
     entitlements: ["hyprnote_pro"],
   });
+  await useOwnSummaryProvider();
   const latestState = () =>
     queryClient
       .getMutationCache()

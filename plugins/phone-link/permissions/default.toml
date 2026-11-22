@@ -1,0 +1,11 @@
+[default]
+description = "Default permissions for the plugin"
+permissions = [
+  "allow-get-status",
+  "allow-start-pairing",
+  "allow-cancel-pairing",
+  "allow-list-phones",
+  "allow-remove-phone",
+  "allow-list-inbox",
+  "allow-update-recording",
+]

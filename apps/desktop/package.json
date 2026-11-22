@@ -56,6 +56,7 @@
     "@anlg/plugin-relay": "workspace:*",
     "@anlg/plugin-session": "workspace:*",
     "@anlg/plugin-settings": "workspace:*",
+    "@anlg/plugin-phone-link": "workspace:*",
     "@anlg/plugin-sfx": "workspace:*",
     "@anlg/plugin-shortcut": "workspace:*",
     "@anlg/plugin-store2": "workspace:*",

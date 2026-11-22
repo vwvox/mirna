@@ -4,27 +4,30 @@ import releaseVersion from "./release-version.json" with { type: "json" };
 
 type AppVariant = "dev" | "staging" | "stable";
 
+// Serra, the Mirna forest green behind the adaptive icon.
+const ICON_BACKGROUND = "#2E4A3B";
+
 const variants = {
   dev: {
-    name: "Anarlog Dev",
+    name: "Mirna Dev",
     icon: "./assets/images/icon-dev.png",
-    iconBackgroundColor: "#0099FF",
-    scheme: "anarlog-dev",
-    bundleIdentifier: "so.anarlog.mobile.dev",
+    iconBackgroundColor: ICON_BACKGROUND,
+    scheme: "mirna-dev",
+    bundleIdentifier: "app.mirna.mobile.dev",
   },
   staging: {
-    name: "Anarlog Staging",
+    name: "Mirna Staging",
     icon: "./assets/images/icon-staging.png",
-    iconBackgroundColor: "#D1D1D1",
-    scheme: "anarlog-staging",
-    bundleIdentifier: "so.anarlog.mobile.staging",
+    iconBackgroundColor: ICON_BACKGROUND,
+    scheme: "mirna-staging",
+    bundleIdentifier: "app.mirna.mobile.staging",
   },
   stable: {
-    name: "Anarlog",
+    name: "Mirna",
     icon: "./assets/images/icon.png",
-    iconBackgroundColor: "#F7E7B0",
-    scheme: "anarlog",
-    bundleIdentifier: "so.anarlog.mobile",
+    iconBackgroundColor: ICON_BACKGROUND,
+    scheme: "mirna",
+    bundleIdentifier: "app.mirna.mobile",
   },
 } as const satisfies Record<
   AppVariant,
@@ -54,7 +57,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     version: releaseVersion.version,
     name: variant.name,
-    slug: config.slug ?? "anarlog-mobile",
+    slug: config.slug ?? "mirna",
     icon: variant.icon,
     scheme: variant.scheme,
     ios: {
@@ -77,7 +80,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           ? "./assets/images/android-icon-foreground-dev.png"
           : "./assets/images/android-icon-foreground.png",
         backgroundColor: variant.iconBackgroundColor,
-        monochromeImage: "./assets/images/android-icon-foreground.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
     },
     plugins: (config.plugins ?? []).map((plugin) => {
@@ -102,26 +105,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...config.extra,
       appVariant,
       appScheme: variant.scheme,
-      supabaseUrl:
-        process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "",
-      supabaseAnonKey:
-        process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-        process.env.SUPABASE_ANON_KEY ??
-        "",
-      apiUrl:
-        process.env.EXPO_PUBLIC_API_URL ??
-        (isDev ? "http://localhost:3001" : "https://api.anarlog.so"),
-      appUrl:
-        process.env.EXPO_PUBLIC_APP_URL ??
-        (isDev ? "http://localhost:3000" : "https://anarlog.so"),
-      posthogApiKey:
-        process.env.EXPO_PUBLIC_POSTHOG_API_KEY ??
-        process.env.POSTHOG_API_KEY ??
-        "",
-      posthogHost:
-        process.env.EXPO_PUBLIC_POSTHOG_HOST ?? "https://us.i.posthog.com",
-      sentryDsn:
-        process.env.EXPO_PUBLIC_SENTRY_DSN ?? process.env.SENTRY_DSN ?? "",
+      // Mirna talks only to the user's own Mac and their own providers. These
+      // hosted endpoints stay empty in every build, whatever the environment says.
+      supabaseUrl: "",
+      supabaseAnonKey: "",
+      apiUrl: "",
+      appUrl: "",
+      posthogApiKey: "",
+      posthogHost: "",
+      sentryDsn: "",
     },
   };
 };

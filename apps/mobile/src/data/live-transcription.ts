@@ -268,7 +268,9 @@ export class SessionLiveTranscription {
         return;
       }
       const token = currentAuth?.data.session?.access_token;
-      if (!token) {
+      // Mirna builds have no hosted endpoint (env.apiUrl is empty), so the
+      // default "anarlog" provider never streams audio anywhere.
+      if (!token || !env.apiUrl) {
         this.fallBack();
         return;
       }

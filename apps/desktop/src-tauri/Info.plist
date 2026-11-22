@@ -13,7 +13,11 @@
     <key>NSRemindersFullAccessUsageDescription</key>
     <string>Mirna uses your reminders to sync and manage tasks.</string>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Mirna uses your local network to reach model servers on this Mac or your network, such as Ollama.</string>
+    <string>Mirna uses your local network to receive recordings from your paired phone and to reach model servers on your network, such as Ollama.</string>
+    <key>NSBonjourServices</key>
+    <array>
+      <string>_mirna._tcp</string>
+    </array>
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIconFile</key>

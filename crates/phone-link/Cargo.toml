@@ -1,0 +1,42 @@
+[package]
+name = "phone-link"
+version = "0.1.0"
+edition = "2024"
+description = "Pairing and end-to-end encrypted recording transfer between the Mirna phone app and the Mac, over the local network"
+
+[features]
+default = []
+client = ["dep:hyper", "dep:hyper-util", "dep:http-body-util"]
+server = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:http-body-util"]
+
+[dependencies]
+bytes = { workspace = true }
+hex = "0.4"
+rand = "0.9"
+rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring", "pem"] }
+rustls = { workspace = true, features = ["ring", "std", "logging"] }
+rustls-pki-types = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = "0.10"
+subtle = "2"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+tracing = { workspace = true }
+url = { workspace = true }
+
+axum = { workspace = true, optional = true }
+http-body-util = { version = "0.1", optional = true }
+hyper = { version = "1", features = ["client", "server", "http1"], optional = true }
+hyper-util = { version = "0.1", features = ["http1", "tokio", "service"], optional = true }
+tower = { workspace = true, optional = true }
+
+[dev-dependencies]
+hex = "0.4"
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[[example]]
+name = "mac_stub"
+required-features = ["server"]

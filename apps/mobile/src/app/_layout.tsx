@@ -1,6 +1,4 @@
-import * as Sentry from "@sentry/react-native";
 import { useMutation, QueryClientProvider } from "@tanstack/react-query";
-import { useFonts } from "expo-font";
 import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -29,6 +27,9 @@ import {
 } from "@/lib/error-reporting";
 import { queryClient } from "@/lib/query-client";
 import { useMountEffect } from "@/lib/use-mount-effect";
+// Registers the background job when the bundle loads (expo-task-manager needs it at top level).
+import "@/mac-link/background";
+import { MacLinkLifecycle } from "@/mac-link/lifecycle";
 import { QuickActionLifecycle } from "@/quick-actions/quick-action-lifecycle";
 import { AppLock } from "@/settings/app-lock";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
@@ -88,6 +89,7 @@ function Screens({ accountUserId }: { accountUserId: string | null }) {
   return (
     <>
       <QuickActionLifecycle accountUserId={accountUserId} />
+      <MacLinkLifecycle />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -208,13 +210,10 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 function RootLayout() {
   const styles = useStyles();
-  const [fontsLoaded, fontError] = useFonts({
-    CaveatSemiBold: require("../../assets/fonts/Caveat-SemiBold.ttf"),
-  });
   const [startupAnimationComplete, setStartupAnimationComplete] =
     useState(false);
 
-  if (!startupAnimationComplete || (!fontsLoaded && !fontError)) {
+  if (!startupAnimationComplete) {
     return (
       <BrandLoadingView
         animated={!startupAnimationComplete}
@@ -246,7 +245,7 @@ function AppStatusBar() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;
 
 const useStyles = createStyleHook((Colors) => ({
   root: {

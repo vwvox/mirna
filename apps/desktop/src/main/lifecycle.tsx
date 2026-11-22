@@ -23,6 +23,7 @@ import { useNotifyPlanRequired } from "~/settings/plan-gate";
 import { SharedAttachmentCacheLifecycle } from "~/shared-notes/attachment-cache-lifecycle";
 import { SharedNotePreviewAuthLifecycle } from "~/shared-notes/preview";
 import { DurableSharedNoteCacheSync } from "~/shared-notes/sync";
+import { PhoneInboxWorker } from "~/phone-link/inbox-worker";
 import { useConfigValue } from "~/shared/config";
 import { useDesktopTabLifecycle } from "~/shared/desktop-tab-lifecycle";
 import { useLatestRef } from "~/shared/hooks/useLatestRef";
@@ -70,6 +71,7 @@ export function ClassicMainServices() {
       <LiveCaptureRecovery />
       <BatchTranscriptionRecovery />
       <RecordingImportWorker />
+      <PhoneInboxWorker />
       <ScheduledMeetingAutoStart />
       <MainListenerControlBridge />
       <BrowserMeetingStartBridge />

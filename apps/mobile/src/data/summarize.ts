@@ -9,7 +9,6 @@ import {
 import { getSummaryEligibility } from "@anlg/utils/summary-eligibility";
 
 import { execute, executeTransaction } from "@/db";
-import { env } from "@/lib/env";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { nowIso } from "@/lib/ids";
 import { queryClient } from "@/lib/query-client";
@@ -92,7 +91,7 @@ async function runSummary(
     );
   if (automatic && prior && hasSummaryContent(prior.body, prior.session_title))
     return;
-  const [notes, transcripts, humans, preferences, provider] = await Promise.all(
+  const [notes, transcripts, humans, preferences, resolved] = await Promise.all(
     [
       execute<{ body: string; body_format: string }>(
         "SELECT body, body_format FROM session_documents WHERE session_id = ? AND kind = 'note' AND deleted_at IS NULL ORDER BY CASE WHEN id = session_id THEN 0 ELSE 1 END, sort_order, id LIMIT 1",
@@ -104,6 +103,9 @@ async function runSummary(
       resolveProvider("llm"),
     ],
   );
+  // Without a summary provider of the user's own, nothing is sent anywhere.
+  if (!resolved) return;
+  const provider = resolved;
   const note = notes[0];
   const text = note
     ? (note.body_format === "markdown"
@@ -143,7 +145,7 @@ async function runSummary(
     source: string,
     task: "enhance" | "title",
   ) {
-    const request = summaryRequest(provider, system, source, env.apiUrl, task);
+    const request = summaryRequest(provider, system, source, "", task);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
     try {

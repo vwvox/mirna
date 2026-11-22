@@ -21,10 +21,10 @@ function formatDuration(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function statusLabel(phase: RecorderPhase, durationMs: number): string {
+function statusLabel(phase: RecorderPhase): string {
   switch (phase) {
     case "recording":
-      return `Listening · ${formatDuration(durationMs)}`;
+      return "Listening ·";
     case "saving":
       return "Saving recording…";
     case "unavailable":
@@ -71,7 +71,7 @@ export function ListeningSheet({
     : recoverable
       ? onRetry
       : onStop;
-  const label = statusLabel(phase, durationMs);
+  const label = statusLabel(phase);
   const actionLabel = permissionDenied
     ? "Settings"
     : recoverable
@@ -93,7 +93,12 @@ export function ListeningSheet({
         ) : phase === "saving" || phase === "starting" ? (
           <ActivityIndicator color={Colors.muted} size="small" />
         ) : null}
-        <Text style={styles.statusText}>{label}</Text>
+        <Text style={styles.statusText}>
+          {label}
+          {phase === "recording" && (
+            <Text style={styles.time}> {formatDuration(durationMs)}</Text>
+          )}
+        </Text>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -136,7 +141,11 @@ const useStyles = createStyleHook((Colors) => ({
     flexShrink: 1,
     ...Typography.caption,
     color: Colors.muted,
-    fontVariant: ["tabular-nums"],
+  },
+  time: {
+    ...Typography.time,
+    fontSize: Typography.caption.fontSize,
+    lineHeight: Typography.caption.lineHeight,
   },
   control: {
     minHeight: 44,
