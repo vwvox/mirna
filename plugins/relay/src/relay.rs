@@ -24,6 +24,8 @@ pub struct PendingResults {
 struct PendingResultsInner {
     next_internal_id: AtomicU64,
     senders: Mutex<HashMap<u64, PendingResultSender>>,
+    next_connection_id: AtomicU64,
+    connections: Mutex<HashMap<u64, (OutboundSender, watch::Sender<bool>)>>,
 }
 
 impl PendingResults {
@@ -44,6 +46,44 @@ impl PendingResults {
 
     async fn remove(&self, internal_id: u64) {
         self.inner.senders.lock().await.remove(&internal_id);
+    }
+
+    async fn register_connection(
+        &self,
+        sender: OutboundSender,
+        overflow: watch::Sender<bool>,
+    ) -> u64 {
+        let id = self.inner.next_connection_id.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .connections
+            .lock()
+            .await
+            .insert(id, (sender, overflow));
+        id
+    }
+
+    async fn remove_connection(&self, id: u64) {
+        self.inner.connections.lock().await.remove(&id);
+    }
+
+    /// Delivers a channel message to the browser that opened the channel, like an event push.
+    pub(crate) async fn push_channel(
+        &self,
+        connection: u64,
+        handler: u64,
+        payload: serde_json::Value,
+    ) -> bool {
+        let Some((sender, overflow)) = self.inner.connections.lock().await.get(&connection).cloned()
+        else {
+            return false;
+        };
+        let json = serde_json::to_string(&EventPush {
+            r#type: "event",
+            handler,
+            payload,
+        })
+        .unwrap_or_default();
+        try_send_event(&sender, &overflow, json)
     }
 }
 
@@ -131,6 +171,9 @@ pub async fn handle_ws<R: Runtime>(socket: WebSocket, app: AppHandle<R>, pending
             }
         }
     });
+    let connection_id = pending
+        .register_connection(outbound_tx.clone(), overflow_tx.clone())
+        .await;
     let event_subs: Arc<Mutex<HashMap<u64, EventId>>> = Arc::new(Mutex::new(HashMap::new()));
     let active_invokes = Arc::new(Mutex::new(HashSet::new()));
     let request_limit = Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS));
@@ -216,6 +259,7 @@ pub async fn handle_ws<R: Runtime>(socket: WebSocket, app: AppHandle<R>, pending
                         &app,
                         id,
                         internal_id,
+                        connection_id,
                         result_rx,
                         &req.cmd,
                         &req.args,
@@ -251,6 +295,7 @@ pub async fn handle_ws<R: Runtime>(socket: WebSocket, app: AppHandle<R>, pending
     for event_id in event_ids {
         app.unlisten(event_id);
     }
+    pending.remove_connection(connection_id).await;
     drop(outbound_tx);
     if tokio::time::timeout(std::time::Duration::from_secs(1), &mut writer)
         .await
@@ -392,32 +437,61 @@ fn event_handler_id(args: &serde_json::Value) -> u64 {
         .unwrap_or(0)
 }
 
+/// Runs a browser invoke in the main webview. Channel arguments (`__CHANNEL__:<id>`) name
+/// callbacks that exist only in the browser, so each is swapped for a main-webview callback that
+/// forwards its raw messages back to that browser over the relay.
+fn invoke_script(internal_id: u64, connection_id: u64, cmd: &str, args: &serde_json::Value) -> String {
+    let args_json = serde_json::to_string(args).unwrap_or("{}".into());
+    let cmd_json = serde_json::to_string(cmd).unwrap_or("\"\"".into());
+    format!(
+        r#"(async function() {{
+  var internals = window.__TAURI_INTERNALS__;
+  function relayChannels(value) {{
+    if (typeof value === "string" && value.indexOf("__CHANNEL__:") === 0) {{
+      var handler = Number(value.slice(12));
+      var proxyId = internals.transformCallback(function (raw) {{
+        internals.invoke("plugin:relay|relay_channel", {{
+          connection: {connection_id}, handler: handler, payload: raw === undefined ? null : raw
+        }});
+        if (raw && typeof raw === "object" && "end" in raw && internals.unregisterCallback) {{
+          internals.unregisterCallback(proxyId);
+        }}
+      }});
+      return "__CHANNEL__:" + proxyId;
+    }}
+    if (Array.isArray(value)) return value.map(relayChannels);
+    if (value && typeof value === "object") {{
+      var out = {{}};
+      for (var key in value) out[key] = relayChannels(value[key]);
+      return out;
+    }}
+    return value;
+  }}
+  try {{
+    var r = await internals.invoke({cmd_json}, relayChannels({args_json}));
+    await internals.invoke("plugin:relay|relay_result", {{
+      id: {internal_id}, ok: true, data: r === undefined ? null : r
+    }});
+  }} catch(e) {{
+    await internals.invoke("plugin:relay|relay_result", {{
+      id: {internal_id}, ok: false, data: (e && e.message) ? e.message : String(e)
+    }});
+  }}
+}})()"#,
+    )
+}
+
 async fn invoke<R: Runtime>(
     app: &AppHandle<R>,
     browser_id: u64,
     internal_id: u64,
+    connection_id: u64,
     rx: tokio::sync::oneshot::Receiver<serde_json::Value>,
     cmd: &str,
     args: &serde_json::Value,
     pending: &PendingResults,
 ) -> InvokeResponse {
-    let args_json = serde_json::to_string(args).unwrap_or("{}".into());
-    let cmd_json = serde_json::to_string(cmd).unwrap_or("\"\"".into());
-
-    let js = format!(
-        r#"(async function() {{
-  try {{
-    var r = await window.__TAURI_INTERNALS__.invoke({cmd_json}, {args_json});
-    await window.__TAURI_INTERNALS__.invoke("plugin:relay|relay_result", {{
-      id: {internal_id}, ok: true, data: r === undefined ? null : r
-    }});
-  }} catch(e) {{
-    await window.__TAURI_INTERNALS__.invoke("plugin:relay|relay_result", {{
-      id: {internal_id}, ok: false, data: (e && e.message) ? e.message : String(e)
-    }});
-  }}
-}})()"#,
-    );
+    let js = invoke_script(internal_id, connection_id, cmd, args);
 
     let webview = app
         .webview_windows()
@@ -479,8 +553,50 @@ async fn invoke<R: Runtime>(
 mod tests {
     use super::{
         MAX_EVENT_SUBSCRIPTIONS, PendingResults, can_register_event_subscription, event_handler_id,
-        send_reply, send_reply_with_timeout, try_send_event,
+        invoke_script, send_reply, send_reply_with_timeout, try_send_event,
     };
+
+    #[tokio::test]
+    async fn channel_messages_reach_only_the_browser_that_opened_them() {
+        let pending = PendingResults::default();
+        let (first_tx, mut first_rx) = tokio::sync::mpsc::channel(4);
+        let (second_tx, mut second_rx) = tokio::sync::mpsc::channel(4);
+        let (overflow_tx, _overflow_rx) = tokio::sync::watch::channel(false);
+        let first = pending
+            .register_connection(first_tx, overflow_tx.clone())
+            .await;
+        let _second = pending.register_connection(second_tx, overflow_tx).await;
+
+        let raw = serde_json::json!({ "index": 0, "message": { "rows": [] } });
+        assert!(pending.push_channel(first, 7, raw.clone()).await);
+
+        let pushed: serde_json::Value =
+            serde_json::from_str(&first_rx.recv().await.unwrap()).unwrap();
+        assert_eq!(
+            pushed,
+            serde_json::json!({ "type": "event", "handler": 7, "payload": raw })
+        );
+        assert!(second_rx.try_recv().is_err());
+
+        pending.remove_connection(first).await;
+        assert!(!pending.push_channel(first, 7, serde_json::Value::Null).await);
+    }
+
+    #[test]
+    fn invoke_script_swaps_browser_channels_for_relayed_ones() {
+        let script = invoke_script(
+            3,
+            9,
+            "plugin:db|subscribe",
+            &serde_json::json!({ "sql": "select 1", "onEvent": "__CHANNEL__:41" }),
+        );
+
+        assert!(script.contains(r#"internals.invoke("plugin:db|subscribe", relayChannels("#));
+        assert!(script.contains(r#""onEvent":"__CHANNEL__:41""#));
+        assert!(script.contains(r#"invoke("plugin:relay|relay_channel""#));
+        assert!(script.contains("connection: 9, handler: handler"));
+        assert!(script.contains("id: 3, ok: true"));
+    }
 
     #[test]
     fn reads_tauri_event_id_for_unlisten_requests() {

@@ -5,6 +5,7 @@ Default permissions for the relay plugin
 #### This default permission set includes the following:
 
 - `allow-relay-result`
+- `allow-relay-channel`
 
 ## Permission Table
 
@@ -14,6 +15,32 @@ Default permissions for the relay plugin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`relay:allow-relay-channel`
+
+</td>
+<td>
+
+Enables the relay_channel command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`relay:deny-relay-channel`
+
+</td>
+<td>
+
+Denies the relay_channel command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

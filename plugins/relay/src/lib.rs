@@ -14,7 +14,10 @@ pub fn init<R: Runtime>() -> tauri::plugin::TauriPlugin<R> {
     let pending = relay::PendingResults::default();
 
     tauri::plugin::Builder::new(PLUGIN_NAME)
-        .invoke_handler(tauri::generate_handler![commands::relay_result])
+        .invoke_handler(tauri::generate_handler![
+            commands::relay_result,
+            commands::relay_channel
+        ])
         .setup(move |app, _api| {
             let port = std::env::var("RELAY_PORT")
                 .ok()

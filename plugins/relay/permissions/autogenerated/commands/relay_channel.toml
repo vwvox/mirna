@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-relay-channel"
+description = "Enables the relay_channel command without any pre-configured scope."
+commands.allow = ["relay_channel"]
+
+[[permission]]
+identifier = "deny-relay-channel"
+description = "Denies the relay_channel command without any pre-configured scope."
+commands.deny = ["relay_channel"]

@@ -31,7 +31,9 @@
   // ---------------------------------------------------------------------------
 
   function createRelayConnection(port) {
-    var maxPendingInvokes = 64;
+    // The app opens a few hundred subscriptions and listeners at startup; the
+    // relay server throttles them, so the browser only bounds runaway growth.
+    var maxPendingInvokes = 1024;
     if (window.location.port !== String(port)) {
       throw new Error("Open the desktop relay URL to connect to Anarlog");
     }

@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the relay_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-relay-channel",
+          "markdownDescription": "Enables the relay_channel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the relay_channel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-relay-channel",
+          "markdownDescription": "Denies the relay_channel command without any pre-configured scope."
+        },
+        {
           "description": "Enables the relay_result command without any pre-configured scope.",
           "type": "string",
           "const": "allow-relay-result",
@@ -307,10 +319,10 @@
           "markdownDescription": "Denies the relay_result command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the relay plugin\n#### This default permission set includes:\n\n- `allow-relay-result`",
+          "description": "Default permissions for the relay plugin\n#### This default permission set includes:\n\n- `allow-relay-result`\n- `allow-relay-channel`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the relay plugin\n#### This default permission set includes:\n\n- `allow-relay-result`"
+          "markdownDescription": "Default permissions for the relay plugin\n#### This default permission set includes:\n\n- `allow-relay-result`\n- `allow-relay-channel`"
         }
       ]
     }

@@ -27,6 +27,8 @@ function loadShim() {
 
   const window = {
     location: {
+      port: "1423",
+      host: "localhost:1423",
       reload() {
         reloads += 1;
       },
@@ -80,7 +82,7 @@ for (const connected of [false, true]) {
   test(`pending invokes are bounded (connected: ${connected})`, async () => {
     const relay = loadShim();
     const socket = connected ? connect(relay) : relay.sockets[0];
-    const pending = Array.from({ length: 64 }, (_, index) =>
+    const pending = Array.from({ length: 1024 }, (_, index) =>
       relay.invoke(`pending-${index}`, {}).catch((error) => error.message),
     );
 
@@ -88,7 +90,7 @@ for (const connected of [false, true]) {
       relay.invoke("overflow", {}),
       /relay invoke limit reached/,
     );
-    assert.equal(socket.sent.length, connected ? 64 : 0);
+    assert.equal(socket.sent.length, connected ? 1024 : 0);
 
     socket.onclose({ code: 1006 });
     await Promise.all(pending);

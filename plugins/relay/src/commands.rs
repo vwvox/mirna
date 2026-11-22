@@ -12,3 +12,15 @@ pub async fn relay_result(
     }
     Ok(())
 }
+
+/// A message on a channel the main webview opened for a browser; forwarded to that browser.
+#[tauri::command]
+pub async fn relay_channel(
+    state: tauri::State<'_, PendingResults>,
+    connection: u64,
+    handler: u64,
+    payload: serde_json::Value,
+) -> Result<(), String> {
+    state.push_channel(connection, handler, payload).await;
+    Ok(())
+}
