@@ -34,6 +34,19 @@ macOS remembers keychain access and privacy permissions (microphone, system audi
 
 `scripts/sign-macos.sh dev` uses it from then on. The first signature asks whether `codesign` may use the key: enter your login password and choose **Always Allow**. The first launch asks once more for Mirna's own keychain item: **Always Allow** again. After that, rebuilds don't ask.
 
+## Install Mirna on your own Mac
+
+An optimised build is about half a gigabyte installed. The build cache it needs (`$CARGO_TARGET_DIR`) can be deleted afterwards; the next build then starts from scratch, which takes about 30–45 minutes.
+
+```bash
+export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target"
+pnpm -F @anlg/desktop tauri build --bundles app,dmg --config \
+  '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"Mirna Development","hardenedRuntime":false}}}'
+open "$CARGO_TARGET_DIR/release/bundle/dmg/"
+```
+
+Open the `.dmg` and drag Mirna into Applications. It's signed with your local certificate, so it only runs on this Mac. Without the hardened runtime it can load its bundled frameworks under a self-signed certificate. The installer window's background comes from `design/installer/dmg-background.html`.
+
 ## Releasing
 
 Builds for other people must be signed with an Apple **Developer ID Application** certificate (Apple Developer Program) and notarized. Its identity stays the same across versions, so keychain access and permissions survive updates. A local or ad hoc signature would make every update ask for the password and lose permissions.
