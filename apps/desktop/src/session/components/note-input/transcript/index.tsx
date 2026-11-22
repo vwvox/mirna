@@ -109,20 +109,26 @@ function TranscriptContent({
         <TranscriptEngineNote sessionId={sessionId} />
       )}
       {screen.kind === "ready" && (
-        <TranscriptViewer
-          transcriptIds={screen.transcriptIds}
-          liveSegments={screen.liveSegments}
-          currentActive={screen.currentActive}
-          captureGeneration={screen.captureGeneration}
-          scrollRef={scrollRef}
-          editMode={editMode && !screen.currentActive}
-          onEditModeChange={screen.currentActive ? undefined : onEditModeChange}
-          footer={
-            screen.liveTranscriptInterrupted ? (
-              <LiveTranscriptInterruptedNotice />
-            ) : null
-          }
-        />
+        // Only the space below the engine note: at full height the last lines
+        // sat under the "Ask about this note" bar and couldn't scroll clear.
+        <div className="flex min-h-0 flex-1 flex-col">
+          <TranscriptViewer
+            transcriptIds={screen.transcriptIds}
+            liveSegments={screen.liveSegments}
+            currentActive={screen.currentActive}
+            captureGeneration={screen.captureGeneration}
+            scrollRef={scrollRef}
+            editMode={editMode && !screen.currentActive}
+            onEditModeChange={
+              screen.currentActive ? undefined : onEditModeChange
+            }
+            footer={
+              screen.liveTranscriptInterrupted ? (
+                <LiveTranscriptInterruptedNotice />
+              ) : null
+            }
+          />
+        </div>
       )}
     </div>
   );

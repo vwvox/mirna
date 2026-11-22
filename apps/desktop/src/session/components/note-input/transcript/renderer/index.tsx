@@ -480,7 +480,7 @@ export function TranscriptViewer({
             "flex min-h-0 min-w-0 flex-1 flex-col gap-8 overflow-x-clip overflow-y-auto",
             "scrollbar-hide",
             "scroll-pb-[calc(8rem+env(safe-area-inset-bottom))]",
-            "pb-[calc(4rem+env(safe-area-inset-bottom))]",
+            "pb-[calc(5.5rem+env(safe-area-inset-bottom))]",
           ])}
         >
           {visibleTranscriptIds.map((transcriptId, index) => {
