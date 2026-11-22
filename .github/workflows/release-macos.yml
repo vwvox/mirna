@@ -21,7 +21,6 @@ name: Release macOS
 on:
   push:
     tags: ["v*"]
-    branches: ["ci/release-macos"] # TEMP: test builds before merging; remove
   workflow_dispatch:
 
 permissions:
