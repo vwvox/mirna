@@ -109,6 +109,11 @@ export const runEnhanceSuccess = async ({
     }
 
     trimmedTitle = snapshot.title.trim();
+    // When the title step comes back empty, the summary's own heading is
+    // still a better name than "Untitled".
+    generatedTitle ||= summaryHeadingTitle(preparedText, [
+      transformedArgs.template?.title,
+    ]);
     if (
       !trimmedTitle &&
       !hasLiveSessionTitleDraft(args.sessionId) &&
@@ -176,6 +181,24 @@ export const runEnhanceSuccess = async ({
     await releaseCloudsyncActivityEventually("enhance", cloudsyncLeaseKey);
   }
 };
+
+/**
+ * The summary's first line when it's a top-level heading that names the
+ * meeting: "# Title" → "Title". Generic headings ("Summary", the template's
+ * own name) don't count.
+ */
+export function summaryHeadingTitle(
+  markdown: string,
+  genericHeadings: readonly (string | null | undefined)[] = [],
+): string {
+  const firstLine = markdown.trimStart().split("\n", 1)[0] ?? "";
+  const match = /^#\s+(.+?)\s*#*\s*$/.exec(firstLine);
+  const title = match ? getPersistableGeneratedTitle(match[1]!) : "";
+  const generic = ["summary", ...genericHeadings].map((heading) =>
+    heading?.trim().toLowerCase(),
+  );
+  return title && !generic.includes(title.toLowerCase()) ? title : "";
+}
 
 export const enhanceSuccess: Pick<TaskConfig<"enhance">, "onSuccess"> = {
   onSuccess: runEnhanceSuccess,

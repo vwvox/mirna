@@ -2,7 +2,11 @@ import type { LanguageModel } from "ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TaskConfig } from ".";
-import { enhanceSuccess, runEnhanceSuccess } from "./enhance-success";
+import {
+  enhanceSuccess,
+  runEnhanceSuccess,
+  summaryHeadingTitle,
+} from "./enhance-success";
 
 import { useLiveTitle } from "~/store/zustand/live-title";
 
@@ -537,5 +541,27 @@ describe("enhanceSuccess.onSuccess", () => {
     expect(
       mocks.persistGeneratedEnhancedNote.mock.calls[0]?.[0].title,
     ).toBeUndefined();
+  });
+});
+
+describe("summaryHeadingTitle", () => {
+  it("names an untitled note after its summary's heading", () => {
+    expect(
+      summaryHeadingTitle(
+        "# Expressing Wants and Food Choices\n\n- Reviewed 想 (xiǎng)",
+      ),
+    ).toBe("Expressing Wants and Food Choices");
+  });
+
+  it("ignores generic headings", () => {
+    expect(summaryHeadingTitle("# Summary\n\nDiscussed it.")).toBe("");
+    expect(
+      summaryHeadingTitle("# Meeting notes\n\n- Point", ["Meeting notes"]),
+    ).toBe("");
+  });
+
+  it("ignores summaries that don't start with a top-level heading", () => {
+    expect(summaryHeadingTitle("## Decisions\n\n- Ship it")).toBe("");
+    expect(summaryHeadingTitle("- Reviewed the plan")).toBe("");
   });
 });
