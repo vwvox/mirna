@@ -3,6 +3,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import { memo, type ReactNode } from "react";
 
 import {
+  House,
   MagnifyingGlass,
   Microphone,
   PencilSimpleLine,
@@ -10,13 +11,13 @@ import {
 } from "@anlg/ui/components/icons";
 import { cn } from "@anlg/utils";
 
-import { MirnaWordmark } from "~/shared/mirna-wordmark";
 import { useNewNoteAndListen } from "~/shared/useNewNote";
 import {
   SidebarNoteFilterMenu,
   SidebarScopeMenu,
 } from "~/sidebar/note-filter-menu";
 import { useSidebarUpcomingMeetingStatus } from "~/sidebar/timeline/upcoming-meeting";
+import { useTabs } from "~/store/zustand/tabs";
 
 export const SidebarTimelineChromeWithUpcomingMeeting = memo(
   function SidebarTimelineChromeWithUpcomingMeeting({
@@ -76,16 +77,12 @@ function SidebarTimelineChrome({
       : null
     : null;
 
+  // No app name here: macOS apps leave the title bar to the window controls
+  // and their own toggles; the name is already in the menu bar and Dock.
   return (
     <div data-tauri-drag-region className="flex w-full items-center gap-3">
-      {sidebarExpanded ? (
-        <MirnaWordmark
-          align="start"
-          className="pointer-events-none mt-0.5 text-[21px]"
-        />
-      ) : null}
       {showSidebarToggle && (
-        <div className={cn([sidebarExpanded && "ml-auto"])}>
+        <div>
           <LeftSurfaceChromeButton
             ariaLabel={sidebarExpanded ? "Hide sidebar" : "Show sidebar"}
             badge={collapsedBadge}
@@ -109,7 +106,11 @@ export function SidebarPrimaryActions({
 }) {
   const { t } = useLingui();
   const newNoteAndListen = useNewNoteAndListen({ behavior: "current" });
-  const searchShortcut = platform() === "macos" ? "⌘K" : "Ctrl K";
+  const isMac = platform() === "macos";
+  const searchShortcut = isMac ? "⌘K" : "Ctrl K";
+  const homeShortcut = isMac ? "⌘⇧H" : "Ctrl Shift H";
+  const onHome = useTabs((state) => state.currentTab?.type === "empty");
+  const openCurrent = useTabs((state) => state.openCurrent);
 
   return (
     <div className="flex shrink-0 flex-col gap-2.5 px-3 pt-1.5">
@@ -157,7 +158,23 @@ export function SidebarPrimaryActions({
           {searchShortcut}
         </kbd>
       </button>
-      <div className="-mx-1 flex items-center pt-2">
+      <button
+        type="button"
+        aria-current={onHome ? "page" : undefined}
+        title={t`Home and questions about all your notes (${homeShortcut})`}
+        onClick={() => openCurrent({ type: "empty" })}
+        className={cn([
+          "-mx-1 flex h-8 items-center gap-2 rounded-lg px-2 text-left text-[13.5px] font-medium transition-colors",
+          onHome
+            ? "bg-accent text-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
+        ])}
+      >
+        <House size={16} aria-hidden />
+        <Trans>Home</Trans>
+      </button>
+      <div className="-mx-1 flex items-center">
         <SidebarScopeMenu />
         <div className="ml-auto">
           <SidebarNoteFilterMenu />

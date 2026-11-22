@@ -73,6 +73,19 @@ export function useMainShortcuts() {
   );
 
   const newNoteAndListen = useNewNoteAndListen();
+  const openCurrent = useTabs((state) => state.openCurrent);
+
+  // Home: today's greeting and questions across all notes.
+  useHotkeys(
+    "mod+shift+h",
+    () => openCurrent({ type: "empty" }),
+    {
+      preventDefault: true,
+      enableOnFormTags: true,
+      enableOnContentEditable: true,
+    },
+    [openCurrent],
+  );
 
   useHotkeys(
     "mod+shift+n",
