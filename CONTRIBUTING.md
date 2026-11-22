@@ -19,9 +19,28 @@ export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-targ
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":false}}'
 APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
-xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
-codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
+scripts/sign-macos.sh dev "$APP"
 open "$APP"
+```
+
+### Sign development builds with a local certificate
+
+macOS remembers keychain access and privacy permissions (microphone, system audio, Accessibility) per signing identity. Signed ad hoc, every rebuild is a new identity: macOS asks for your login password again and the permissions have to be granted again. A local certificate keeps the identity stable. Create it once:
+
+1. Open **Keychain Access** (Spotlight: "Keychain Access").
+2. Menu bar: **Keychain Access › Certificate Assistant › Create a Certificate…**
+3. Name: `Mirna Development`. Identity Type: **Self-Signed Root**. Certificate Type: **Code Signing**.
+4. Click **Create**, then **Done**.
+
+`scripts/sign-macos.sh dev` uses it from then on. The first signature asks whether `codesign` may use the key: enter your login password and choose **Always Allow**. The first launch asks once more for Mirna's own keychain item: **Always Allow** again. After that, rebuilds don't ask.
+
+## Releasing
+
+Builds for other people must be signed with an Apple **Developer ID Application** certificate (Apple Developer Program) and notarized. Its identity stays the same across versions, so keychain access and permissions survive updates. A local or ad hoc signature would make every update ask for the password and lose permissions.
+
+```bash
+scripts/sign-macos.sh release "$APP"   # refuses anything but Developer ID
+scripts/sign-macos.sh check "$APP"     # use as the last step before publishing
 ```
 
 ## See the running app in a browser
@@ -43,7 +62,7 @@ Frontend edits hot-reload in that tab, so styling can be checked instantly. The 
 | `CARGO_PROFILE_DEV_DEBUG=0` | Smaller build output on small disks |
 | `SONIQO_DISABLE=1` | Builds `transcribe-soniqo` with stubs when the Metal Toolchain is unavailable |
 | `vendor/swift-rs` | Xcode 27's default SwiftPM engine writes products where swift-rs does not look; the patch selects the native build system |
-| Debug `.app` plus ad-hoc re-sign | macOS ties system-audio and Accessibility permissions to the app's signature. They may need granting again after each rebuild. |
+| `scripts/sign-macos.sh dev` | macOS ties keychain access and permissions to the app's signature. With the local certificate they carry over; signed ad hoc, they're asked for again after each rebuild. |
 
 - **After updating Xcode:** delete `$CARGO_TARGET_DIR`, because cached build scripts keep old toolchain paths.
 

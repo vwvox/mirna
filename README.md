@@ -41,13 +41,13 @@ export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-targ
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":false}}'
 APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
-xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
-codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
+scripts/sign-macos.sh dev "$APP"
 open "$APP"
 ```
 
 - **Why a bundle:** run it as a real `.app` like this, rather than with `tauri dev`, so that macOS can grant microphone, system-audio and Accessibility permissions to the app itself.
 - **Parakeet needs Xcode's Metal Toolchain** (`xcodebuild -downloadComponent MetalToolchain`). Without it, add `SONIQO_DISABLE=1` to the exports and `"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}` to the `bundle` config.
+- **Signing:** create a local "Mirna Development" certificate once ([how](CONTRIBUTING.md#sign-development-builds-with-a-local-certificate)) so rebuilds don't ask for your password. Builds for other people need a Developer ID signature; `scripts/sign-macos.sh check` refuses anything else.
 - **More detail:** [CONTRIBUTING.md](CONTRIBUTING.md) explains the build quirks.
 
 In the app:
