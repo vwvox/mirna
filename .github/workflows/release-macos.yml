@@ -39,6 +39,10 @@ jobs:
   build:
     runs-on: macos-26
     timeout-minutes: 240
+    env:
+      # Tauri otherwise bundles into apps/desktop/src-tauri/target; keep
+      # everything in one place, which is also where rust-cache looks.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
     steps:
       - uses: actions/checkout@v4
 
@@ -85,6 +89,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: release-macos
+          # Save the compiled crates even if a later step fails, so a retry
+          # doesn't start from scratch.
+          cache-on-failure: true
 
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
