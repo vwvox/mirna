@@ -240,6 +240,33 @@ describe("getDefaultSttSelection", () => {
     ).toEqual({ provider: "deepgram", model: "nova-3-general" });
   });
 
+  test("never repairs an on-device choice with a cloud provider", () => {
+    const statuses = {
+      deepgram: { configured: true, models: [{ id: "nova-3-general" }] },
+      local_file: { configured: false, models: [{ id: "local-file" }] },
+      soniqo: {
+        configured: true,
+        models: [{ id: "soniqo-parakeet-batch", isDownloaded: true }],
+      },
+    };
+    expect(
+      getDefaultSttSelection(
+        ["deepgram", "soniqo"],
+        statuses,
+        "local_file",
+        "local-file",
+      ),
+    ).toEqual({ provider: "soniqo", model: "soniqo-parakeet-batch" });
+    expect(
+      getDefaultSttSelection(
+        ["deepgram"],
+        statuses,
+        "local_file",
+        "local-file",
+      ),
+    ).toBeNull();
+  });
+
   test("returns no selection when nothing is available", () => {
     expect(
       getDefaultSttSelection(["anarlog"], {

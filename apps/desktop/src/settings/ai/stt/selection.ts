@@ -30,6 +30,12 @@ export async function getLanguageSupportIssue(
   };
 }
 
+const ON_DEVICE_STT_PROVIDERS = new Set([
+  "soniqo",
+  "apple_speech",
+  "local_file",
+]);
+
 export function getDefaultSttSelection(
   providerIds: readonly string[],
   statuses: Record<
@@ -42,9 +48,15 @@ export function getDefaultSttSelection(
   currentProvider?: string,
   currentModel?: string,
 ) {
+  // Repairing an on-device choice never moves recordings to the cloud.
+  const onDeviceOnly =
+    !!currentProvider && ON_DEVICE_STT_PROVIDERS.has(currentProvider);
   for (const provider of providerIds) {
     const status = statuses[provider];
     if (!status?.configured) {
+      continue;
+    }
+    if (onDeviceOnly && !ON_DEVICE_STT_PROVIDERS.has(provider)) {
       continue;
     }
 

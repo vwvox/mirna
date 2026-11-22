@@ -690,11 +690,14 @@ export function useConfiguredMapping(): {
     "local_stt_model_path",
   ] as const);
 
+  // A failed lookup must not read as "on-device transcription unavailable":
+  // that made the page repair a working Whisper choice while the app started.
   const deviceInfo = useQuery({
     queryKey: ["device-info"],
     queryFn: async () => {
       const result = await miscCommands.getDeviceInfo(null);
-      return result.status === "ok" ? result.data : null;
+      if (result.status !== "ok") throw new Error(String(result.error));
+      return result.data;
     },
     staleTime: Infinity,
   });
@@ -835,7 +838,7 @@ export function useConfiguredMapping(): {
     isReady:
       isReady &&
       supportedModels.isFetched &&
-      deviceInfo.isFetched &&
+      deviceInfo.isSuccess &&
       Object.values(availability).every((value) => value !== undefined),
   };
 }
