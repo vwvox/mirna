@@ -54,6 +54,7 @@ fn resolve_default_path_for_command(data_dir: &Path, command_name: Option<&OsStr
     // `anarlog-nightly` falls through: the Nightly desktop app opens the same
     // database as stable.
     let channel_identifier = match command_name {
+        Some("mirna") => Some("app.mirna.dev"),
         Some("anarlog-dev") => Some("com.hyprnote.dev"),
         Some("anarlog-staging") => Some("com.hyprnote.staging"),
         _ => None,
@@ -125,6 +126,10 @@ mod tests {
         std::fs::create_dir_all(stable.parent().unwrap()).unwrap();
         std::fs::write(&stable, "").unwrap();
 
+        assert_eq!(
+            resolve_default_path_for_command(dir.path(), Some(OsStr::new("mirna"))),
+            dir.path().join("app.mirna.dev/app.db")
+        );
         assert_eq!(
             resolve_default_path_for_command(dir.path(), Some(OsStr::new("anarlog-dev"))),
             dir.path().join("com.hyprnote.dev/app.db")
