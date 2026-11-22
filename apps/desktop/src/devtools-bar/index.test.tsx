@@ -147,7 +147,7 @@ vi.mock("./metrics", async (importOriginal) => {
   };
 });
 
-import { DevtoolsStatusBar } from "./index";
+import { DEVTOOLS_OPT_IN_STORAGE_KEY, DevtoolsStatusBar } from "./index";
 import { resetDevtoolsMetrics, useDevtoolsMetrics } from "./metrics";
 
 import { commands } from "~/types/tauri.gen";
@@ -177,6 +177,7 @@ describe("DevtoolsStatusBar", () => {
     mocks.billing.plan = "trial";
     mocks.billing.trialDaysRemaining = 12;
     vi.mocked(commands.showDevtool).mockResolvedValue(true);
+    localStorage.setItem(DEVTOOLS_OPT_IN_STORAGE_KEY, "1");
     resetDevtoolsMetrics();
     useDevtoolsMetrics.setState({
       fps: [58, 60],
@@ -194,6 +195,21 @@ describe("DevtoolsStatusBar", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it("stays hidden in a dev build until toggled with Option-Command-D", async () => {
+    localStorage.removeItem(DEVTOOLS_OPT_IN_STORAGE_KEY);
+    renderBar();
+
+    await vi.waitFor(() => expect(commands.showDevtool).toHaveBeenCalled());
+    expect(screen.queryByTestId("devtools-status-bar-collapsed")).toBeNull();
+
+    fireEvent.keyDown(window, { code: "KeyD", metaKey: true, altKey: true });
+
+    expect(
+      await screen.findByTestId("devtools-status-bar-collapsed"),
+    ).toBeTruthy();
+    expect(localStorage.getItem(DEVTOOLS_OPT_IN_STORAGE_KEY)).toBe("1");
   });
 
   it("renders nothing when devtools are disabled", async () => {

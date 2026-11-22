@@ -54,6 +54,7 @@ vi.mock("~/contexts/shell", () => ({
 
 vi.mock("~/shared/useNewNote", () => ({
   useNewNote: () => mocks.createNewNote,
+  useNewNoteAndListen: () => vi.fn(),
 }));
 
 vi.mock("~/shared/open-note-dialog", () => ({
@@ -156,20 +157,20 @@ describe("WindowsTitleBar", () => {
   it("shows note actions beside the sidebar toggle only while expanded", () => {
     const { rerender } = render(<WindowsTitleBar showSidebarTimelineChrome />);
 
-    for (const name of ["Search", "New note", "Sort notes"]) {
+    for (const name of ["Search", "New note", "Group and sort"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
 
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     fireEvent.click(screen.getByRole("button", { name: "New note" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sort notes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Group and sort" }));
     expect(mocks.openNoteDialog).toHaveBeenCalledOnce();
     expect(mocks.createNewNote).toHaveBeenCalledOnce();
 
     mocks.leftSidebarExpanded = false;
     rerender(<WindowsTitleBar showSidebarTimelineChrome />);
 
-    for (const name of ["Search", "New note", "Sort notes"]) {
+    for (const name of ["Search", "New note", "Group and sort"]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
   });

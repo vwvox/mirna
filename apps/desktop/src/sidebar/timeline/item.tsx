@@ -1,4 +1,4 @@
-import { useLingui } from "@lingui/react/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { platform } from "@tauri-apps/plugin-os";
 import {
   createContext,
@@ -47,6 +47,7 @@ import {
 import { getSessionEvent } from "~/session/utils";
 import { openStandaloneNoteWindow } from "~/session/window";
 import { useConfigValue } from "~/shared/config";
+import { formatRecordingLength } from "~/shared/format-recording-length";
 import type { MenuItemDef } from "~/shared/hooks/useNativeContextMenu";
 import { useTimeFormat } from "~/shared/hooks/useTimeFormat";
 import { InteractiveButton } from "~/shared/ui/interactive-button";
@@ -67,9 +68,19 @@ export const ManagedSharedSessionIdsContext = createContext<
   ReadonlySet<string>
 >(EMPTY_MANAGED_SHARED_SESSION_IDS);
 
+/** What a row says instead of its time while something is happening. */
+export type TimelineRowStatus =
+  | { kind: "live"; elapsed: string }
+  | { kind: "progress"; label: string; percent: number | null }
+  | { kind: "busy"; label: string }
+  | { kind: "problem"; label: string };
+
 type ItemBaseProps = {
   title: string;
   displayTime: string;
+  durationLabel?: string;
+  untitledLabel?: string;
+  status?: TimelineRowStatus | null;
   folder?: string;
   tags?: string[];
   isLive?: boolean;
@@ -164,6 +175,9 @@ export const TimelineItemComponent = memo(
 const ItemBase = memo(function ItemBase({
   title,
   displayTime,
+  durationLabel,
+  untitledLabel,
+  status,
   folder,
   tags,
   isLive,
@@ -246,12 +260,12 @@ const ItemBase = memo(function ItemBase({
           !multiSelected && !selected && "hover:bg-accent/50",
           isUpcoming &&
             !isLive && [
-              "bg-destructive/8 text-foreground",
-              "focus-visible:ring-destructive/25",
+              "bg-mirna-ipe/10 text-foreground",
+              "focus-visible:ring-mirna-ipe/40",
             ],
           isLive && [
-            "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-            "focus-visible:ring-destructive/40 focus-visible:ring-2 focus-visible:outline-hidden",
+            "bg-accent",
+            "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
           ],
           ignored && "opacity-40",
           !ignored && muted && !isLive && !isUpcoming && "opacity-65",
@@ -263,10 +277,7 @@ const ItemBase = memo(function ItemBase({
             {folderLabel ? (
               <div
                 className={cn([
-                  "pointer-events-none flex min-w-0 items-center gap-1 text-[11px] leading-4",
-                  isLive
-                    ? "text-destructive-foreground/65"
-                    : "text-muted-foreground",
+                  "text-muted-foreground pointer-events-none flex min-w-0 items-center gap-1 text-[11px] leading-4",
                 ])}
               >
                 <FolderSimple className="size-3 shrink-0" aria-hidden />
@@ -275,31 +286,23 @@ const ItemBase = memo(function ItemBase({
             ) : null}
             <div
               className={cn(
-                "pointer-events-none min-w-0 truncate text-sm font-normal",
+                "pointer-events-none min-w-0 truncate text-sm font-medium",
                 ignored && "line-through",
+                !title && "text-muted-foreground font-normal italic",
+                selected && title && "text-mirna-wordmark font-semibold",
               )}
             >
-              {title || t`Untitled`}
+              {title || untitledLabel || t`Untitled`}
             </div>
-            {displayTime && (
-              <div
-                className={cn([
-                  "font-mono text-xs",
-                  isLive
-                    ? "text-destructive-foreground/65"
-                    : "text-muted-foreground",
-                ])}
-              >
-                {displayTime}
-              </div>
-            )}
+            <TimelineRowMeta
+              displayTime={displayTime}
+              durationLabel={durationLabel}
+              status={status}
+            />
             {tagLine ? (
               <div
                 className={cn([
-                  "pointer-events-none min-w-0 truncate text-[11px] leading-4",
-                  isLive
-                    ? "text-destructive-foreground/65"
-                    : "text-muted-foreground",
+                  "text-muted-foreground pointer-events-none min-w-0 truncate text-[11px] leading-4",
                 ])}
               >
                 {tagLine}
@@ -319,7 +322,7 @@ const ItemBase = memo(function ItemBase({
               />
             )
           ) : null}
-          {showSpinner ? (
+          {showSpinner && !status ? (
             <Spinner
               size={14}
               aria-hidden
@@ -337,11 +340,11 @@ const ItemBase = memo(function ItemBase({
         <div
           aria-hidden
           data-sidebar-timeline-upcoming-gauge
-          className="bg-destructive/20 pointer-events-none absolute top-2 bottom-2 left-1.5 w-0.5 overflow-hidden rounded-full"
+          className="bg-mirna-ipe/25 pointer-events-none absolute top-2 bottom-2 left-1.5 w-0.5 overflow-hidden rounded-full"
         >
           <div
             data-sidebar-timeline-upcoming-gauge-fill
-            className="bg-destructive absolute bottom-0 left-0 w-full rounded-full transition-[height] duration-300 ease-linear"
+            className="bg-mirna-ipe absolute bottom-0 left-0 w-full rounded-full transition-[height] duration-300 ease-linear"
             style={{ height: `${upcomingGaugePercent}%` }}
           />
         </div>
@@ -357,8 +360,8 @@ const ItemBase = memo(function ItemBase({
           }}
           className={cn([
             "absolute top-1/2 right-3 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm",
-            "text-white/80 transition-colors hover:bg-white/15 hover:text-white",
-            "focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-hidden",
+            "text-mirna-terra hover:bg-background hover:text-foreground transition-colors",
+            "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
           ])}
         >
           <span
@@ -390,6 +393,9 @@ function itemBasePropsAreEqual(prev: ItemBaseProps, next: ItemBaseProps) {
   return (
     prev.title === next.title &&
     prev.displayTime === next.displayTime &&
+    prev.durationLabel === next.durationLabel &&
+    prev.untitledLabel === next.untitledLabel &&
+    rowStatusKey(prev.status) === rowStatusKey(next.status) &&
     prev.folder === next.folder &&
     (prev.tags ?? []).join("\u001f") === (next.tags ?? []).join("\u001f") &&
     prev.isLive === next.isLive &&
@@ -648,14 +654,20 @@ const SessionItem = memo(
     );
     const authAvailable = useAppLock((state) => state.available) === true;
 
-    const { sessionMode, stop, amplitude } = useListener((state) => {
-      const sessionMode = state.getSessionMode(sessionId);
-      return {
-        sessionMode,
-        stop: state.stop,
-        amplitude: sessionMode === "active" ? state.live.amplitude : null,
-      };
-    });
+    const { sessionMode, stop, amplitude, liveSeconds, batchPercent } =
+      useListener((state) => {
+        const sessionMode = state.getSessionMode(sessionId);
+        return {
+          sessionMode,
+          stop: state.stop,
+          amplitude: sessionMode === "active" ? state.live.amplitude : null,
+          liveSeconds: sessionMode === "active" ? state.live.seconds : 0,
+          batchPercent:
+            sessionMode === "running_batch"
+              ? (state.batch[sessionId]?.percentage ?? null)
+              : null,
+        };
+      });
     const isEnhancing = useIsSessionEnhancing(sessionId);
     const isLive = sessionMode === "active";
     const isFinalizing = sessionMode === "finalizing";
@@ -667,6 +679,43 @@ const SessionItem = memo(
       (isFinalizing || isEnhancing || isBatching || isOpening);
 
     const sessionEvent = getSessionEvent(item.data);
+    const audioMs = Number(item.data.audio_ms ?? 0);
+    const hasTranscript = Boolean(Number(item.data.has_transcript ?? 0));
+    const durationLabel =
+      audioMs >= 1000 ? formatRecordingLength(audioMs) : undefined;
+    const untitledLabel =
+      audioMs > 0 ? t`Untitled recording` : t`Untitled note`;
+    const status = useMemo<TimelineRowStatus | null>(() => {
+      if (isLive) {
+        return {
+          kind: "live",
+          elapsed: formatRecordingLength(liveSeconds * 1000),
+        };
+      }
+      if (isBatching) {
+        return {
+          kind: "progress",
+          label: t`Transcribing`,
+          percent: batchPercent,
+        };
+      }
+      if (isFinalizing) return { kind: "busy", label: t`Finishing up` };
+      if (isEnhancing) return { kind: "busy", label: t`Writing summary` };
+      if (audioMs > 0 && !hasTranscript) {
+        return { kind: "problem", label: t`No speech heard` };
+      }
+      return null;
+    }, [
+      audioMs,
+      batchPercent,
+      hasTranscript,
+      isBatching,
+      isEnhancing,
+      isFinalizing,
+      isLive,
+      liveSeconds,
+      t,
+    ]);
 
     const timeFormat = useTimeFormat();
     const displayTime = useMemo(
@@ -806,6 +855,9 @@ const SessionItem = memo(
       <ItemBase
         title={title}
         displayTime={displayTime}
+        durationLabel={durationLabel}
+        untitledLabel={untitledLabel}
+        status={status}
         folder={folder}
         tags={tags}
         isLive={isLive}
@@ -838,6 +890,78 @@ const SessionItem = memo(
     );
   },
 );
+
+function rowStatusKey(status: TimelineRowStatus | null | undefined): string {
+  if (!status) return "";
+  switch (status.kind) {
+    case "live":
+      return `live:${status.elapsed}`;
+    case "progress":
+      return `progress:${status.label}:${status.percent ?? ""}`;
+    default:
+      return `${status.kind}:${status.label}`;
+  }
+}
+
+function TimelineRowMeta({
+  displayTime,
+  durationLabel,
+  status,
+}: {
+  displayTime: string;
+  durationLabel?: string;
+  status?: TimelineRowStatus | null;
+}) {
+  if (status?.kind === "live") {
+    return (
+      <div className="pointer-events-none flex items-center gap-1.5 text-[11.5px] font-semibold text-[#8A3A1E] dark:text-[#E9A285]">
+        <span
+          aria-hidden
+          className="bg-mirna-terra animate-live-pulse size-1.5 rounded-full motion-reduce:animate-none"
+        />
+        <Trans>Recording</Trans>
+        <span className="font-mono font-normal">· {status.elapsed}</span>
+      </div>
+    );
+  }
+  if (status?.kind === "progress") {
+    return (
+      <div className="text-mirna-wordmark pointer-events-none flex items-center gap-2 text-[11.5px] font-semibold">
+        {status.label}
+        {status.percent !== null ? (
+          <span
+            aria-hidden
+            className="bg-border flex h-[3px] w-[70px] overflow-hidden rounded-full"
+          >
+            <span
+              className="bg-mirna-serra dark:bg-mirna-sage"
+              style={{ width: `${Math.round(status.percent)}%` }}
+            />
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+  if (status?.kind === "busy") {
+    return (
+      <div className="text-muted-foreground pointer-events-none text-[11.5px] font-semibold">
+        {status.label}
+      </div>
+    );
+  }
+  const time = [displayTime, durationLabel].filter(Boolean).join(" · ");
+  if (!time && status?.kind !== "problem") return null;
+  return (
+    <div className="text-muted-foreground pointer-events-none flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]">
+      {time ? <span className="truncate">{time}</span> : null}
+      {status?.kind === "problem" ? (
+        <span className="bg-mirna-terra/15 shrink-0 rounded-full px-1.5 py-px font-sans text-[11px] font-semibold text-[#8A3A1E] dark:text-[#E9A285]">
+          {status.label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function formatDisplayTime(
   timestamp: string | null | undefined,

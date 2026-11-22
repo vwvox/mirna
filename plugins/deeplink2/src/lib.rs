@@ -182,8 +182,9 @@ mod test {
         let deeplinks = docs::parse_deeplinks(&source_code).unwrap();
         assert!(!deeplinks.is_empty());
 
-        let output_dir = std::path::Path::new("../../apps/web/content/deeplinks");
-        std::fs::create_dir_all(output_dir).unwrap();
+        // Mirna has no docs site: render the pages to check they build, outside the repo.
+        let output_dir = std::env::temp_dir().join("mirna-docs-check/deeplinks");
+        std::fs::create_dir_all(&output_dir).unwrap();
 
         for deeplink in &deeplinks {
             let filepath = output_dir.join(deeplink.doc_path());

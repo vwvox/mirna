@@ -78,7 +78,7 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
           label: t`General`,
           icon: Gear,
           searchTerms: [
-            t`Start Anarlog at login`,
+            t`Start Mirna at login`,
             t`Automatically install updates`,
             t`Show release notes`,
             t`Show app in Dock`,
@@ -288,7 +288,7 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
           searchTerms: [
             t`Lock app`,
             t`Share usage data`,
-            t`Send sanitized crash and error reports to help improve Anarlog.`,
+            t`Send sanitized crash and error reports to help improve Mirna.`,
           ],
         },
         {
@@ -308,7 +308,7 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
           icon: Code,
           searchTerms: [
             t`CLI & MCP`,
-            t`Anarlog CLI`,
+            t`Mirna CLI`,
             t`MCP server`,
             t`Agent skills`,
             t`Cloud API & Connectors`,

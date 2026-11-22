@@ -238,6 +238,14 @@ msgstr ""
 msgid "A Markdown file with the note, summary, and transcript."
 msgstr ""
 
+#: src/main/empty.tsx
+msgid "A meeting, a call or just you thinking out loud."
+msgstr ""
+
+#: src/main/empty.tsx
+msgid "A meeting, a call or just you thinking out loud. Audio stays on this Mac."
+msgstr ""
+
 #: src/sidebar/timeline/utils/index.ts
 msgid "a month ago"
 msgstr ""
@@ -388,10 +396,6 @@ msgstr ""
 msgid "Add an action"
 msgstr ""
 
-#: src/settings/general/camera-watermark.tsx
-msgid "Add Anarlog Camera to macOS"
-msgstr ""
-
 #: src/settings/automations/index.tsx
 msgid "Add and configure at least one action first."
 msgstr ""
@@ -456,6 +460,10 @@ msgstr ""
 msgid "Add members"
 msgstr ""
 
+#: src/settings/general/camera-watermark.tsx
+msgid "Add Mirna Camera to macOS"
+msgstr ""
+
 #: src/settings/dictionary/index.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Add names, jargon, or product terms to prefer"
@@ -497,6 +505,10 @@ msgstr ""
 
 #: src/calendar/components/event-chip.tsx
 msgid "Add to folder"
+msgstr ""
+
+#: src/session/components/outer-header/index.tsx
+msgid "Add to this recording"
 msgstr ""
 
 #: src/settings/developers/webhooks.tsx
@@ -555,6 +567,11 @@ msgstr ""
 msgid "All events"
 msgstr ""
 
+#: src/main/empty.tsx
+#: src/sidebar/note-filter-menu.tsx
+msgid "All notes"
+msgstr ""
+
 #: src/shared/open-note-dialog.tsx
 msgid "All Notes"
 msgstr ""
@@ -599,117 +616,8 @@ msgstr ""
 msgid "Analyzing structure..."
 msgstr ""
 
-#. placeholder {0}: update.version
-#: src/sidebar/toast/registry.tsx
-msgid "Anarlog {0} is available"
-msgstr ""
-
-#. placeholder {0}: update.version
-#: src/sidebar/toast/registry.tsx
-msgid "Anarlog {0} is ready to install"
-msgstr ""
-
-#: src/settings/general/camera-watermark.tsx
-msgid "Anarlog Camera"
-msgstr ""
-
-#: src/services/camera-guidance.tsx
-msgid "Anarlog Camera is hiding your room now. Turn off {app}'s blur or background: it hides the badge."
-msgstr ""
-
-#: src/settings/general/camera-watermark.tsx
-msgid "Anarlog Camera needs your camera to show you."
-msgstr ""
-
-#: src/onboarding/permissions.tsx
-msgid "Anarlog can hear others"
-msgstr ""
-
-#: src/onboarding/permissions.tsx
-msgid "Anarlog can hear your voice"
-msgstr ""
-
-#: src/onboarding/permissions.tsx
-msgid "Anarlog can read meeting details"
-msgstr ""
-
-#: src/settings/developers/cli.tsx
-#: src/sidebar/settings-nav-groups.ts
-msgid "Anarlog CLI"
-msgstr ""
-
-#: src/session/components/note-input/enhanced/enhance-error.tsx
-msgid "Anarlog could not generate this summary because you were not signed in. Sign in, then try again."
-msgstr ""
-
-#: src/shared-notes/index.tsx
-msgid "Anarlog could not read the local shared-note cache."
-msgstr ""
-
-#: src/settings/sync/index.tsx
-msgid "Anarlog could not start cloud sync on this device."
-msgstr ""
-
-#: src/settings/sync/index.tsx
-msgid "Anarlog could not start cloud sync on this device. It will keep retrying."
-msgstr ""
-
-#: src/settings/general/account.tsx
-msgid "Anarlog couldn't sign you out. Try again."
-msgstr ""
-
-#: src/lock/gate.tsx
-msgid "Anarlog is Locked"
-msgstr ""
-
-#: src/services/camera-guidance.tsx
-msgid "Anarlog left {app}'s blur or background on because it couldn't confirm Anarlog Camera hides your room yet."
-msgstr ""
-
-#: src/session-sharing/access-management.tsx
-msgid "Anarlog member"
-msgstr ""
-
-#: src/onboarding/index.tsx
-msgid "Anarlog needs access to your microphone and system audio to record and transcribe your meetings"
-msgstr ""
-
-#: src/onboarding/index.tsx
-msgid "Anarlog needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
-msgstr ""
-
 #: src/settings/general/primary-recording-device.tsx
 msgid "Anarlog Pro coordinates recording across your devices."
-msgstr ""
-
-#. placeholder {0}: statuses[0].displayName
-#: src/settings/developers/skills.tsx
-msgid "Anarlog skill added to {0}"
-msgstr ""
-
-#. placeholder {0}: statuses.length
-#: src/settings/developers/skills.tsx
-msgid "Anarlog skill added to {0} agents"
-msgstr ""
-
-#: src/session-sharing/access-management.tsx
-msgid "Anarlog user"
-msgstr ""
-
-#: src/settings/sync/index.tsx
-msgid "Anarlog will keep retrying."
-msgstr ""
-
-#: src/settings/sync/index.tsx
-msgid "Anarlog will retry automatically."
-msgstr ""
-
-#: src/settings/general/storage/legacy-cleanup.tsx
-msgid "Anarlog will retry automatically. This does not affect your notes."
-msgstr ""
-
-#: src/onboarding/index.tsx
-msgid "Anarlog will sync your calendar to get meeting reminders"
 msgstr ""
 
 #: src/templates/template-icon-picker.tsx
@@ -781,15 +689,15 @@ msgid "Approve"
 msgstr ""
 
 #: src/settings/general/camera-watermark.tsx
-msgid "Approve Anarlog Camera in System Settings under Login Items & Extensions."
+msgid "Approve Mirna Camera in System Settings under Login Items & Extensions."
 msgstr ""
 
-#: src/composer/index.tsx
-msgid "Ask Anarlog AI anything"
+#: src/session/components/floating/index.tsx
+msgid "Ask about this note"
 msgstr ""
 
-#: src/shared/chat-cta.tsx
-msgid "Ask Anarlog anything"
+#: src/main/empty.tsx
+msgid "Ask about your notes"
 msgstr ""
 
 #: src/chat/components/input/index.tsx
@@ -798,11 +706,16 @@ msgid "Ask anything"
 msgstr ""
 
 #: src/settings/general/notification.tsx
-msgid "Ask before stopping when a meeting may have ended. When alerts are off, Anarlog keeps listening."
+msgid "Ask before stopping when a meeting may have ended. When alerts are off, Mirna keeps listening."
 msgstr ""
 
 #: src/settings/general/primary-recording-device.tsx
 msgid "Ask each meeting"
+msgstr ""
+
+#: src/composer/index.tsx
+#: src/shared/chat-cta.tsx
+msgid "Ask Mirna anything"
 msgstr ""
 
 #: src/task/resource-view.tsx
@@ -818,7 +731,7 @@ msgid "Attach Markdown or text"
 msgstr ""
 
 #: src/templates/auto-format-examples-dialog.tsx
-msgid "Attach up to three past summaries you like. Anarlog will learn how you prefer meeting notes to be structured and written."
+msgid "Attach up to three past summaries you like. Mirna will learn how you prefer meeting notes to be structured and written."
 msgstr ""
 
 #: src/session-sharing/attachment-management.ts
@@ -852,7 +765,7 @@ msgid "Authenticating…"
 msgstr ""
 
 #: src/instruction/index.tsx
-msgid "Authorize access in your browser, then return to Anarlog."
+msgid "Authorize access in your browser, then return to Mirna."
 msgstr ""
 
 #: src/templates/auto-form.tsx
@@ -1306,14 +1219,6 @@ msgstr ""
 msgid "Choose Google Drive folder"
 msgstr ""
 
-#: src/settings/appearance/app-icon.tsx
-msgid "Choose how Anarlog appears in the Dock."
-msgstr ""
-
-#: src/settings/appearance/theme.tsx
-msgid "Choose how Anarlog looks on this device."
-msgstr ""
-
 #: src/templates/auto-form.tsx
 msgid "Choose how Auto structures and styles your summaries."
 msgstr ""
@@ -1321,6 +1226,18 @@ msgstr ""
 #: src/settings/general/audio-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Choose how long recordings stay on this device."
+msgstr ""
+
+#: src/settings/appearance/app-icon.tsx
+msgid "Choose how Mirna appears in the Dock."
+msgstr ""
+
+#: src/settings/appearance/theme.tsx
+msgid "Choose how Mirna looks on this device."
+msgstr ""
+
+#: src/sidebar/footer.tsx
+msgid "Choose models"
 msgstr ""
 
 #: src/templates/template-icon-picker.tsx
@@ -1417,6 +1334,10 @@ msgstr ""
 msgid "Closed"
 msgstr ""
 
+#: src/sidebar/footer.tsx
+msgid "Cloud"
+msgstr ""
+
 #: src/settings/developers/cloud-api.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Cloud API & Connectors"
@@ -1435,7 +1356,7 @@ msgid "Cloud API enabled — 1 meeting uploaded"
 msgstr ""
 
 #: src/settings/developers/cloud-api.tsx
-msgid "Cloud API enabled, but existing meetings could not be uploaded. Anarlog will retry."
+msgid "Cloud API enabled, but existing meetings could not be uploaded. Mirna will retry."
 msgstr ""
 
 #: src/settings/developers/cloud-api.tsx
@@ -1449,6 +1370,10 @@ msgstr ""
 
 #: src/settings/developers/cloud-api.tsx
 msgid "Cloud API URL copied"
+msgstr ""
+
+#: src/sidebar/footer.tsx
+msgid "Cloud notes"
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -1471,6 +1396,10 @@ msgstr ""
 
 #: src/settings/sync/index.tsx
 msgid "Cloud sync resumes when the current activity finishes."
+msgstr ""
+
+#: src/sidebar/footer.tsx
+msgid "Cloud transcription"
 msgstr ""
 
 #: src/session-sharing/comments.tsx
@@ -1557,7 +1486,7 @@ msgid "Complete onboarding. You're ready for your next conversation."
 msgstr ""
 
 #: src/instruction/index.tsx
-msgid "Complete sign-in in your browser, then return to Anarlog."
+msgid "Complete sign-in in your browser, then return to Mirna."
 msgstr ""
 
 #: src/settings/general/notification.tsx
@@ -1619,7 +1548,7 @@ msgid "Connect a CRM in Settings › CRM to enrich contacts."
 msgstr ""
 
 #: src/settings/crm/index.tsx
-msgid "Connect a CRM to look up your contacts from Anarlog. Connections are managed through your Anarlog account."
+msgid "Connect a CRM to look up your contacts from Mirna. Connections are managed through your Mirna account."
 msgstr ""
 
 #: src/onboarding/calendar.tsx
@@ -1640,7 +1569,6 @@ msgid "Connect Google Drive"
 msgstr ""
 
 #: src/auth/connect-local-library-dialog.tsx
-#: src/auth/context.tsx
 msgid "Connect library"
 msgstr ""
 
@@ -1747,7 +1675,7 @@ msgid "Continuing without trial"
 msgstr ""
 
 #: src/settings/general/meeting-settings.tsx
-msgid "Control listening without reopening Anarlog."
+msgid "Control listening without reopening Mirna."
 msgstr ""
 
 #: src/settings/stats/index.tsx
@@ -2026,7 +1954,6 @@ msgstr ""
 msgid "Couldn't open device add-ons. Try again."
 msgstr ""
 
-#: src/auth/context.tsx
 #: src/settings/referrals.tsx
 msgid "Couldn't open sign-in. Try again."
 msgstr ""
@@ -2098,7 +2025,7 @@ msgid "Create your account"
 msgstr ""
 
 #: src/settings/stats/badge-collection.tsx
-msgid "Create your Anarlog account. A place for your conversations to call home."
+msgid "Create your Mirna account. A place for your conversations to call home."
 msgstr ""
 
 #: src/session/components/outer-header/overflow/export-modal.tsx
@@ -2329,7 +2256,7 @@ msgid "Dictation shortcut"
 msgstr ""
 
 #: src/settings/dictation.tsx
-msgid "Dictation uses your microphone, transcription provider, languages, and dictionary. Temporary audio is deleted after transcription. Your last transcript stays in memory until dictation is disabled or Anarlog closes."
+msgid "Dictation uses your microphone, transcription provider, languages, and dictionary. Temporary audio is deleted after transcription. Your last transcript stays in memory until dictation is disabled or Mirna closes."
 msgstr ""
 
 #: src/settings/dictation.tsx
@@ -2406,7 +2333,7 @@ msgstr ""
 
 #. placeholder {0}: update.version
 #: src/sidebar/toast/registry.tsx
-msgid "Downloading Anarlog {0}{progress}"
+msgid "Downloading Mirna {0}{progress}"
 msgstr ""
 
 #: src/sidebar/toast/registry.tsx
@@ -2608,7 +2535,7 @@ msgid "Every conversation adds to your story."
 msgstr ""
 
 #: src/settings/automations/google-drive-config.tsx
-msgid "Every note summarized after enabling this automation is saved here as one file with its summary and transcript in the selected format. Anarlog must be open."
+msgid "Every note summarized after enabling this automation is saved here as one file with its summary and transcript in the selected format. Mirna must be open."
 msgstr ""
 
 #. placeholder {0}: owned.workspaceName
@@ -2749,12 +2676,12 @@ msgid "Finding Your Rhythm"
 msgstr ""
 
 #: src/instruction/index.tsx
-msgid "Finish checkout in your browser to unlock more, then return to Anarlog."
+msgid "Finish checkout in your browser to unlock more, then return to Mirna."
 msgstr ""
 
 #: src/settings/general/account.tsx
 #: src/settings/referrals.tsx
-msgid "Finish in your browser, then return to Anarlog."
+msgid "Finish in your browser, then return to Mirna."
 msgstr ""
 
 #: src/settings/general/account.tsx
@@ -2765,8 +2692,17 @@ msgstr ""
 msgid "Finishing connection…"
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
+#: src/sidebar/timeline/item.tsx
+msgid "Finishing up"
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "First Words"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Fix"
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -2814,6 +2750,10 @@ msgstr ""
 
 #: src/sidebar/settings-nav-groups.ts
 msgid "Folders"
+msgstr ""
+
+#: src/sidebar/note-filter-menu.tsx
+msgid "Folders appear here once notes are filed."
 msgstr ""
 
 #: src/templates/template-icon-picker.tsx
@@ -2932,8 +2872,20 @@ msgstr ""
 msgid "Go to recent"
 msgstr ""
 
+#: src/main/empty.tsx
+msgid "Good afternoon"
+msgstr ""
+
+#: src/main/empty.tsx
+msgid "Good evening"
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "Good Listener"
+msgstr ""
+
+#: src/main/empty.tsx
+msgid "Good morning"
 msgstr ""
 
 #: src/settings/automations/google-drive-config.tsx
@@ -2947,6 +2899,10 @@ msgstr ""
 #: src/billing/trial-started-dialog.tsx
 #: src/settings/ai/stt/select.tsx
 msgid "Got it"
+msgstr ""
+
+#: src/sidebar/note-filter-menu.tsx
+msgid "Group and sort"
 msgstr ""
 
 #: src/sidebar/note-filter-menu.tsx
@@ -2979,7 +2935,7 @@ msgid "Hands-free dictation"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
-msgid "Have Anarlog ready when you sign in."
+msgid "Have Mirna ready when you sign in."
 msgstr ""
 
 #: src/calendar/components/apple/permission.tsx
@@ -2991,31 +2947,31 @@ msgid "Having trouble? Paste the redirect URL"
 msgstr ""
 
 #: src/settings/stats/badge-collection.tsx
-msgid "Hello, Anarlog"
+msgid "Hello, Mirna"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
 msgid "Help"
 msgstr ""
 
-#: src/onboarding/permissions.tsx
-msgid "Help Anarlog listen to others"
-msgstr ""
-
-#: src/onboarding/permissions.tsx
-msgid "Help Anarlog listen to you"
-msgstr ""
-
-#: src/onboarding/permissions.tsx
-msgid "Help Anarlog read meeting activity"
-msgstr ""
-
 #: src/settings/general/app-settings.tsx
-msgid "Help improve Anarlog with anonymous usage data."
+msgid "Help improve Mirna with anonymous usage data."
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Help Mirna listen to others"
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Help Mirna listen to you"
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Help Mirna read meeting activity"
 msgstr ""
 
 #: src/chat/components/body/empty.tsx
-msgid "Hi, I'm Anarlog AI. Set up a language model and I'll be ready to help."
+msgid "Hi, I'm Mirna. Set up a language model and I'll be ready to help."
 msgstr ""
 
 #: src/settings/general/notification.tsx
@@ -3090,7 +3046,7 @@ msgid "Icons"
 msgstr ""
 
 #: src/services/camera-guidance.tsx
-msgid "If {app} blurs or replaces your background, that hides the badge. Keep it on until Anarlog Camera hides your room, then check your video before turning off {app}'s background."
+msgid "If {app} blurs or replaces your background, that hides the badge. Keep it on until Mirna Camera hides your room, then check your video before turning off {app}'s background."
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -3098,7 +3054,7 @@ msgid "If a dictation can't be transcribed or inserted, keep it on this device f
 msgstr ""
 
 #: src/settings/general/account.tsx
-msgid "If Anarlog stays closed, paste the link in the sign-in window."
+msgid "If Mirna stays closed, paste the link in the sign-in window."
 msgstr ""
 
 #: src/settings/referrals.tsx
@@ -3171,6 +3127,10 @@ msgstr ""
 msgid "Includes imported transcripts. Deleted conversations are excluded."
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
+msgid "Inputs being recorded"
+msgstr ""
+
 #: src/templates/sections-editor.tsx
 msgid "Insert above"
 msgstr ""
@@ -3188,7 +3148,7 @@ msgid "Install"
 msgstr ""
 
 #: src/settings/sync/index.tsx
-msgid "Install Anarlog and sign in with this account on the new device. Keep this device online and the new device will connect automatically."
+msgid "Install Mirna and sign in with this account on the new device. Keep this device online and the new device will connect automatically."
 msgstr ""
 
 #: src/settings/developers/skills.tsx
@@ -3320,16 +3280,16 @@ msgstr ""
 msgid "Keep {PRO_TRIAL_DAYS} days"
 msgstr ""
 
-#: src/settings/dictation.tsx
-msgid "Keep Anarlog running to use your shortcut in other apps."
-msgstr ""
-
 #: src/session-sharing/management-panel.tsx
 msgid "Keep desktop edits"
 msgstr ""
 
 #: src/settings/team/index.tsx
 msgid "Keep forever"
+msgstr ""
+
+#: src/settings/dictation.tsx
+msgid "Keep Mirna running to use your shortcut in other apps."
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -3357,7 +3317,7 @@ msgid "Keep your recovery key saved somewhere safe. You can still use it if anot
 msgstr ""
 
 #: src/dictation/recovery.tsx
-msgid "Kept on this device for 24 hours. Anarlog never inserts these by itself."
+msgid "Kept on this device for 24 hours. Mirna never inserts these by itself."
 msgstr ""
 
 #: src/settings/developers/cloud-api.tsx
@@ -3397,6 +3357,10 @@ msgstr ""
 #. placeholder {1}: result.matched
 #: src/imports/screen.tsx
 msgid "Last import: {0} added, {1} unchanged"
+msgstr ""
+
+#: src/main/empty.tsx
+msgid "Last note"
 msgstr ""
 
 #. placeholder {0}: lastRun.detail
@@ -3619,12 +3583,24 @@ msgstr ""
 msgid "Lower other audio while dictating"
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
+msgid "Mac audio is silent"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Mac audio on"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Mac audio silent"
+msgstr ""
+
 #: src/settings/general/camera-watermark.tsx
 msgid "macOS asks you to approve the camera once."
 msgstr ""
 
 #: src/settings/ai/shared/index.tsx
-msgid "macOS cannot access your login Keychain. Repairing briefly locks it and asks for your Mac password before Anarlog retries this API key."
+msgid "macOS cannot access your login Keychain. Repairing briefly locks it and asks for your Mac password before Mirna retries this API key."
 msgstr ""
 
 #: src/auth/cloudsync-keychain-repair.tsx
@@ -3676,7 +3652,7 @@ msgid "Manage workspace billing"
 msgstr ""
 
 #: src/settings/general/account.tsx
-msgid "Manage your sign-in methods on the Anarlog website."
+msgid "Manage your sign-in methods on the Mirna website."
 msgstr ""
 
 #: src/settings/automations/google-drive-config.tsx
@@ -3815,10 +3791,6 @@ msgstr ""
 msgid "Memory Keeper"
 msgstr ""
 
-#: src/session/components/note-input/header-raw.tsx
-msgid "Memos"
-msgstr ""
-
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 msgid "Merge"
 msgstr ""
@@ -3828,7 +3800,7 @@ msgid "Merged"
 msgstr ""
 
 #: src/composer/index.tsx
-msgid "Message Anarlog AI"
+msgid "Message Mirna"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/export-modal.tsx
@@ -3852,6 +3824,18 @@ msgstr ""
 msgid "Microphone detection"
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
+msgid "Microphone is silent"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Microphone on"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Microphone silent"
+msgstr ""
+
 #: src/settings/general/storage/legacy-cleanup.tsx
 msgid "Migration complete"
 msgstr ""
@@ -3866,6 +3850,115 @@ msgstr ""
 
 #: src/main/windows-window-controls.tsx
 msgid "Minimize"
+msgstr ""
+
+#. placeholder {0}: update.version
+#: src/sidebar/toast/registry.tsx
+msgid "Mirna {0} is available"
+msgstr ""
+
+#. placeholder {0}: update.version
+#: src/sidebar/toast/registry.tsx
+msgid "Mirna {0} is ready to install"
+msgstr ""
+
+#: src/settings/general/camera-watermark.tsx
+msgid "Mirna Camera"
+msgstr ""
+
+#: src/services/camera-guidance.tsx
+msgid "Mirna Camera is hiding your room now. Turn off {app}'s blur or background: it hides the badge."
+msgstr ""
+
+#: src/settings/general/camera-watermark.tsx
+msgid "Mirna Camera needs your camera to show you."
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Mirna can hear others"
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Mirna can hear your voice"
+msgstr ""
+
+#: src/onboarding/permissions.tsx
+msgid "Mirna can read meeting details"
+msgstr ""
+
+#: src/settings/developers/cli.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Mirna CLI"
+msgstr ""
+
+#: src/session/components/note-input/enhanced/enhance-error.tsx
+msgid "Mirna could not generate this summary because you were not signed in. Sign in, then try again."
+msgstr ""
+
+#: src/shared-notes/index.tsx
+msgid "Mirna could not read the local shared-note cache."
+msgstr ""
+
+#: src/settings/sync/index.tsx
+msgid "Mirna could not start cloud sync on this device."
+msgstr ""
+
+#: src/settings/sync/index.tsx
+msgid "Mirna could not start cloud sync on this device. It will keep retrying."
+msgstr ""
+
+#: src/settings/general/account.tsx
+msgid "Mirna couldn't sign you out. Try again."
+msgstr ""
+
+#: src/lock/gate.tsx
+msgid "Mirna is Locked"
+msgstr ""
+
+#: src/services/camera-guidance.tsx
+msgid "Mirna left {app}'s blur or background on because it couldn't confirm Mirna Camera hides your room yet."
+msgstr ""
+
+#: src/session-sharing/access-management.tsx
+msgid "Mirna member"
+msgstr ""
+
+#: src/onboarding/index.tsx
+msgid "Mirna needs access to your microphone and system audio to record and transcribe your meetings"
+msgstr ""
+
+#: src/onboarding/index.tsx
+msgid "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
+msgstr ""
+
+#. placeholder {0}: statuses[0].displayName
+#: src/settings/developers/skills.tsx
+msgid "Mirna skill added to {0}"
+msgstr ""
+
+#. placeholder {0}: statuses.length
+#: src/settings/developers/skills.tsx
+msgid "Mirna skill added to {0} agents"
+msgstr ""
+
+#: src/session-sharing/access-management.tsx
+msgid "Mirna user"
+msgstr ""
+
+#: src/settings/sync/index.tsx
+msgid "Mirna will keep retrying."
+msgstr ""
+
+#: src/settings/sync/index.tsx
+msgid "Mirna will retry automatically."
+msgstr ""
+
+#: src/settings/general/storage/legacy-cleanup.tsx
+msgid "Mirna will retry automatically. This does not affect your notes."
+msgstr ""
+
+#: src/onboarding/index.tsx
+msgid "Mirna will sync your calendar to get meeting reminders"
 msgstr ""
 
 #: src/settings/referrals.tsx
@@ -3927,6 +4020,10 @@ msgstr ""
 msgid "My automations"
 msgstr ""
 
+#: src/session/components/note-input/header-raw.tsx
+msgid "My notes"
+msgstr ""
+
 #: src/crm/enrich-contact.tsx
 msgid "name"
 msgstr ""
@@ -3958,6 +4055,10 @@ msgstr ""
 msgid "New automation"
 msgstr ""
 
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "New blank note"
+msgstr ""
+
 #: src/chat/components/toolbar-controls.tsx
 msgid "New chat"
 msgstr ""
@@ -3967,10 +4068,9 @@ msgid "New folder"
 msgstr ""
 
 #: src/imports/screen.tsx
-msgid "New meetings are imported automatically while Anarlog is running."
+msgid "New meetings are imported automatically while Mirna is running."
 msgstr ""
 
-#: src/main/empty.tsx
 #: src/main/windows-title-bar.tsx
 msgid "New Note"
 msgstr ""
@@ -4017,6 +4117,10 @@ msgstr ""
 #: src/imports/screen.tsx
 #: src/settings/general/notification.tsx
 msgid "No apps found."
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "No audio is being captured"
 msgstr ""
 
 #: src/settings/automations/index.tsx
@@ -4075,6 +4179,7 @@ msgstr ""
 msgid "No emoji found"
 msgstr ""
 
+#: src/session/components/folder-picker.tsx
 #: src/sidebar/timeline/utils/index.ts
 msgid "No folder"
 msgstr ""
@@ -4145,7 +4250,7 @@ msgid "No page selected yet."
 msgstr ""
 
 #: src/settings/automations/starter-config.tsx
-msgid "No pages found. Share the page with the Anarlog integration in Notion first."
+msgid "No pages found. Share the page with the Mirna integration in Notion first."
 msgstr ""
 
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
@@ -4189,6 +4294,10 @@ msgstr ""
 
 #: src/chat/components/input/use-dictation.ts
 msgid "No speech detected"
+msgstr ""
+
+#: src/sidebar/timeline/item.tsx
+msgid "No speech heard"
 msgstr ""
 
 #: src/dictation/recovery.tsx
@@ -4320,6 +4429,10 @@ msgstr ""
 msgid "Oldest"
 msgstr ""
 
+#: src/sidebar/footer.tsx
+msgid "On this Mac"
+msgstr ""
+
 #: src/settings/dictation.tsx
 msgid "On Wayland, approve the shortcuts in your desktop's prompt. Use Control + Alt + Escape to cancel. On X11, press Escape to cancel. The target app must expose an editable accessibility field."
 msgstr ""
@@ -4359,6 +4472,7 @@ msgid "Only sync items from this {0}."
 msgstr ""
 
 #: src/calendar/components/apple/permission.tsx
+#: src/main/empty.tsx
 #: src/task/resource-view.tsx
 msgid "Open"
 msgstr ""
@@ -4373,20 +4487,6 @@ msgstr ""
 
 #: src/chat/components/body/empty.tsx
 msgid "Open AI Settings"
-msgstr ""
-
-#: src/composer/index.tsx
-#: src/onboarding/final.tsx
-#: src/services/enhancer/summary-notification.ts
-msgid "Open Anarlog"
-msgstr ""
-
-#: src/settings/general/app-settings.tsx
-msgid "Open Anarlog from the menu bar."
-msgstr ""
-
-#: src/settings/sync/index.tsx
-msgid "Open Anarlog on an existing synced device signed in to the same account. This device will connect automatically."
 msgstr ""
 
 #: src/sidebar/timeline/index.tsx
@@ -4417,6 +4517,20 @@ msgstr ""
 
 #: src/services/event-notification/index.ts
 msgid "Open meeting"
+msgstr ""
+
+#: src/composer/index.tsx
+#: src/onboarding/final.tsx
+#: src/services/enhancer/summary-notification.ts
+msgid "Open Mirna"
+msgstr ""
+
+#: src/settings/general/app-settings.tsx
+msgid "Open Mirna from the menu bar."
+msgstr ""
+
+#: src/settings/sync/index.tsx
+msgid "Open Mirna on an existing synced device signed in to the same account. This device will connect automatically."
 msgstr ""
 
 #: src/task/resource-view.tsx
@@ -4465,12 +4579,12 @@ msgstr ""
 
 #. placeholder {0}: accessibilityGuidance.paneTitle ?? "Privacy"
 #: src/onboarding/permissions.tsx
-msgid "Opens System Settings and guides you to add Anarlog to the {0} list"
+msgid "Opens System Settings and guides you to add Mirna to the {0} list"
 msgstr ""
 
 #. placeholder {0}: accessibilityGuidance.paneTitle ?? "Privacy"
 #: src/settings/general/permissions.tsx
-msgid "Opens System Settings and guides you to add Anarlog to the {0} list."
+msgid "Opens System Settings and guides you to add Mirna to the {0} list."
 msgstr ""
 
 #: src/calendar/components/apple/permission.tsx
@@ -4550,7 +4664,7 @@ msgid "Paste the authorization code"
 msgstr ""
 
 #: src/instruction/index.tsx
-msgid "Paste the browser URL here if the browser button did not reopen Anarlog."
+msgid "Paste the browser URL here if the browser button did not reopen Mirna."
 msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
@@ -4631,7 +4745,7 @@ msgid "Phone"
 msgstr ""
 
 #: src/services/camera-guidance.tsx
-msgid "Pick Anarlog Camera as your camera. Anarlog couldn't switch it in {app}."
+msgid "Pick Mirna Camera as your camera. Mirna couldn't switch it in {app}."
 msgstr ""
 
 #: src/contacts/contact-page-header.tsx
@@ -4696,7 +4810,7 @@ msgid "Preparing…"
 msgstr ""
 
 #: src/settings/dictation.tsx
-msgid "Press Escape to cancel. Dictation stops after five minutes and pauses while Anarlog records a meeting."
+msgid "Press Escape to cancel. Dictation stops after five minutes and pauses while Mirna records a meeting."
 msgstr ""
 
 #: src/settings/dictation-shortcut.tsx
@@ -4884,8 +4998,13 @@ msgstr ""
 msgid "Reconnect Slack"
 msgstr ""
 
+#: src/main/sidebar-timeline-chrome.tsx
 #: src/session/components/outer-header/index.tsx
 msgid "Record"
+msgstr ""
+
+#: src/session/components/outer-header/index.tsx
+msgid "Record more"
 msgstr ""
 
 #: src/settings/general/permissions.tsx
@@ -4894,6 +5013,10 @@ msgstr ""
 
 #: src/settings/general/permissions.tsx
 msgid "Record your voice in meetings and calls."
+msgstr ""
+
+#: src/sidebar/timeline/item.tsx
+msgid "Recording"
 msgstr ""
 
 #: src/session/components/note-input/transcript/actions.ts
@@ -4912,6 +5035,10 @@ msgstr ""
 
 #: src/services/meeting-capture-stop.tsx
 msgid "Recording stopped"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Recording time"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
@@ -5125,11 +5252,11 @@ msgid "Require SSO"
 msgstr ""
 
 #: src/settings/privacy/index.tsx
-msgid "Require Touch ID or your password when opening Anarlog."
+msgid "Require Touch ID or your password when opening Mirna."
 msgstr ""
 
 #: src/settings/privacy/index.tsx
-msgid "Require Windows Hello face, PIN, or password when opening Anarlog."
+msgid "Require Windows Hello face, PIN, or password when opening Mirna."
 msgstr ""
 
 #: src/shared/open-note-dialog.tsx
@@ -5376,6 +5503,10 @@ msgstr ""
 msgid "Search language..."
 msgstr "تلاش زبان..."
 
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "Search notes"
+msgstr ""
+
 #: src/shared/open-note-dialog.tsx
 msgid "Search notes and pages..."
 msgstr ""
@@ -5397,7 +5528,7 @@ msgid "Search or type owner/repo"
 msgstr ""
 
 #: src/settings/automations/starter-config.tsx
-msgid "Search pages shared with Anarlog…"
+msgid "Search pages shared with Mirna…"
 msgstr ""
 
 #: src/settings/ai/shared/provider-search.tsx
@@ -5507,7 +5638,7 @@ msgstr ""
 
 #: src/settings/privacy/index.tsx
 #: src/sidebar/settings-nav-groups.ts
-msgid "Send sanitized crash and error reports to help improve Anarlog."
+msgid "Send sanitized crash and error reports to help improve Mirna."
 msgstr ""
 
 #: src/automations/starters.tsx
@@ -5568,9 +5699,9 @@ msgstr ""
 msgid "Setting up encrypted cloud sync."
 msgstr ""
 
-#: src/main/empty.tsx
 #: src/main/windows-title-bar.tsx
 #: src/shared/open-note-dialog.tsx
+#: src/sidebar/footer.tsx
 #: src/sidebar/toast/registry.tsx
 msgid "Settings"
 msgstr ""
@@ -5617,6 +5748,10 @@ msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
 msgid "Share one item with a guest, or add it to a Team for everyone."
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Share or export"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
@@ -5694,16 +5829,12 @@ msgid "Show All Recurring Events"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
-msgid "Show Anarlog in the Dock and app switcher."
-msgstr ""
-
-#: src/settings/general/app-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Show app in Dock"
 msgstr ""
 
 #: src/settings/general/permissions.tsx
-msgid "Show Apple Calendar events in Anarlog."
+msgid "Show Apple Calendar events in Mirna."
 msgstr ""
 
 #: src/session/components/outer-header/overflow/index.tsx
@@ -5744,6 +5875,14 @@ msgstr ""
 
 #: src/settings/appearance/time-format.tsx
 msgid "Show meeting times as 14:00 instead of 2:00 PM."
+msgstr ""
+
+#: src/settings/general/app-settings.tsx
+msgid "Show Mirna in the Dock and app switcher."
+msgstr ""
+
+#: src/sidebar/note-filter-menu.tsx
+msgid "Show notes: {label}"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
@@ -5793,7 +5932,7 @@ msgid "Show words in the floating panel as you speak. Uses a live connection to 
 msgstr ""
 
 #: src/settings/general/camera-watermark.tsx
-msgid "Show your camera with a badge saying Anarlog is taking notes in apps where you pick Anarlog Camera."
+msgid "Show your camera with a badge saying Mirna is taking notes in apps where you pick Mirna Camera."
 msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
@@ -5804,10 +5943,6 @@ msgstr ""
 #: src/shared-notes/index.tsx
 #: src/sidebar/toast/registry.tsx
 msgid "Sign in"
-msgstr ""
-
-#: src/auth/context.tsx
-msgid "Sign in again"
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -5824,11 +5959,6 @@ msgstr ""
 
 #: src/folders/sidebar.tsx
 msgid "Sign in to add this folder"
-msgstr ""
-
-#: src/settings/general/account.tsx
-#: src/settings/general/billing.tsx
-msgid "Sign in to Anarlog"
 msgstr ""
 
 #: src/settings/general/primary-recording-device.tsx
@@ -5862,7 +5992,12 @@ msgid "Sign in to generate this summary"
 msgstr ""
 
 #: src/sidebar/toast/registry.tsx
-msgid "Sign in to get the most out of Anarlog"
+msgid "Sign in to get the most out of Mirna"
+msgstr ""
+
+#: src/settings/general/account.tsx
+#: src/settings/general/billing.tsx
+msgid "Sign in to Mirna"
 msgstr ""
 
 #: src/settings/referrals.tsx
@@ -5898,7 +6033,7 @@ msgid "Sign in with ChatGPT Plus or Pro, then paste the redirect URL from your b
 msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
-msgid "Sign in with ChatGPT Plus or Pro. We'll open Anarlog and finish connecting."
+msgid "Sign in with ChatGPT Plus or Pro. We'll open Mirna and finish connecting."
 msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
@@ -5923,7 +6058,7 @@ msgid "Sign out and sign in again to resume cloud sync."
 msgstr ""
 
 #: src/settings/general/account.tsx
-msgid "Sign out of Anarlog?"
+msgid "Sign out of Mirna?"
 msgstr ""
 
 #: src/onboarding/account/after-login.tsx
@@ -5989,10 +6124,6 @@ msgstr ""
 msgid "Something went wrong while generating the summary."
 msgstr ""
 
-#: src/sidebar/note-filter-menu.tsx
-msgid "Sort notes"
-msgstr ""
-
 #: src/contacts/related-notes.tsx
 #: src/contacts/shared.tsx
 msgid "Sort options"
@@ -6011,7 +6142,7 @@ msgid "Source: AI model provider"
 msgstr ""
 
 #: src/session/components/note-input/enhanced/enhance-error.tsx
-msgid "Source: Anarlog"
+msgid "Source: Mirna"
 msgstr ""
 
 #: src/session/components/note-input/enhanced/enhance-error.tsx
@@ -6042,11 +6173,6 @@ msgstr ""
 msgid "Start a Pro trial or add your own LLM API key to generate a summary from this transcript."
 msgstr ""
 
-#: src/settings/general/app-settings.tsx
-#: src/sidebar/settings-nav-groups.ts
-msgid "Start Anarlog at login"
-msgstr "لاگ ان پر Anarlog شروع کریں"
-
 #: src/settings/general/billing.tsx
 msgid "Start free trial"
 msgstr ""
@@ -6055,16 +6181,23 @@ msgstr ""
 msgid "Start listening when a scheduled meeting begins."
 msgstr ""
 
+#: src/settings/general/app-settings.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Start Mirna at login"
+msgstr ""
+
+#: src/main/empty.tsx
+msgid "Start on a blank page. You can add a recording to it later."
+msgstr ""
+
 #: src/settings/team/index.tsx
 msgid "Start Pro"
 msgstr ""
 
-#: src/services/event-notification/index.ts
-msgid "Start recording"
-msgstr ""
-
 #: src/main/empty.tsx
-msgid "Start Recording"
+#: src/services/event-notification/index.ts
+#: src/session/components/outer-header/index.tsx
+msgid "Start recording"
 msgstr ""
 
 #: src/chat/components/input/index.tsx
@@ -6122,7 +6255,7 @@ msgid "Starting…"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
-msgid "Stay current with updates installed the next time Anarlog opens."
+msgid "Stay current with updates installed the next time Mirna opens."
 msgstr ""
 
 #: src/settings/automations/index.tsx
@@ -6134,7 +6267,7 @@ msgid "Stone"
 msgstr ""
 
 #: src/composer/index.tsx
-#: src/session/components/outer-header/index.tsx
+#: src/session/components/outer-header/record-control.tsx
 msgid "Stop"
 msgstr ""
 
@@ -6142,7 +6275,6 @@ msgstr ""
 msgid "Stop auto-add"
 msgstr ""
 
-#: src/session/components/outer-header/index.tsx
 #: src/sidebar/timeline/item.tsx
 msgid "Stop listening"
 msgstr ""
@@ -6348,7 +6480,7 @@ msgid "Talk to sales"
 msgstr ""
 
 #: src/settings/developers/skills.tsx
-msgid "Teach coding agents when and how to use the Anarlog CLI and MCP"
+msgid "Teach coding agents when and how to use the Mirna CLI and MCP"
 msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
@@ -6481,7 +6613,7 @@ msgid "This guest needs Team access"
 msgstr ""
 
 #: src/session/components/outer-header/index.tsx
-msgid "This is a prerecorded demo, so your camera stays off. Click Join & record to see Anarlog in action."
+msgid "This is a prerecorded demo, so your camera stays off. Click Join & record to see Mirna in action."
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -6489,6 +6621,7 @@ msgid "This name is synced to your other devices signed in to this account."
 msgstr ""
 
 #: src/calendar/components/event-chip.tsx
+#: src/session/components/floating/index.tsx
 msgid "This note"
 msgstr ""
 
@@ -6505,11 +6638,11 @@ msgid "This recording is using batch transcription, so the transcript isn't avai
 msgstr ""
 
 #: src/settings/plan-gate.tsx
-msgid "This requires Anarlog Enterprise"
+msgid "This requires Anarlog Pro"
 msgstr ""
 
 #: src/settings/plan-gate.tsx
-msgid "This requires Anarlog Pro"
+msgid "This requires Mirna Enterprise"
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -6536,7 +6669,7 @@ msgid "Tip: Add teammate names, acronyms, company jargon, and product terms."
 msgstr ""
 
 #: src/session/components/note-input/enhanced/streaming.tsx
-msgid "Tip: The Anarlog team loves our users!"
+msgid "Tip: The Mirna team loves our users!"
 msgstr ""
 
 #: src/sidebar/timeline/utils/index.ts
@@ -6549,6 +6682,11 @@ msgstr ""
 
 #: src/dictation/recovery.tsx
 msgid "Transcribe"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+#: src/sidebar/timeline/item.tsx
+msgid "Transcribing"
 msgstr ""
 
 #: src/chat/components/input/index.tsx
@@ -6637,11 +6775,11 @@ msgid "Turn assigned follow-ups into Linear issue drafts."
 msgstr ""
 
 #: src/settings/general/camera-watermark.tsx
-msgid "Turn on Anarlog Camera in System Settings under Privacy & Security, Camera."
+msgid "Turn on Mirna Camera in System Settings under Privacy & Security, Camera."
 msgstr ""
 
 #: src/calendar/components/apple/permission.tsx
-msgid "Turn on Anarlog in System Settings → Privacy & Security → Calendars, then return here."
+msgid "Turn on Mirna in System Settings → Privacy & Security → Calendars, then return here."
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -6707,7 +6845,7 @@ msgid "Unlock the Team library"
 msgstr ""
 
 #: src/settings/ai/shared/index.tsx
-msgid "Unlock your login Keychain in the macOS prompt. Anarlog will retry saving this API key automatically."
+msgid "Unlock your login Keychain in the macOS prompt. Mirna will retry saving this API key automatically."
 msgstr ""
 
 #: src/contacts/details.tsx
@@ -6732,6 +6870,7 @@ msgstr ""
 msgid "Until {endsOn}"
 msgstr ""
 
+#: src/main/empty.tsx
 #: src/session/components/note-input/raw.tsx
 #: src/session/components/outer-header/overflow/export-modal.tsx
 #: src/session/components/title-input.tsx
@@ -6751,8 +6890,16 @@ msgstr ""
 msgid "Untitled automation"
 msgstr ""
 
+#: src/sidebar/timeline/item.tsx
+msgid "Untitled note"
+msgstr ""
+
 #: src/contacts/related-notes.tsx
 msgid "Untitled Note"
+msgstr ""
+
+#: src/sidebar/timeline/item.tsx
+msgid "Untitled recording"
 msgstr ""
 
 #: src/edit/tab-content.tsx
@@ -6776,7 +6923,7 @@ msgid "Update"
 msgstr ""
 
 #: src/settings/sync/index.tsx
-msgid "Update Anarlog to keep syncing"
+msgid "Update Mirna to keep syncing"
 msgstr ""
 
 #: src/automations/starters.tsx
@@ -6847,7 +6994,7 @@ msgid "Upload transcript"
 msgstr ""
 
 #: src/settings/developers/cloud-api.tsx
-msgid "Uploads meeting content for remote access while Anarlog is closed."
+msgid "Uploads meeting content for remote access while Mirna is closed."
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -6951,16 +7098,16 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: src/lock/gate.tsx
-msgid "View Anarlog"
-msgstr ""
-
 #: src/settings/referrals.tsx
 msgid "View billing"
 msgstr ""
 
 #: src/contacts/organization-details.tsx
 msgid "View LinkedIn profile"
+msgstr ""
+
+#: src/lock/gate.tsx
+msgid "View Mirna"
 msgstr ""
 
 #: src/lock/screen.tsx
@@ -6972,7 +7119,7 @@ msgid "View sync log"
 msgstr ""
 
 #: src/chat/components/input/use-dictation.ts
-msgid "Voice input is unavailable while Anarlog is recording a meeting."
+msgid "Voice input is unavailable while Mirna is recording a meeting."
 msgstr ""
 
 #: src/settings/general/notification.tsx
@@ -7019,15 +7166,11 @@ msgid "Weekly streak: {0}"
 msgstr ""
 
 #: src/onboarding/index.tsx
-msgid "Welcome to Anarlog"
+msgid "Welcome to"
 msgstr ""
 
 #: src/chat/components/body/empty.tsx
 msgid "What action items have come up so far in this meeting?"
-msgstr ""
-
-#: src/settings/general/camera-watermark.tsx
-msgid "What Anarlog Camera shows behind you."
 msgstr ""
 
 #: src/chat/components/body/empty.tsx
@@ -7042,6 +7185,10 @@ msgstr ""
 msgid "What key decisions were made in my recent meetings?"
 msgstr ""
 
+#: src/settings/general/camera-watermark.tsx
+msgid "What Mirna Camera shows behind you."
+msgstr ""
+
 #: src/folders/folder-editor.tsx
 msgid "What these notes are usually about"
 msgstr ""
@@ -7054,12 +7201,12 @@ msgstr ""
 msgid "What's new in {version}?"
 msgstr ""
 
-#: src/settings/general/camera-watermark.tsx
-msgid "When Anarlog records a call in {switchApps}, switch its camera to Anarlog Camera."
-msgstr ""
-
 #: src/settings/dictionary/replacements.tsx
 msgid "When I say"
+msgstr ""
+
+#: src/settings/general/camera-watermark.tsx
+msgid "When Mirna records a call in {switchApps}, switch its camera to Mirna Camera."
 msgstr ""
 
 #: src/settings/general/index.tsx
@@ -7110,8 +7257,16 @@ msgstr ""
 msgid "Workspace subdomain"
 msgstr ""
 
+#: src/main/empty.tsx
+msgid "Write a note"
+msgstr ""
+
 #: src/automations/starters.tsx
 msgid "Write to a folder"
+msgstr ""
+
+#: src/sidebar/timeline/item.tsx
+msgid "Writing summary"
 msgstr ""
 
 #: src/settings/general/billing.tsx
@@ -7217,10 +7372,6 @@ msgstr ""
 msgid "Your insights"
 msgstr ""
 
-#: src/auth/context.tsx
-msgid "Your local notes are available. Connect this library to sync with your current account."
-msgstr ""
-
 #: src/billing/trial-ended-dialog.tsx
 msgid "Your notes and recordings are safe. Free local transcription still works. Upgrade anytime to keep Pro features."
 msgstr ""
@@ -7234,7 +7385,7 @@ msgid "Your notes remain available locally."
 msgstr ""
 
 #: src/settings/sync/index.tsx
-msgid "Your notes remain available locally. Anarlog will keep retrying."
+msgid "Your notes remain available locally. Mirna will keep retrying."
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -7276,15 +7427,11 @@ msgid "Your Pro trial just started"
 msgstr ""
 
 #: src/settings/general/e2ee-setup.tsx
-msgid "Your recovery key encrypts synced notes before they leave this device. Anarlog cannot read or recover it."
+msgid "Your recovery key encrypts synced notes before they leave this device. Mirna cannot read or recover it."
 msgstr ""
 
 #: src/settings/referrals.tsx
 msgid "Your referrals"
-msgstr ""
-
-#: src/auth/context.tsx
-msgid "Your session has expired. Sign in again to reconnect."
 msgstr ""
 
 #: src/services/enhancer/summary-notification.ts

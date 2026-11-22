@@ -182,8 +182,8 @@ mod test {
         for (channel, current, legacy) in [
             (
                 crate::Channel::Dev,
-                "com.hyprnote.dev/auth.json",
-                "com.hyprnote.dev/auth.json",
+                "app.mirna.dev/auth.json",
+                "app.mirna.dev/auth.json",
             ),
             (
                 crate::Channel::Staging,

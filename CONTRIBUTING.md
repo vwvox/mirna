@@ -18,11 +18,21 @@ pnpm install
 export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0 SONIQO_DISABLE=1
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}}}'
-APP="$CARGO_TARGET_DIR/debug/bundle/macos/Anarlog Dev.app"
-xattr -cr "$APP"
-codesign --force --deep --sign - --identifier com.hyprnote.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
+APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
+xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
+codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
 open "$APP"
 ```
+
+## See the running app in a browser
+
+Debug builds run a relay on `127.0.0.1:1423` (`plugins/relay`). It serves the app's interface from the Vite dev server and forwards every command, event and live query to the running desktop app. That gives a browser tab, including an agent's browser, the real app with real data and full DOM access, without screenshots or extra macOS permissions.
+
+1. Start the signed debug app (above).
+2. Run `pnpm -F desktop dev` (Vite on port 1422).
+3. Open `http://localhost:1423/app/main`.
+
+Frontend edits hot-reload in that tab, so styling can be checked instantly. The native app still needs a rebuild to pick them up. The tab acts on your real notes, so treat clicks there as real actions.
 
 ## Build quirks and why they exist
 

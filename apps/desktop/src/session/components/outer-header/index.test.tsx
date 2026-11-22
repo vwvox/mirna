@@ -105,8 +105,22 @@ vi.mock("~/stt/contexts", () => ({
       getSessionMode: (sessionId: string) =>
         mocks.sessionModes[sessionId] ?? "inactive",
       stop: mocks.stopListening,
+      live: {
+        seconds: 64,
+        amplitude: { mic: 0.4, speaker: 0.2 },
+        captureHealth: { mic: true, speaker: true, unavailable: false },
+      },
+      batch: { "session-1": { percentage: 64 } },
     }),
   ),
+}));
+
+vi.mock("~/shared/hooks/usePermissions", () => ({
+  usePermission: () => ({ status: "authorized", open: vi.fn() }),
+}));
+
+vi.mock("./overflow/export-modal", () => ({
+  ExportModal: () => null,
 }));
 
 vi.mock("~/stt/useStartListening", () => ({
@@ -191,7 +205,13 @@ function renderHeader(
   );
 }
 
-const ACTIONS = ["Record", "Join & record", "Stop", "Share note"] as const;
+const ACTIONS = [
+  "Record",
+  "Record more",
+  "Join & record",
+  "Stop",
+  "Share note",
+] as const;
 
 function visibleAction() {
   const visible = ACTIONS.filter((name) =>
@@ -237,8 +257,8 @@ describe("OuterHeader", () => {
     ],
     ["post-meeting transcription", { mode: "running_batch", now: AFTER }, null],
     ["finalizing", { mode: "finalizing", event: scheduled(MEET_LINK) }, null],
-    ["inactive with transcript", { transcript: true }, "Record"],
-    ["inactive with audio", { audio: true }, "Record"],
+    ["inactive with transcript", { transcript: true }, "Record more"],
+    ["inactive with audio", { audio: true }, "Record more"],
     ["meeting over", { event: scheduled(MEET_LINK), now: AFTER }, "Record"],
     [
       "recorded event without ended_at",
@@ -247,7 +267,7 @@ describe("OuterHeader", () => {
         now: AFTER,
         transcript: true,
       },
-      "Record",
+      "Record more",
     ],
     ["meeting without a link", { event: scheduled() }, "Record"],
     [
@@ -290,6 +310,21 @@ describe("OuterHeader", () => {
 
     expect(visibleAction()).toBe(expected);
     expect(screen.getByRole("button", { name: "More" })).not.toBeNull();
+  });
+
+  it("shows transcription progress instead of a record button after stopping", () => {
+    arrange({ mode: "running_batch", now: AFTER });
+    renderHeader();
+
+    expect(screen.getByRole("status").textContent).toContain("Transcribing");
+    expect(screen.getByRole("status").textContent).toContain("64%");
+  });
+
+  it("shows the live timer while recording", () => {
+    arrange({ mode: "active" });
+    renderHeader();
+
+    expect(screen.getByLabelText("Recording time").textContent).toBe("1:04");
   });
 
   it("starts listening from record without opening a meeting", () => {

@@ -456,7 +456,7 @@ describe("SessionViewSwitcher", () => {
     expect(screen.getByPlaceholderText("Search templates...")).not.toBeNull();
   });
 
-  it("shows the used template's icon in the active summary pill", () => {
+  it("names the active summary tab after its template, as text not an icon", () => {
     hoisted.activeTemplateTitle = "Scrum";
     hoisted.activeTemplateIcon = {
       type: "icon",
@@ -465,9 +465,9 @@ describe("SessionViewSwitcher", () => {
     };
     renderSwitcher({ currentTab: { type: "enhanced", id: "note-1" } });
 
-    const pill = screen.getByRole("button", { name: "Scrum" });
-    const icon = pill.querySelector("svg");
-    expect(icon?.getAttribute("color")).toBe("#16a34a");
+    const tab = screen.getByRole("button", { name: "Scrum" });
+    expect(tab.textContent).toContain("Scrum");
+    expect(tab.querySelector('svg[color="#16a34a"]')).toBeNull();
   });
 
   it("hides the view switcher when the memo is the only view", () => {

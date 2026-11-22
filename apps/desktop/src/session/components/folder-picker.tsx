@@ -5,7 +5,13 @@ import {
   commands as windowsCommands,
   getCurrentWebviewWindowLabel,
 } from "@anlg/plugin-windows";
-import { CaretRight, Check, Folder, Plus } from "@anlg/ui/components/icons";
+import {
+  CaretDown,
+  CaretRight,
+  Check,
+  Folder,
+  Plus,
+} from "@anlg/ui/components/icons";
 import {
   Command,
   CommandEmpty,
@@ -73,10 +79,7 @@ export function FolderPicker({
           }
           title={currentPath ? currentPath : t`Select folder`}
           className={cn([
-            "flex h-7 items-center rounded-full [&_svg]:size-4",
-            currentPath
-              ? "max-w-36 min-w-0 gap-1 px-1.5 @max-[480px]:w-7 @max-[480px]:gap-0 @max-[480px]:px-0"
-              : "w-7 justify-center",
+            "flex h-8 max-w-48 min-w-0 items-center gap-1.5 rounded-lg px-2 [&_svg]:size-4",
             "text-muted-foreground hover:bg-accent hover:text-foreground transition-colors",
             squircleFocusVisibleClassName,
             open && "bg-accent text-foreground",
@@ -90,11 +93,10 @@ export function FolderPicker({
           ) : (
             <Folder className="size-4 shrink-0" />
           )}
-          {currentPath ? (
-            <span className="min-w-0 truncate text-xs text-neutral-600 @max-[480px]:sr-only dark:text-neutral-300">
-              {currentPath}
-            </span>
-          ) : null}
+          <span className="min-w-0 truncate text-[13.5px]">
+            {currentPath || t`No folder`}
+          </span>
+          <CaretDown className="size-3.5! shrink-0 opacity-70" aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent

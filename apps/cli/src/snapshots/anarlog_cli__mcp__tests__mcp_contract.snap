@@ -114,12 +114,12 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Get a complete Anarlog meeting export with notes, summaries, participants, action items, and transcripts.",
+      "description": "Get a complete Mirna meeting export with notes, summaries, participants, action items, and transcripts.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
           "meeting_id": {
-            "description": "Anarlog meeting id",
+            "description": "Mirna meeting id",
             "type": "string"
           }
         },
@@ -432,12 +432,12 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Get one Anarlog meeting with its canonical note, summaries, participants, and action items. Use get_meeting_transcript separately for transcript words.",
+      "description": "Get one Mirna meeting with its canonical note, summaries, participants, and action items. Use get_meeting_transcript separately for transcript words.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
           "meeting_id": {
-            "description": "Anarlog meeting id",
+            "description": "Mirna meeting id",
             "type": "string"
           }
         },
@@ -704,7 +704,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Get a bounded page of transcript words and readable text for an Anarlog meeting. Pass pagination.next_offset as offset to continue.",
+      "description": "Get a bounded page of transcript words and readable text for a Mirna meeting. Pass pagination.next_offset as offset to continue.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -719,7 +719,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
             ]
           },
           "meeting_id": {
-            "description": "Anarlog meeting id",
+            "description": "Mirna meeting id",
             "type": "string"
           },
           "offset": {
@@ -816,7 +816,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "Get one staged Anarlog proposal, including its unified diff. The proposal is not applied.",
+      "description": "Get one staged Mirna proposal, including its unified diff. The proposal is not applied.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1108,7 +1108,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": true,
         "readOnlyHint": false
       },
-      "description": "Create a meeting from a local audio file using the running Anarlog desktop app and its configured providers. May send audio to the configured transcription provider and use paid quota. file_path is on this computer, not a remote host. Returns durable job and meeting IDs. Reuse request_key on retries; poll get_recording_import until done or failed.",
+      "description": "Create a meeting from a local audio file using the running Mirna desktop app and its configured providers. May send audio to the configured transcription provider and use paid quota. file_path is on this computer, not a remote host. Returns durable job and meeting IDs. Reuse request_key on retries; poll get_recording_import until done or failed.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1181,7 +1181,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List Anarlog meeting folders, including empty and parent folders, with pagination metadata. Pass a returned path as list_meetings folder_path. Query matches a case-insensitive path substring.",
+      "description": "List Mirna meeting folders, including empty and parent folders, with pagination metadata. Pass a returned path as list_meetings folder_path. Query matches a case-insensitive path substring.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1311,7 +1311,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List recent Anarlog meetings with pagination metadata. Use query to narrow by title or meeting id and folder_path to scope to a folder and its subfolders, then pass next_offset as offset to continue.",
+      "description": "List recent Mirna meetings with pagination metadata. Use query to narrow by title or meeting id and folder_path to scope to a folder and its subfolders, then pass next_offset as offset to continue.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1483,7 +1483,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": true
       },
-      "description": "List staged Anarlog meeting proposals. Defaults to pending proposals. Pass status all to include applied and declined rows, and next_offset as offset to continue.",
+      "description": "List staged Mirna meeting proposals. Defaults to pending proposals. Pass status all to include applied and declined rows, and next_offset as offset to continue.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1651,7 +1651,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": false
       },
-      "description": "Propose a complete memo replacement. The proposal stays pending until a human applies it in the Anarlog desktop app.",
+      "description": "Propose a complete memo replacement. The proposal stays pending until a human applies it in the Mirna desktop app.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {
@@ -1735,7 +1735,7 @@ expression: "canonicalize_json(serde_json::json!({\n    \"protocol_version\": in
         "openWorldHint": false,
         "readOnlyHint": false
       },
-      "description": "Propose a complete summary replacement. The proposal stays pending until a human applies it in the Anarlog desktop app. Specify target_id when the meeting has multiple summaries.",
+      "description": "Propose a complete summary replacement. The proposal stays pending until a human applies it in the Mirna desktop app. Specify target_id when the meeting has multiple summaries.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "properties": {

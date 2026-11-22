@@ -1,4 +1,6 @@
-pub const DEV_IDENTIFIER: &str = "com.hyprnote.dev";
+pub const DEV_IDENTIFIER: &str = "app.mirna.dev";
+/// Dev's identifier before the Mirna rename; its secrets move to dev's keychain service on read.
+pub const LEGACY_DEV_IDENTIFIER: &str = "com.hyprnote.dev";
 pub const STAGING_IDENTIFIER: &str = "com.hyprnote.staging";
 pub const NIGHTLY_IDENTIFIER: &str = "com.hyprnote.nightly";
 pub const STABLE_IDENTIFIER: &str = "com.hyprnote.stable";
@@ -41,7 +43,7 @@ impl Channel {
 
     pub fn product_name(self) -> &'static str {
         match self {
-            Self::Dev => "Anarlog Dev",
+            Self::Dev => "Mirna",
             Self::Staging => "Anarlog Staging",
             Self::Nightly => "Anarlog Nightly",
             Self::Stable => "Anarlog",
@@ -52,7 +54,7 @@ impl Channel {
     /// entry by it (`StartupWMClass`), and it is the bundled CLI's command name.
     pub fn executable(self) -> &'static str {
         match self {
-            Self::Dev => "anarlog-dev",
+            Self::Dev => "mirna",
             Self::Staging => "anarlog-staging",
             Self::Nightly => "anarlog-nightly",
             Self::Stable => "anarlog",
@@ -62,7 +64,7 @@ impl Channel {
     /// Deep-link schemes this channel registers; the first is the one it builds links with.
     pub fn schemes(self) -> &'static [&'static str] {
         match self {
-            Self::Dev => &["anarlog-dev", "hypr", "char"],
+            Self::Dev => &["mirna"],
             Self::Staging => &["anarlog-staging", "hyprnote-staging"],
             Self::Nightly => &["anarlog-nightly", "hyprnote-nightly"],
             Self::Stable => &["anarlog", "hyprnote"],

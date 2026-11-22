@@ -192,9 +192,9 @@ mod tests {
         for (channel, base, database_dir, local_data_dir) in [
             (
                 Channel::Dev,
-                "com.hyprnote.dev",
-                "com.hyprnote.dev",
-                "com.hyprnote.dev",
+                "app.mirna.dev",
+                "app.mirna.dev",
+                "app.mirna.dev",
             ),
             (
                 Channel::Staging,

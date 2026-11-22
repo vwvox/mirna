@@ -24,9 +24,9 @@ use dispatch::{
     NoticeTarget, PostResult, Settlement, StillWanted,
 };
 
-/// The disclosure Anarlog posts in the meeting chat. Chat capture ignores it as a consent reply.
+/// The disclosure Mirna posts in the meeting chat. Chat capture ignores it as a consent reply.
 pub const MEETING_DISCLOSURE_MESSAGE: &str =
-    "I'm using Anarlog to record and transcribe this meeting. https://anarlog.so";
+    "I'm using Mirna to record and transcribe this meeting.";
 
 /// Time for the call's window to settle after the recording starts, before the chat is looked for.
 const SETTLE: Duration = Duration::from_secs(4);

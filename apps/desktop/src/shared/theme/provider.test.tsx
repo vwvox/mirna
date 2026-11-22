@@ -160,6 +160,13 @@ describe("AppThemeProvider", () => {
       expected: "staging",
     },
     {
+      name: "Mirna dev build",
+      identifier: "app.mirna.dev",
+      theme: "system",
+      appIcon: "default",
+      expected: "dev",
+    },
+    {
       name: "stable fallback",
       identifier: new Error("unavailable"),
       theme: "system",
@@ -167,11 +174,11 @@ describe("AppThemeProvider", () => {
       expected: "stable",
     },
     {
-      name: "explicit dark appearance",
+      name: "dark appearance, ignoring a saved Anarlog icon",
       identifier: "com.hyprnote.stable",
       theme: "dark",
       appIcon: "anagram",
-      expected: "anagram-dark",
+      expected: "stable-dark",
     },
   ])("uses the $expected Dock icon for a $name", async (scenario) => {
     themeState.settingsReady = true;
@@ -313,18 +320,18 @@ describe("AppThemeProvider", () => {
       name: "system appearance",
       matches: false,
       theme: undefined,
-      expectedIcon: "anagram-dark",
+      expectedIcon: "stable-dark",
       readsNativeTheme: true,
     },
     {
       name: "explicit theme",
       matches: true,
       theme: "light",
-      expectedIcon: "anagram",
+      expectedIcon: "stable",
       readsNativeTheme: false,
     },
   ] as const)(
-    "applies an icon selection using the $name",
+    "keeps the channel icon over an inherited icon selection using the $name",
     async ({ matches, theme, expectedIcon, readsNativeTheme }) => {
       systemTheme.matches = matches;
       nativeTheme.mockResolvedValue("dark");

@@ -51,6 +51,10 @@ pub fn legacy_locations(identifier: &str, scope: &str, key: &str) -> Vec<(String
     if legacy_service != service {
         locations.push((legacy_service, legacy_account));
     }
+    if identifier == crate::channel::DEV_IDENTIFIER {
+        let previous = crate::channel::LEGACY_DEV_IDENTIFIER;
+        locations.push((self::service(previous), account(previous, scope, key)));
+    }
 
     locations
 }
@@ -243,6 +247,36 @@ mod tests {
     }
 
     #[test]
+    fn mirna_dev_reads_move_secrets_saved_before_the_rename() {
+        let keychain = Rc::new(Keychain::default());
+        keychain.items.borrow_mut().insert(
+            item(
+                "com.anarlog.dev.secure-store",
+                "v2:ai-provider-api-keys:llm:deepseek",
+            ),
+            "sk-test".to_string(),
+        );
+        let store = store(crate::channel::DEV_IDENTIFIER, &keychain);
+
+        assert_eq!(
+            store.read("ai-provider-api-keys", "llm:deepseek").unwrap(),
+            Some("sk-test".to_string())
+        );
+        let items = keychain.items.borrow();
+        assert_eq!(
+            items.get(&item(
+                "app.mirna.dev.secure-store",
+                "ai-provider-api-keys:llm:deepseek"
+            )),
+            Some(&"sk-test".to_string())
+        );
+        assert!(!items.contains_key(&item(
+            "com.anarlog.dev.secure-store",
+            "v2:ai-provider-api-keys:llm:deepseek"
+        )));
+    }
+
+    #[test]
     fn versions_dev_accounts_across_signing_changes() {
         assert_eq!(
             account("com.hyprnote.dev", "provider", "deepgram"),
@@ -291,6 +325,15 @@ mod tests {
     #[test]
     fn identifier_keychain_golden() {
         for (identifier, expected_service, expected_account, expected_legacy) in [
+            (
+                "app.mirna.dev",
+                "app.mirna.dev.secure-store",
+                "ai-provider-api-keys:llm:openai",
+                &[(
+                    "com.anarlog.dev.secure-store",
+                    "v2:ai-provider-api-keys:llm:openai",
+                )][..],
+            ),
             (
                 "com.hyprnote.dev",
                 "com.anarlog.dev.secure-store",

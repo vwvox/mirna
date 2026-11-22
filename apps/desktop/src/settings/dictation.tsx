@@ -73,7 +73,7 @@ export function SettingsDictation() {
             title={<Trans>Enable dictation</Trans>}
             description={
               <Trans>
-                Keep Anarlog running to use your shortcut in other apps.
+                Keep Mirna running to use your shortcut in other apps.
               </Trans>
             }
             checked={enabled}
@@ -129,7 +129,7 @@ export function SettingsDictation() {
             ) : (
               <Trans>
                 Press Escape to cancel. Dictation stops after five minutes and
-                pauses while Anarlog records a meeting.
+                pauses while Mirna records a meeting.
               </Trans>
             )}
           </p>
@@ -212,7 +212,7 @@ export function SettingsDictation() {
               Dictation uses your microphone, transcription provider, languages,
               and dictionary. Temporary audio is deleted after transcription.
               Your last transcript stays in memory until dictation is disabled
-              or Anarlog closes.
+              or Mirna closes.
             </Trans>
           </p>
           {status.lastTranscript && (

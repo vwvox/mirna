@@ -40,9 +40,9 @@ pnpm install
 export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR="$HOME/Library/Caches/mirna-target" CARGO_PROFILE_DEV_DEBUG=0 SONIQO_DISABLE=1
 pnpm -F @anlg/desktop tauri build --debug --bundles app \
   --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"files":{"Resources/mlx-swift_Cmlx.bundle/default.metallib":null}}}}'
-APP="$CARGO_TARGET_DIR/debug/bundle/macos/Anarlog Dev.app"
-xattr -cr "$APP"
-codesign --force --deep --sign - --identifier com.hyprnote.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
+APP="$CARGO_TARGET_DIR/debug/bundle/macos/Mirna.app"
+xattr -cr "$APP" 2>/dev/null || true  # macOS may refuse to strip its provenance tag; harmless
+codesign --force --deep --sign - --identifier app.mirna.dev --entitlements apps/desktop/src-tauri/Entitlements.plist "$APP"
 open "$APP"
 ```
 

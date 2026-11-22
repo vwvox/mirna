@@ -22,7 +22,7 @@ export function useNotifyPlanRequired() {
       const message =
         plan === "pro"
           ? t`This requires Anarlog Pro`
-          : t`This requires Anarlog Enterprise`;
+          : t`This requires Mirna Enterprise`;
 
       toast.warning(message, {
         ...(plan === "pro"

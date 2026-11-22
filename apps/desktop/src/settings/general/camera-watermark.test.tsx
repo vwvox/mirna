@@ -60,7 +60,7 @@ function renderSettings(state?: CameraWatermarkState) {
 }
 
 function cameraSwitch() {
-  return screen.getByRole("switch", { name: "Anarlog Camera" });
+  return screen.getByRole("switch", { name: "Mirna Camera" });
 }
 
 afterEach(() => {
@@ -69,20 +69,20 @@ afterEach(() => {
   mocks.setEnabled.mockReset();
 });
 
-test("a build without Anarlog Camera does not offer camera settings", () => {
+test("a build without Mirna Camera does not offer camera settings", () => {
   const state = cameraState({ status: "unavailable", reason: "not_bundled" });
   mocks.getState.mockResolvedValue(state);
   renderSettings(state);
 
-  expect(screen.queryByRole("switch", { name: "Anarlog Camera" })).toBeNull();
+  expect(screen.queryByRole("switch", { name: "Mirna Camera" })).toBeNull();
   expect(screen.queryByText("Switch my camera automatically")).toBeNull();
 });
 
-test("a refused opt-in leaves Anarlog Camera and its automatic switch off", async () => {
+test("a refused opt-in leaves Mirna Camera and its automatic switch off", async () => {
   mocks.getState.mockResolvedValue(cameraState({ status: "available" }));
   mocks.setEnabled.mockResolvedValue({
     status: "error",
-    error: "Anarlog Camera isn't available in this build",
+    error: "Mirna Camera isn't available in this build",
   });
   renderSettings();
 

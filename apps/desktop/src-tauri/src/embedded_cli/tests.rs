@@ -26,7 +26,7 @@ fn maps_bundle_id_to_command_name() {
     );
     assert_eq!(
         command_name_from_identifier(DEV_BUNDLE_ID),
-        Some("anarlog-dev")
+        Some("mirna")
     );
     assert_eq!(
         command_name_from_identifier("com.hyprnote.qa.cutover1118"),

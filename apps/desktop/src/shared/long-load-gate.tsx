@@ -128,7 +128,7 @@ function StartupErrorView({ error }: { error: Error }) {
     >
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
         <h1 className="text-foreground text-base font-semibold">
-          {needsUpdate ? "Anarlog needs an update" : "Anarlog could not start"}
+          {needsUpdate ? "Mirna needs an update" : "Mirna could not start"}
         </h1>
         <p className="text-muted-foreground text-sm leading-relaxed">
           {needsUpdate

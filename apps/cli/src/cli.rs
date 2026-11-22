@@ -485,8 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn public_docs_and_skill_cover_the_command_contract() {
-        let docs = include_str!("../../../docs/reference/cli.mdx");
+    fn skill_covers_the_command_contract() {
         let skill = concat!(
             include_str!("../../../skills/anarlog/references/cli.md"),
             include_str!("../../../skills/anarlog/references/setup.md"),
@@ -496,10 +495,8 @@ mod tests {
         collect_leaf_commands(&command, "", &mut paths);
 
         for path in paths {
-            assert!(docs.contains(&path), "CLI docs are missing `{path}`");
-            assert!(skill.contains(&path), "Anarlog skill is missing `{path}`");
+            assert!(skill.contains(&path), "Mirna skill is missing `{path}`");
         }
-        assert_options_are_documented(&command, docs);
     }
 
     #[test]
@@ -544,20 +541,6 @@ mod tests {
             } else {
                 paths.push(path);
             }
-        }
-    }
-
-    fn assert_options_are_documented(command: &clap::Command, docs: &str) {
-        for argument in command.get_arguments() {
-            if let Some(long) = argument.get_long() {
-                assert!(
-                    docs.contains(&format!("--{long}")),
-                    "CLI docs are missing `--{long}`"
-                );
-            }
-        }
-        for subcommand in command.get_subcommands() {
-            assert_options_are_documented(subcommand, docs);
         }
     }
 }

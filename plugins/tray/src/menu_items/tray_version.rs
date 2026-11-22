@@ -12,7 +12,7 @@ impl TrayVersion {
         match identifier {
             "com.hyprnote.stable" | "com.hyprnote.Hyprnote" => "stable",
             "com.hyprnote.staging" => "staging",
-            "com.hyprnote.dev" => "dev",
+            "app.mirna.dev" | "com.hyprnote.dev" => "dev",
             _ => match app_name {
                 "Anarlog" | "Char" | "Hyprnote" => "stable",
                 "Anarlog Staging" | "Char Staging" | "Hyprnote Staging" => "staging",

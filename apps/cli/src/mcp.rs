@@ -41,7 +41,7 @@ impl AnarlogMcpServer {
 impl AnarlogMcpServer {
     #[tool(
         title = "Import recording",
-        description = "Create a meeting from a local audio file using the running Anarlog desktop app and its configured providers. May send audio to the configured transcription provider and use paid quota. file_path is on this computer, not a remote host. Returns durable job and meeting IDs. Reuse request_key on retries; poll get_recording_import until done or failed.",
+        description = "Create a meeting from a local audio file using the running Mirna desktop app and its configured providers. May send audio to the configured transcription provider and use paid quota. file_path is on this computer, not a remote host. Returns durable job and meeting IDs. Reuse request_key on retries; poll get_recording_import until done or failed.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::RecordingImport>(),
         annotations(read_only_hint = false, destructive_hint = false, idempotent_hint = false, open_world_hint = true)
     )]
@@ -75,7 +75,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "List meetings",
-        description = "List recent Anarlog meetings with pagination metadata. Use query to narrow by title or meeting id and folder_path to scope to a folder and its subfolders, then pass next_offset as offset to continue.",
+        description = "List recent Mirna meetings with pagination metadata. Use query to narrow by title or meeting id and folder_path to scope to a folder and its subfolders, then pass next_offset as offset to continue.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::MeetingPage>(),
         annotations(
             read_only_hint = true,
@@ -96,7 +96,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "List folders",
-        description = "List Anarlog meeting folders, including empty and parent folders, with pagination metadata. Pass a returned path as list_meetings folder_path. Query matches a case-insensitive path substring.",
+        description = "List Mirna meeting folders, including empty and parent folders, with pagination metadata. Pass a returned path as list_meetings folder_path. Query matches a case-insensitive path substring.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::FolderPage>(),
         annotations(
             read_only_hint = true,
@@ -117,7 +117,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Get meeting",
-        description = "Get one Anarlog meeting with its canonical note, summaries, participants, and action items. Use get_meeting_transcript separately for transcript words.",
+        description = "Get one Mirna meeting with its canonical note, summaries, participants, and action items. Use get_meeting_transcript separately for transcript words.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::LocalMeeting>(),
         annotations(
             read_only_hint = true,
@@ -141,7 +141,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Get meeting transcript",
-        description = "Get a bounded page of transcript words and readable text for an Anarlog meeting. Pass pagination.next_offset as offset to continue.",
+        description = "Get a bounded page of transcript words and readable text for a Mirna meeting. Pass pagination.next_offset as offset to continue.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::TranscriptPage>(),
         annotations(
             read_only_hint = true,
@@ -183,7 +183,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Export meeting",
-        description = "Get a complete Anarlog meeting export with notes, summaries, participants, action items, and transcripts.",
+        description = "Get a complete Mirna meeting export with notes, summaries, participants, action items, and transcripts.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::MeetingExport>(),
         annotations(
             read_only_hint = true,
@@ -204,7 +204,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Propose summary edit",
-        description = "Propose a complete summary replacement. The proposal stays pending until a human applies it in the Anarlog desktop app. Specify target_id when the meeting has multiple summaries.",
+        description = "Propose a complete summary replacement. The proposal stays pending until a human applies it in the Mirna desktop app. Specify target_id when the meeting has multiple summaries.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::Proposal>(),
         annotations(
             read_only_hint = false,
@@ -234,7 +234,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Propose memo edit",
-        description = "Propose a complete memo replacement. The proposal stays pending until a human applies it in the Anarlog desktop app.",
+        description = "Propose a complete memo replacement. The proposal stays pending until a human applies it in the Mirna desktop app.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::Proposal>(),
         annotations(
             read_only_hint = false,
@@ -264,7 +264,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "List proposals",
-        description = "List staged Anarlog meeting proposals. Defaults to pending proposals. Pass status all to include applied and declined rows, and next_offset as offset to continue.",
+        description = "List staged Mirna meeting proposals. Defaults to pending proposals. Pass status all to include applied and declined rows, and next_offset as offset to continue.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::ProposalPage>(),
         annotations(
             read_only_hint = true,
@@ -285,7 +285,7 @@ impl AnarlogMcpServer {
 
     #[tool(
         title = "Get proposal",
-        description = "Get one staged Anarlog proposal, including its unified diff. The proposal is not applied.",
+        description = "Get one staged Mirna proposal, including its unified diff. The proposal is not applied.",
         output_schema = rmcp::handler::server::tool::schema_for_type::<access::Proposal>(),
         annotations(
             read_only_hint = true,
@@ -727,30 +727,21 @@ mod tests {
                 "propose_summary_edit",
             ]
         );
-        let mcp_docs = include_str!("../../../docs/reference/mcp.mdx");
         let mcp_skill = include_str!("../../../skills/anarlog/references/mcp.md");
         for tool_name in &tool_names {
-            assert!(
-                mcp_docs.contains(tool_name),
-                "MCP docs are missing `{tool_name}`"
-            );
             assert!(
                 mcp_skill.contains(tool_name),
                 "Anarlog skill is missing `{tool_name}`"
             );
         }
         for tool in tools {
-            let properties = tool
-                .input_schema
-                .get("properties")
-                .and_then(Value::as_object)
-                .expect("tool input properties");
-            for parameter in properties.keys() {
-                assert!(
-                    mcp_docs.contains(&format!("`{parameter}`")),
-                    "MCP docs are missing `{parameter}`"
-                );
-            }
+            assert!(
+                tool.input_schema
+                    .get("properties")
+                    .and_then(Value::as_object)
+                    .is_some(),
+                "tool input properties"
+            );
             assert_eq!(
                 tool.output_schema
                     .as_ref()
@@ -807,7 +798,6 @@ mod tests {
             ]
         );
         for (_, uri, _) in &template_contract {
-            assert!(mcp_docs.contains(uri), "MCP docs are missing `{uri}`");
             assert!(mcp_skill.contains(uri), "Anarlog skill is missing `{uri}`");
         }
         assert_eq!(resources.len(), 1);

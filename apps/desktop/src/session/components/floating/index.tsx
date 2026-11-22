@@ -1,3 +1,4 @@
+import { Trans } from "@lingui/react/macro";
 import { AnimatePresence, motion } from "motion/react";
 
 import { cn } from "@anlg/utils";
@@ -31,7 +32,10 @@ export function FloatingActionButton(_props: {
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="visible relative max-w-full transition-transform duration-200 ease-out"
           >
-            <ChatCTA />
+            <ChatCTA
+              label={<Trans>Ask about this note</Trans>}
+              scope={<Trans>This note</Trans>}
+            />
           </motion.div>
         </AnimatePresence>
       </div>

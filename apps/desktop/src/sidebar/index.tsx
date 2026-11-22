@@ -7,6 +7,7 @@ import { CalendarNav } from "./calendar";
 import { ContactsNav } from "./contacts";
 import { FolderMaterialsPanel } from "./folder-materials";
 import { FoldersNav } from "./folders";
+import { SidebarFooter } from "./footer";
 import type { SidebarNoteFilter } from "./note-filter";
 import { SettingsNav } from "./settings";
 import { SharedNotesNav } from "./shared-notes";
@@ -106,6 +107,9 @@ export function LeftSidebar({
           )}
         </div>
       </div>
+      {isTimelineSidebarLayout && !usesTitleBarSidebarActions() ? (
+        <SidebarFooter />
+      ) : null}
     </div>
   );
 }

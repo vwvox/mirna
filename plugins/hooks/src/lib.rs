@@ -61,8 +61,9 @@ mod test {
         let hooks = docs::parse_hooks(&source_code).unwrap();
         assert!(!hooks.is_empty());
 
-        let output_dir = std::path::Path::new("../../apps/web/content/hooks");
-        std::fs::create_dir_all(output_dir).unwrap();
+        // Mirna has no docs site: render the pages to check they build, outside the repo.
+        let output_dir = std::env::temp_dir().join("mirna-docs-check/hooks");
+        std::fs::create_dir_all(&output_dir).unwrap();
 
         for hook in &hooks {
             let filepath = output_dir.join(hook.doc_path());

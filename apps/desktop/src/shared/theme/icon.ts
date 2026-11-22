@@ -1,5 +1,8 @@
 import { resolveIsDarkMode, type ThemePreference } from "./resolve";
 
+/** Mirna ships one icon; the inherited alternates are Anarlog artwork. */
+export const APP_ICON_CHOICE_ENABLED = false;
+
 export type AppIconPreference =
   | "default"
   | "stable"

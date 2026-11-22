@@ -18,6 +18,7 @@ import {
   SessionViewSwitcher,
 } from "./components/note-input/header";
 import { SearchProvider } from "./components/note-input/search/context";
+import { NoteViewBar } from "./components/note-view-bar";
 import { OuterHeader } from "./components/outer-header";
 import { PendingProposalsBanner } from "./components/pending-proposals-banner";
 import { SessionSurface } from "./components/session-surface";
@@ -273,19 +274,6 @@ function TabContentNoteInner({
               currentView={currentView}
               tab={tab}
               standaloneWindow={standaloneWindow}
-              viewSwitcher={
-                editorTabs.length > 1 ? (
-                  <SessionViewSwitcher
-                    sessionId={sessionId}
-                    editorTabs={editorTabs}
-                    currentTab={currentView}
-                    handleTabChange={handleTabChange}
-                    isTranscribing={isTranscribing}
-                    transcriptEditMode={transcriptEditMode}
-                    onTranscriptEditModeChange={handleTranscriptEditModeChange}
-                  />
-                ) : null
-              }
             />
           )
         }
@@ -307,6 +295,25 @@ function TabContentNoteInner({
               <NoteConflictBanner sessionId={sessionId} />
               <PendingProposalsBanner sessionId={sessionId} />
             </>
+          ) : null}
+          {!lockOverlay ? (
+            <NoteViewBar
+              sessionId={sessionId}
+              startedAt={sessionEvent?.started_at}
+              switcher={
+                editorTabs.length > 1 ? (
+                  <SessionViewSwitcher
+                    sessionId={sessionId}
+                    editorTabs={editorTabs}
+                    currentTab={currentView}
+                    handleTabChange={handleTabChange}
+                    isTranscribing={isTranscribing}
+                    transcriptEditMode={transcriptEditMode}
+                    onTranscriptEditModeChange={handleTranscriptEditModeChange}
+                  />
+                ) : null
+              }
+            />
           ) : null}
           {showTopAudioPlayer && !lockOverlay ? (
             <div

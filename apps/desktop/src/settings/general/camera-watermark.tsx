@@ -122,12 +122,12 @@ export function CameraWatermarkSettings() {
       </h2>
       <div className="flex flex-col gap-4">
         <SettingSwitchRow
-          title={<Trans>Anarlog Camera</Trans>}
+          title={<Trans>Mirna Camera</Trans>}
           description={
             available ? (
               <Trans>
-                Show your camera with a badge saying Anarlog is taking notes in
-                apps where you pick Anarlog Camera.
+                Show your camera with a badge saying Mirna is taking notes in
+                apps where you pick Mirna Camera.
               </Trans>
             ) : (
               <Trans>Not included in this build.</Trans>
@@ -139,11 +139,11 @@ export function CameraWatermarkSettings() {
         />
         {available && enabled && state.extension !== "active" && (
           <SettingRow
-            title={<Trans>Add Anarlog Camera to macOS</Trans>}
+            title={<Trans>Add Mirna Camera to macOS</Trans>}
             description={
               state.extension === "needs_approval" ? (
                 <Trans>
-                  Approve Anarlog Camera in System Settings under Login Items
+                  Approve Mirna Camera in System Settings under Login Items
                   &amp; Extensions.
                 </Trans>
               ) : state.extension === "failed" ? (
@@ -186,11 +186,11 @@ export function CameraWatermarkSettings() {
             description={
               state.camera_access === "denied" ? (
                 <Trans>
-                  Turn on Anarlog Camera in System Settings under Privacy &amp;
+                  Turn on Mirna Camera in System Settings under Privacy &amp;
                   Security, Camera.
                 </Trans>
               ) : (
-                <Trans>Anarlog Camera needs your camera to show you.</Trans>
+                <Trans>Mirna Camera needs your camera to show you.</Trans>
               )
             }
             controlWidth="content"
@@ -214,8 +214,8 @@ export function CameraWatermarkSettings() {
             title={<Trans>Switch my camera automatically</Trans>}
             description={
               <Trans>
-                When Anarlog records a call in {switchApps}, switch its camera
-                to Anarlog Camera.
+                When Mirna records a call in {switchApps}, switch its camera
+                to Mirna Camera.
               </Trans>
             }
             checked={enabled && autoSwitch}
@@ -226,7 +226,7 @@ export function CameraWatermarkSettings() {
         {available && (
           <SettingRow
             title={<Trans>Background</Trans>}
-            description={<Trans>What Anarlog Camera shows behind you.</Trans>}
+            description={<Trans>What Mirna Camera shows behind you.</Trans>}
           >
             {(labelProps) => (
               <Select

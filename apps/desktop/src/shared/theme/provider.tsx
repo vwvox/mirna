@@ -13,6 +13,7 @@ import { applyDocumentTheme, writeStoredThemePreference } from "./apply";
 import {
   type AppIconPreference,
   normalizeAppIconPreference,
+  APP_ICON_CHOICE_ENABLED,
   resolveDockIconName,
 } from "./icon";
 import type { ThemePreference } from "./resolve";
@@ -194,7 +195,12 @@ async function applyDockIcon(
 
   try {
     const result = await iconCommands.setDockIcon(
-      resolveDockIconName(appIcon, theme, systemIsDark, appIdentifier),
+      resolveDockIconName(
+        APP_ICON_CHOICE_ENABLED ? appIcon : "default",
+        theme,
+        systemIsDark,
+        appIdentifier,
+      ),
     );
     if (result.status === "error") {
       console.error("[theme] failed to update Dock icon", result.error);

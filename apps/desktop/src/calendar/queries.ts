@@ -195,6 +195,23 @@ export function useTimelineSessionsTable(): TimelineSessionsTable {
         folder_path AS folder_id,
         locked,
         COALESCE((
+          SELECT SUM(CAST(json_extract(capture.value, '$.ended_at_ms') AS INTEGER))
+          FROM json_each(CASE
+            WHEN json_valid(sessions.metadata_json)
+              AND json_type(sessions.metadata_json, '$.speaker_context.meetings') = 'array'
+            THEN json_extract(sessions.metadata_json, '$.speaker_context.meetings')
+            ELSE '[]'
+          END) AS capture
+        ), 0) AS audio_ms,
+        EXISTS(
+          SELECT 1
+          FROM transcripts
+          WHERE transcripts.session_id = sessions.id
+            AND transcripts.deleted_at IS NULL
+            AND json_valid(transcripts.words_json)
+            AND json_array_length(transcripts.words_json) > 0
+        ) AS has_transcript,
+        COALESCE((
           SELECT json_group_array(tags.name)
           FROM session_tags
           INNER JOIN tags

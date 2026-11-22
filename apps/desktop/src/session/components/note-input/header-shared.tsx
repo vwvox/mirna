@@ -32,9 +32,12 @@ export function IconHeaderView({
   title,
   size = "tray",
   className,
+  showIcon = false,
 }: {
   isActive: boolean;
   label: string;
+  /** Icons only show when they carry status (live, transcribing). */
+  showIcon?: boolean;
   hoverLabel?: string;
   icon: React.ReactNode;
   suffixIcon?: React.ReactNode;
@@ -61,12 +64,7 @@ export function IconHeaderView({
         isActive,
         size,
         cn([
-          "px-2",
-          isActive
-            ? suffixIcon
-              ? "max-w-40 min-w-10 gap-1.5 @max-[480px]:max-w-12 @max-[480px]:min-w-12 @max-[480px]:gap-0 @max-[480px]:px-1.5"
-              : "max-w-40 min-w-10 gap-1.5 @max-[480px]:max-w-10 @max-[480px]:gap-0"
-            : null,
+          "max-w-48 gap-1.5",
           hoverLabel
             ? "after:hidden after:min-w-0 after:truncate after:text-xs after:font-medium after:content-[attr(data-hover-label)] hover:after:block"
             : null,
@@ -74,17 +72,15 @@ export function IconHeaderView({
         ]),
       )}
     >
-      {icon}
-      {isActive && (
-        <span
-          className={cn([
-            "min-w-0 truncate text-xs font-medium @max-[480px]:sr-only",
-            hoverLabel ? "group-hover/header-view:hidden" : null,
-          ])}
-        >
-          {label}
-        </span>
-      )}
+      {showIcon ? icon : null}
+      <span
+        className={cn([
+          "min-w-0 truncate",
+          hoverLabel ? "group-hover/header-view:hidden" : null,
+        ])}
+      >
+        {label}
+      </span>
       {isActive ? suffixIcon : null}
     </button>
   );
@@ -95,21 +91,14 @@ export function iconHeaderViewClassName(
   size: "tray" | "standalone" = "tray",
   className?: string,
 ) {
-  const heightClassName = size === "tray" ? "h-6" : "h-7";
+  void size;
 
   return cn([
-    "group/header-view rounded-pill flex shrink-0 items-center justify-center transition-colors select-none [corner-shape:round] [&>svg]:shrink-0",
+    "group/header-view -mb-px flex h-9 shrink-0 items-center justify-center border-b-2 px-0.5 text-sm transition-colors select-none [&>svg]:shrink-0",
+    "focus-visible:text-foreground focus-visible:outline-hidden",
     isActive
-      ? [
-          "text-foreground bg-white shadow-xs",
-          "dark:bg-accent dark:text-foreground dark:shadow-none",
-        ]
-      : [
-          "text-muted-foreground/70",
-          "hover:bg-background/60 hover:text-foreground",
-          "dark:hover:bg-accent/80 dark:hover:text-foreground",
-        ],
-    heightClassName,
+      ? "border-mirna-serra text-mirna-wordmark dark:border-mirna-sage font-semibold"
+      : "text-muted-foreground hover:text-foreground border-transparent font-medium",
     className,
   ]);
 }

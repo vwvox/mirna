@@ -7,10 +7,14 @@
 @layer theme {
   :root {
     --provider-brand-filter: none;
+    --mirna-terra: #b4532f;
+    --mirna-wordmark: #2e4a3b;
   }
 
   .dark {
     --provider-brand-filter: brightness(0) invert(1);
+    --mirna-terra: #e9a285;
+    --mirna-wordmark: #f5f3ec;
     --kbd-press-shadow-outer: rgba(0, 0, 0, 0.35);
     --kbd-press-shadow-inset: rgba(255, 255, 255, 0.08);
     --selection-overlay: rgba(96, 165, 250, 0.25);

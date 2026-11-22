@@ -50,6 +50,7 @@ const CHANNELS = {
     host: "so.anarlog.staging.browser_meeting",
     icon: "staging",
   },
+  "app.mirna.dev": { host: "so.anarlog.dev.browser_meeting", icon: "dev" },
   "com.hyprnote.dev": { host: "so.anarlog.dev.browser_meeting", icon: "dev" },
 };
 export const CAMERA_INPUTS = [

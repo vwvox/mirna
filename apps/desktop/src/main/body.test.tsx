@@ -103,6 +103,7 @@ vi.mock("./tab-content", () => ({
 
 vi.mock("~/sidebar/note-filter-menu", () => ({
   SidebarNoteFilterMenu: () => <button type="button">Sort notes</button>,
+  SidebarScopeMenu: () => <button type="button">All notes</button>,
 }));
 
 vi.mock("./useShortcuts", () => ({
@@ -115,6 +116,7 @@ vi.mock("~/shared/open-note-dialog", () => ({
 
 vi.mock("~/shared/useNewNote", () => ({
   useNewNote: () => vi.fn(),
+  useNewNoteAndListen: () => vi.fn(),
 }));
 
 vi.mock("~/sidebar/timeline/upcoming-meeting", () => ({

@@ -59,8 +59,7 @@ export function SessionViewSwitcher({
       aria-label={t`Session note views`}
       data-tauri-drag-region="false"
       className={cn([
-        "pointer-events-auto relative z-10 w-fit max-w-full shrink-0 overflow-visible",
-        "bg-foreground/10 dark:bg-accent/55 rounded-pill flex h-7 items-center gap-[2px] p-[2px] [corner-shape:round]",
+        "pointer-events-auto relative z-10 flex w-fit max-w-full shrink-0 items-end gap-5 overflow-visible",
       ])}
     >
       {editorTabs.map((view, index) => {

@@ -48,6 +48,9 @@ export type TimelineSessionRow = {
   folder_id?: string | null;
   locked?: boolean | number | null;
   tags?: string[];
+  /** Sum of the session's capture lengths, from `metadata_json.speaker_context`. */
+  audio_ms?: number | null;
+  has_transcript?: boolean | number | null;
 };
 
 const UNACCEPTED_SELF_STATUSES = new Set(["pending", "tentative", "declined"]);

@@ -10,6 +10,7 @@ import { env } from "~/env";
 export const id = () => crypto.randomUUID() as string;
 
 const desktopSchemes = [
+  "mirna",
   "anarlog",
   "anarlog-staging",
   "anarlog-nightly",
@@ -27,6 +28,7 @@ export type DesktopScheme = (typeof desktopSchemes)[number];
 export const getScheme = async (): Promise<DesktopScheme> => {
   const id = await getIdentifier();
   const schemes: Record<string, DesktopScheme> = {
+    "app.mirna.dev": "mirna",
     "com.hyprnote.stable": "anarlog",
     "com.hyprnote.Hyprnote": "anarlog",
     "com.hyprnote.staging": "anarlog-staging",

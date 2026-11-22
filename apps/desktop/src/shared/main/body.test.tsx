@@ -76,6 +76,7 @@ vi.mock("~/main/tab-content", () => ({
 
 vi.mock("~/sidebar/note-filter-menu", () => ({
   SidebarNoteFilterMenu: () => <button type="button">Sort notes</button>,
+  SidebarScopeMenu: () => <button type="button">All notes</button>,
 }));
 
 vi.mock("~/sidebar/timeline/upcoming-meeting", () => ({
@@ -112,6 +113,7 @@ vi.mock("~/shared/open-note-dialog", () => ({
 
 vi.mock("~/shared/useNewNote", () => ({
   useNewNote: () => mocks.createNewNote,
+  useNewNoteAndListen: () => vi.fn(),
 }));
 
 vi.mock("~/store/zustand/tabs", () => ({
@@ -151,8 +153,8 @@ describe("ClassicMainBody", () => {
   it("renders sidebar timeline chrome and current tab content", () => {
     render(<ClassicMainBody />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    fireEvent.click(screen.getByRole("button", { name: "New note" }));
+    fireEvent.click(screen.getByRole("button", { name: /Search notes/ }));
+    fireEvent.click(screen.getByRole("button", { name: "New blank note" }));
 
     expect(screen.getByTestId("main-sidebar")).toBeTruthy();
     expect(screen.getByTestId("main-tab-content").textContent).toContain(

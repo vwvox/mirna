@@ -68,6 +68,26 @@ const CHANNEL_TEXT: Record<BuildChannel, string> = {
 };
 
 const COLLAPSED_STORAGE_KEY = "anarlog:devtools-bar:collapsed";
+/** Mirna's daily build is a dev build, so the bar is opt-in: ⌥⌘D shows or hides it. */
+export const DEVTOOLS_OPT_IN_STORAGE_KEY = "mirna:devtools-bar:enabled";
+
+function readDevtoolsOptIn(): boolean {
+  try {
+    return localStorage.getItem(DEVTOOLS_OPT_IN_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function isDevtoolsToggleShortcut(event: KeyboardEvent): boolean {
+  return (
+    event.metaKey &&
+    event.altKey &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    event.code === "KeyD"
+  );
+}
 
 const ITEM_CLASS = "flex items-center gap-1.5 px-2";
 const BUTTON_CLASS = cn([
@@ -93,13 +113,30 @@ const TONE_CLASS: Record<Tone, string> = {
 export function DevtoolsStatusBar(props: Record<never, never>) {
   ignoreRenderTracking(props);
 
+  const [optedIn, setOptedIn] = useState(readDevtoolsOptIn);
   const enabledQuery = useQuery({
     queryKey: ["devtools-panel", "enabled"],
     queryFn: commands.showDevtool,
     staleTime: Infinity,
   });
 
-  if (enabledQuery.data !== true) {
+  useMountEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isDevtoolsToggleShortcut(event)) return;
+      event.preventDefault();
+      setOptedIn((current) => {
+        const next = !current;
+        try {
+          localStorage.setItem(DEVTOOLS_OPT_IN_STORAGE_KEY, next ? "1" : "0");
+        } catch {}
+        return next;
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  if (enabledQuery.data !== true || !optedIn) {
     return null;
   }
 

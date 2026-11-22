@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { commands as deeplinkCommands } from "@anlg/plugin-deeplink2";
 import { commands as openerCommands } from "@anlg/plugin-opener2";
-import { Headset, Square, VideoCamera } from "@anlg/ui/components/icons";
+import { Headset, Microphone, VideoCamera } from "@anlg/ui/components/icons";
 import { Button } from "@anlg/ui/components/ui/button";
 import {
   Popover,
@@ -13,9 +13,14 @@ import {
 import { cn, parseEventInstant, safeParseDate } from "@anlg/utils";
 
 import { FolderPicker } from "../folder-picker";
-import { RecordingIcon, useHasTranscript } from "../shared";
+import { useHasTranscript } from "../shared";
 import { TitleInput } from "../title-input";
 import { OverflowButton } from "./overflow";
+import {
+  LiveRecordingPill,
+  ProcessingStatus,
+  ShareButton,
+} from "./record-control";
 
 import { useAudioPlayer } from "~/audio-player";
 import { useNow } from "~/calendar/hooks";
@@ -99,6 +104,11 @@ export function OuterHeader({
             : "pl-[32px]"),
       ])}
     >
+      {!showTitleInput ? (
+        <div className="flex min-w-0 shrink items-center pl-2">
+          <FolderPicker sessionId={sessionId} />
+        </div>
+      ) : null}
       {viewSwitcher}
       {showTitleInput && tab ? (
         <div className="flex min-w-0 shrink items-center gap-1">
@@ -120,12 +130,14 @@ export function OuterHeader({
         data-tauri-drag-region
         className="relative z-10 flex shrink-0 items-center pr-1"
       >
-        {!showTitleInput && <FolderPicker sessionId={sessionId} align="end" />}
         <HeaderMeetingControl
           sessionId={sessionId}
           sessionMode={sessionMode}
           meetingOver={meetingOver}
         />
+        {meetingOver ? (
+          <ShareButton sessionId={sessionId} currentView={currentView} />
+        ) : null}
         <OverflowButton
           standaloneWindow={standaloneWindow}
           sessionId={sessionId}
@@ -154,7 +166,7 @@ function HeaderMeetingControl({
     : null;
   const ended = !!endedAt && endedAt.getTime() <= now.getTime();
   if (sessionMode === "finalizing" || sessionMode === "running_batch") {
-    return null;
+    return <ProcessingStatus sessionId={sessionId} sessionMode={sessionMode} />;
   }
 
   // Sharing published notes through the vendor's servers; Mirna keeps notes local.
@@ -285,15 +297,6 @@ function HeaderMeetingAction({
     stop();
   }, [sessionId, stop]);
   const action = (() => {
-    if (sessionMode === "active") {
-      return {
-        label: t`Stop`,
-        title: t`Stop listening`,
-        icon: <Square className="size-3 text-red-500" />,
-        onClick: stopListening,
-      };
-    }
-
     if (
       canJoinFromHeader &&
       (isWelcomeDemo || !meetingStarted || !meetingMicInUse)
@@ -316,10 +319,11 @@ function HeaderMeetingAction({
       };
     }
 
+    const recordMore = audioExists || hasTranscript;
     return {
-      label: t`Record`,
-      title: t`Record`,
-      icon: <RecordingIcon />,
+      label: recordMore ? t`Record more` : t`Record`,
+      title: recordMore ? t`Add to this recording` : t`Start recording`,
+      icon: <Microphone size={16} className="text-mirna-terra" />,
       onClick: start,
     };
   })();
@@ -336,6 +340,14 @@ function HeaderMeetingAction({
     !hasTranscript &&
     !audioExists;
 
+  if (sessionMode === "active") {
+    return (
+      <div className="mr-1 ml-1">
+        <LiveRecordingPill onStop={stopListening} />
+      </div>
+    );
+  }
+
   return (
     <Popover open={showWelcomeDemoPrompt}>
       <div className="relative mr-1 ml-1 flex min-w-0 shrink-0 items-center">
@@ -350,9 +362,9 @@ function HeaderMeetingAction({
             disabled={disabled}
             onClick={action.onClick}
             className={cn([
-              "max-w-56 shrink-0 gap-1.5 overflow-hidden border pr-2.5 pl-1.5 text-sm",
+              "h-[34px] max-w-56 shrink-0 gap-[7px] overflow-hidden rounded-[10px] border pr-3 pl-2.5 text-[13.5px] font-semibold",
               isPrimaryCta
-                ? "border-border text-foreground bg-transparent shadow-none"
+                ? "border-border bg-card text-foreground shadow-none"
                 : "border-border bg-card text-foreground",
               disabled && "cursor-default opacity-60",
             ])}
@@ -376,7 +388,7 @@ function HeaderMeetingAction({
             />
             <span className="relative block font-medium">{t`Try the demo`}</span>
             <span className="text-muted-foreground relative mt-0.5 block leading-snug">
-              {t`This is a prerecorded demo, so your camera stays off. Click Join & record to see Anarlog in action.`}
+              {t`This is a prerecorded demo, so your camera stays off. Click Join & record to see Mirna in action.`}
             </span>
           </PopoverContent>
         ) : showCountdown ? (

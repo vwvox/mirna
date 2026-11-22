@@ -18,7 +18,7 @@ import { resetSidebarNotes, useSidebarNotes } from "./note-filter";
 import { SidebarNoteFilterMenu } from "./note-filter-menu";
 
 function openSortMenu() {
-  const trigger = screen.getByRole("button", { name: "Sort notes" });
+  const trigger = screen.getByRole("button", { name: "Group and sort" });
   fireEvent.pointerDown(trigger);
   fireEvent.click(trigger);
 }
@@ -57,5 +57,13 @@ describe("SidebarNoteFilterMenu", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Oldest" }));
 
     expect(useSidebarNotes.getState().sortOrder).toBe("oldest");
+  });
+});
+
+describe("folderLabel", () => {
+  it("shows the last part of a nested folder path", async () => {
+    const { folderLabel } = await import("./note-filter-menu");
+    expect(folderLabel("Work/Clients/Acme")).toBe("Acme");
+    expect(folderLabel("Personal")).toBe("Personal");
   });
 });

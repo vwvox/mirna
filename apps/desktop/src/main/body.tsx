@@ -29,7 +29,10 @@ import {
 } from "./left-sidebar-panel";
 import { useMainAreaTopWindowDrag } from "./main-area-window-drag";
 import { ClassicMainSidebar } from "./shell-sidebar";
-import { SidebarTimelineChromeWithUpcomingMeeting } from "./sidebar-timeline-chrome";
+import {
+  SidebarPrimaryActions,
+  SidebarTimelineChromeWithUpcomingMeeting,
+} from "./sidebar-timeline-chrome";
 import { ClassicMainTabContent } from "./tab-content";
 import { useClassicMainShortcuts } from "./useShortcuts";
 
@@ -403,29 +406,37 @@ export function ClassicMainBody() {
   } as LeftSidebarSizeStyle;
   const timelineHeader =
     showSidebarTimelineChrome && !usesTitleBarSidebarActions() ? (
-      <div
-        data-tauri-drag-region
-        data-sidebar-timeline-header
-        className={cn([
-          "flex min-h-9 shrink-0 items-start pr-1",
-          showWindowControlsGutter
-            ? [
-                WINDOW_CONTROLS_GUTTER_CLASS,
-                WINDOW_CONTROLS_ROW_PADDING_TOP_CLASS,
-              ]
-            : "pt-[9px] pl-2",
-        ])}
-        onWheelCapture={handleSidebarTimelineHeaderWheel}
-      >
+      <div className="flex shrink-0 flex-col">
+        <div
+          data-tauri-drag-region
+          data-sidebar-timeline-header
+          className={cn([
+            "flex min-h-9 shrink-0 items-start pr-1",
+            showWindowControlsGutter
+              ? [
+                  WINDOW_CONTROLS_GUTTER_CLASS,
+                  WINDOW_CONTROLS_ROW_PADDING_TOP_CLASS,
+                ]
+              : "pt-[9px] pl-2",
+          ])}
+          onWheelCapture={handleSidebarTimelineHeaderWheel}
+        >
+          {showSidebarTimeline ? (
+            <SidebarTimelineChromeWithUpcomingMeeting
+              currentSessionId={currentSessionId}
+              sidebarExpanded
+              showSidebarToggle={showSidebarToggleInBody}
+              showIgnoredTimelineEvents={showIgnoredTimelineEvents}
+              onNewNote={createNewNote}
+              onSearch={handleOpenNoteDialog}
+              onToggleSidebar={handleToggleLeftSidebar}
+            />
+          ) : null}
+        </div>
         {showSidebarTimeline ? (
-          <SidebarTimelineChromeWithUpcomingMeeting
-            currentSessionId={currentSessionId}
-            sidebarExpanded
-            showSidebarToggle={showSidebarToggleInBody}
-            showIgnoredTimelineEvents={showIgnoredTimelineEvents}
+          <SidebarPrimaryActions
             onNewNote={createNewNote}
             onSearch={handleOpenNoteDialog}
-            onToggleSidebar={handleToggleLeftSidebar}
           />
         ) : null}
       </div>

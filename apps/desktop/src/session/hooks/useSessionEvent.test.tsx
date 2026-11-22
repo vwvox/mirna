@@ -80,8 +80,12 @@ it("refreshes the open note and sidebar together when a calendar event is resche
       '', '', '', '', '[]', '{}', NULL
     );
   `);
+  database.exec(`
+    ALTER TABLE sessions ADD COLUMN metadata_json TEXT;
+    CREATE TABLE transcripts (session_id TEXT, words_json TEXT, deleted_at TEXT);
+  `);
   database
-    .prepare("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)")
+    .prepare("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)")
     .run(
       "session-1",
       "user-1",

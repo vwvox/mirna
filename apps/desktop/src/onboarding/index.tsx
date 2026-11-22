@@ -24,6 +24,7 @@ import { OnboardingSection } from "./shared";
 
 import { trackAnalyticsEvent } from "~/analytics";
 import { useAuth } from "~/auth";
+import { MirnaWordmark } from "~/shared/mirna-wordmark";
 import { StandaloneWindowShell } from "~/shared/window-shell";
 import { type Tab, useTabs } from "~/store/zustand/tabs";
 
@@ -214,8 +215,9 @@ function OnboardingScreenContent({
           headerClassName,
         ])}
       >
-        <h1 className="font-hand text-foreground text-4xl leading-none font-semibold tracking-normal">
-          <Trans>Welcome to Anarlog</Trans>
+        <h1 className="font-brand text-mirna-wordmark flex items-start gap-[0.3em] text-4xl leading-none font-normal tracking-[-0.01em]">
+          <Trans>Welcome to</Trans>
+          <MirnaWordmark />
         </h1>
       </div>
 
@@ -227,13 +229,13 @@ function OnboardingScreenContent({
             description={
               currentPlatform === "macos" ? (
                 <Trans>
-                  Anarlog needs microphone and system audio to transcribe your
+                  Mirna needs microphone and system audio to transcribe your
                   meetings, plus Accessibility to read meeting controls, visible
                   chat.
                 </Trans>
               ) : (
                 <Trans>
-                  Anarlog needs access to your microphone and system audio to
+                  Mirna needs access to your microphone and system audio to
                   record and transcribe your meetings
                 </Trans>
               )
@@ -278,7 +280,7 @@ function OnboardingScreenContent({
             title={<Trans>Connect calendar</Trans>}
             description={
               <Trans>
-                Anarlog will sync your calendar to get meeting reminders
+                Mirna will sync your calendar to get meeting reminders
               </Trans>
             }
             completedTitle={<Trans>Calendar connected</Trans>}

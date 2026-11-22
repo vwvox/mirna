@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 
-import { CaretDown, Sparkle } from "@anlg/ui/components/icons";
+import { CaretDown } from "@anlg/ui/components/icons";
 import { Spinner } from "@anlg/ui/components/ui/spinner";
 import { cn } from "@anlg/utils";
 
@@ -24,11 +24,7 @@ import {
   useNativeContextMenu,
 } from "~/shared/hooks/useNativeContextMenu";
 import { createTaskId } from "~/store/zustand/ai-task/task-configs";
-import {
-  TemplateIconGlyph,
-  useUserTemplate,
-  type TemplateIcon,
-} from "~/templates";
+import { useUserTemplate, type TemplateIcon } from "~/templates";
 
 export function HeaderViewEnhanced({
   isActive,
@@ -104,8 +100,7 @@ function HeaderViewEnhancedInactive({
   enhancedNoteId: string;
   onClick?: () => void;
 }) {
-  const { viewTitle, templateIcon, templateTooltip } =
-    useEnhancedViewTitle(enhancedNoteId);
+  const { viewTitle, templateTooltip } = useEnhancedViewTitle(enhancedNoteId);
   const isGenerating = useEnhancedViewGenerating(enhancedNoteId);
 
   return (
@@ -116,15 +111,10 @@ function HeaderViewEnhancedInactive({
       aria-label={viewTitle}
       onClick={onClick}
       title={templateTooltip}
-      className={iconHeaderViewClassName(false, "tray", "px-2")}
+      className={iconHeaderViewClassName(false, "tray")}
     >
-      {isGenerating ? (
-        <Spinner size={16} className="shrink-0" />
-      ) : templateIcon ? (
-        <TemplateIconGlyph icon={templateIcon} className="size-4 text-sm" />
-      ) : (
-        <Sparkle className="size-4" />
-      )}
+      {isGenerating ? <Spinner size={14} className="shrink-0" /> : null}
+      <span className="min-w-0 truncate">{viewTitle}</span>
     </button>
   );
 }
@@ -149,8 +139,7 @@ function HeaderViewEnhancedActive({
   const enhancedNote = useEnhancedNote(enhancedNoteId);
   const content = enhancedNote?.content;
   const usedTemplateId = enhancedNote?.templateId?.trim() || null;
-  const { viewTitle, templateIcon, templateTooltip } =
-    useEnhancedViewTitle(enhancedNoteId);
+  const { viewTitle, templateTooltip } = useEnhancedViewTitle(enhancedNoteId);
   const noteMarkdown = useMemo(() => getStoredNoteMarkdown(content), [content]);
 
   const handleCopy = useCallback(() => {
@@ -254,31 +243,20 @@ function HeaderViewEnhancedActive({
         true,
         "tray",
         cn([
-          "max-w-56 min-w-[62px] gap-1.5 px-2 @max-[480px]:max-w-12 @max-[480px]:min-w-12 @max-[480px]:gap-0 @max-[480px]:px-1.5",
+          "max-w-56 gap-1",
           isGenerating ? "cursor-not-allowed opacity-70" : "cursor-pointer",
           isError
             ? [
                 "text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:bg-red-50",
                 "dark:text-red-400 dark:hover:bg-red-950/50 dark:hover:text-red-300 dark:focus-visible:bg-red-950/50",
               ]
-            : [
-                "focus-visible:text-foreground focus-visible:bg-white",
-                "dark:focus-visible:text-primary dark:focus-visible:bg-white",
-              ],
+            : null,
         ]),
       )}
     >
-      {isGenerating ? (
-        <Spinner size={16} className="shrink-0" />
-      ) : templateIcon ? (
-        <TemplateIconGlyph icon={templateIcon} className="size-4 text-sm" />
-      ) : (
-        <Sparkle className="size-4" />
-      )}
-      <span className="min-w-0 truncate text-xs font-medium @max-[480px]:sr-only">
-        {viewTitle}
-      </span>
-      <CaretDown className="size-3.5" />
+      {isGenerating ? <Spinner size={14} className="shrink-0" /> : null}
+      <span className="min-w-0 truncate">{viewTitle}</span>
+      <CaretDown className="size-3.5 opacity-70" />
     </button>
   );
 

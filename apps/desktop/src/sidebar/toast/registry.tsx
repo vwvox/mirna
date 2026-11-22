@@ -146,11 +146,11 @@ export function createToastRegistry({
         icon: (
           <img
             src={ANARLOG_ICON_SRC}
-            alt="Anarlog"
+            alt="Mirna"
             className="size-5 object-contain object-center"
           />
         ),
-        description: t`Sign in to get the most out of Anarlog`,
+        description: t`Sign in to get the most out of Mirna`,
         primaryAction: {
           label: t`Sign in`,
           onClick: onSignIn,
@@ -236,7 +236,7 @@ function createDesktopUpdateToast(
       // A new ID separates the finished notification from the loading state while
       // this update was downloading.
       id: `${id}:ready`,
-      description: t`Anarlog ${update.version} is ready to install`,
+      description: t`Mirna ${update.version} is ready to install`,
       primaryAction: update.installing
         ? undefined
         : { label: t`Restart`, onClick: update.installUpdate },
@@ -251,7 +251,7 @@ function createDesktopUpdateToast(
         : ` (${Math.round(update.progress * 100)}%)`;
     return {
       id: `${id}:downloading`,
-      description: t`Downloading Anarlog ${update.version}${progress}`,
+      description: t`Downloading Mirna ${update.version}${progress}`,
       lifecycle: { type: "persistent", dismissal: "session" },
       loading: true,
     };
@@ -271,7 +271,7 @@ function createDesktopUpdateToast(
 
   return {
     id: `${id}:available`,
-    description: t`Anarlog ${update.version} is available`,
+    description: t`Mirna ${update.version} is available`,
     primaryAction: busy
       ? undefined
       : { label: t`Download`, onClick: update.downloadUpdate },

@@ -92,6 +92,7 @@ import {
   InfoIcon,
   KanbanIcon,
   Key01Icon,
+  LaptopIcon,
   LaptopPhoneSyncIcon,
   Leaf01Icon,
   LeftToRightListBulletIcon,
@@ -161,6 +162,7 @@ import {
   ShuffleIcon,
   SidebarLeftIcon,
   SignpostIcon,
+  SlidersHorizontalIcon,
   SmartphoneIcon,
   SortByUp01Icon,
   SortDescendingIcon,
@@ -577,6 +579,7 @@ export const Image = /* @__PURE__ */ createIcon(Image01Icon, "Image");
 export const Info = /* @__PURE__ */ createIcon(InfoIcon, "Info");
 export const Kanban = /* @__PURE__ */ createIcon(KanbanIcon, "Kanban");
 export const Key = /* @__PURE__ */ createIcon(Key01Icon, "Key");
+export const Laptop = /* @__PURE__ */ createIcon(LaptopIcon, "Laptop");
 export const Leaf = /* @__PURE__ */ createIcon(Leaf01Icon, "Leaf");
 export const Lightbulb = /* @__PURE__ */ createIcon(LightbulbIcon, "Lightbulb");
 export const Lightning = /* @__PURE__ */ createIcon(ZapIcon, "Lightning");
@@ -712,6 +715,10 @@ export const ShoppingBag = /* @__PURE__ */ createIcon(
   "ShoppingBag",
 );
 export const Shuffle = /* @__PURE__ */ createIcon(ShuffleIcon, "Shuffle");
+export const SlidersHorizontal = /* @__PURE__ */ createIcon(
+  SlidersHorizontalIcon,
+  "SlidersHorizontal",
+);
 export const Sidebar = /* @__PURE__ */ createIcon(
   ViewSidebarLeftIcon,
   "Sidebar",

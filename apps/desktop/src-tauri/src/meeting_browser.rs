@@ -25,7 +25,7 @@ use tauri_plugin_detect::MeetingNoticeObserver;
 use tauri_plugin_transcription::MeetingCapture;
 
 const MAIN_WINDOW: &str = "main";
-const NEEDS_CALL_RECORDER: &str = "Only Anarlog's call recorder can confirm a Meet call, and it isn't on. Start the recording in Anarlog instead.";
+const NEEDS_CALL_RECORDER: &str = "Only Mirna's call recorder can confirm a Meet call, and it isn't on. Start the recording in Mirna instead.";
 
 /// Extension starts through the main window: it creates the note and records it the record
 /// button's way, carrying the start's request id; the runtime reserves the capture of exactly that
@@ -57,7 +57,7 @@ impl StartHost for TauriStartHost {
             .reserve_extension_start(request_id, session_id)
             .map_err(|error| match error {
                 MeetingError::CaptureActive => {
-                    "Anarlog is already recording a meeting. Stop it first.".to_string()
+                    "Mirna is already recording a meeting. Stop it first.".to_string()
                 }
                 other => other.to_string(),
             })
@@ -347,7 +347,7 @@ pub fn host_name(identifier: &str) -> Option<&'static str> {
         "com.hyprnote.stable" => Some("so.anarlog.browser_meeting"),
         "com.hyprnote.nightly" => Some("so.anarlog.nightly.browser_meeting"),
         "com.hyprnote.staging" => Some("so.anarlog.staging.browser_meeting"),
-        "com.hyprnote.dev" => Some("so.anarlog.dev.browser_meeting"),
+        "app.mirna.dev" | "com.hyprnote.dev" => Some("so.anarlog.dev.browser_meeting"),
         _ => None,
     }
 }
@@ -429,7 +429,7 @@ pub fn register_host(
 ) -> std::io::Result<Vec<PathBuf>> {
     let manifest = serde_json::json!({
         "name": host_name,
-        "description": "Anarlog Google Meet bridge",
+        "description": "Mirna Google Meet bridge",
         "path": host_path,
         "type": "stdio",
         "allowed_origins": [format!("chrome-extension://{extension_id}/")],
