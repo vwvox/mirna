@@ -11,9 +11,14 @@ import { useLanguageModel } from "~/ai/hooks";
 import type { ContextRef } from "~/chat/context/entities";
 import { renderFolderContext } from "~/chat/context/folder-context";
 import { hydrateSessionContext } from "~/chat/context/session-context-hydrator";
-import { loadHuman, loadOrganization } from "~/contacts/queries";
+import {
+  loadHuman,
+  loadOrganization,
+  usePersonalContact,
+} from "~/contacts/queries";
 import { useToolRegistry } from "~/contexts/tool";
 import { useConfigValue } from "~/shared/config";
+import { useOwnerUserId } from "~/shared/owner-user";
 
 const MEETING_CONTEXT_TOOL_GUIDANCE = `
 Context and local meeting tool guidance:
@@ -99,15 +104,19 @@ export function useTransport(
   const configuredModel = useLanguageModel("chat");
   const model = modelOverride ?? configuredModel;
   const language = useConfigValue("ai_language") || "en";
+  // Who is asking: their name labels their own speech in transcripts.
+  const selfId = useOwnerUserId();
+  const { data: self } = usePersonalContact(selfId ?? "");
+  const userName = self?.name.trim() || null;
   const systemPromptQuery = useQuery({
-    queryKey: ["chat-system-prompt", language],
+    queryKey: ["chat-system-prompt", language, userName],
     enabled: systemPromptOverride === undefined,
     staleTime: Infinity,
     retry: false,
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const result = await templateCommands.render({
-        chatSystem: { language },
+        chatSystem: { language, userName },
       });
       if (result.status !== "ok") {
         console.error(result.error);

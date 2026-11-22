@@ -17,13 +17,14 @@ import { preserveScrollPosition } from "./viewport-hooks";
 import { trackAnalyticsEvent } from "~/analytics";
 import { useSessionEventParticipants } from "~/calendar/queries";
 import { ContactImage } from "~/contacts/contact-avatar";
-import { createHuman, useHumans } from "~/contacts/queries";
+import { createHuman, updateHuman, useHumans } from "~/contacts/queries";
 import { ContactFacehash } from "~/contacts/shared";
 import {
   addSessionParticipant,
   useSession,
   useSessionParticipants,
 } from "~/session/queries";
+import { useOwnerUserId } from "~/shared/owner-user";
 import type { Segment } from "~/stt/live-segment";
 import {
   assignSessionTranscriptSpeaker,
@@ -162,7 +163,57 @@ export type SpeakerParticipantOption = {
   isSessionParticipant: boolean;
   isNew?: boolean;
   isCreateOption?: boolean;
+  /** The person using Mirna. */
+  isSelf?: boolean;
+  /** Typed while you have no name yet: saves it as your name. */
+  claimsName?: boolean;
 };
+
+/**
+ * "You" at the top of the picker, and, while you have no name yet, an option
+ * to take a typed name as yours instead of creating someone new.
+ */
+export function buildSelfSpeakerOptions({
+  selfId,
+  selfName,
+  query,
+  youLabel,
+  youWithNameLabel,
+}: {
+  selfId: string | null;
+  selfName: string;
+  query: string;
+  youLabel: string;
+  youWithNameLabel: (name: string) => string;
+}): SpeakerParticipantOption[] {
+  if (!selfId) return [];
+  const typed = query.trim();
+  const normalized = typed.toLowerCase();
+  const name = selfName.trim();
+  const you: SpeakerParticipantOption = {
+    id: selfId,
+    name: name ? youWithNameLabel(name) : youLabel,
+    isSessionParticipant: true,
+    isSelf: true,
+  };
+  const matchesYou =
+    !normalized ||
+    ["you", "me", "myself", youLabel.toLowerCase()].some((word) =>
+      word.startsWith(normalized),
+    ) ||
+    (name && name.toLowerCase().includes(normalized));
+  const options = matchesYou ? [you] : [];
+  if (!name && typed) {
+    options.push({
+      id: selfId,
+      name: typed,
+      isSessionParticipant: true,
+      isSelf: true,
+      claimsName: true,
+    });
+  }
+  return options;
+}
 
 export function buildSpeakerParticipantGroups({
   sessionParticipants,
@@ -330,6 +381,9 @@ export function SpeakerParticipantPicker({
     sessionId ?? "",
   );
 
+  const selfId = useOwnerUserId();
+  const selfName =
+    humanRecords.find((human) => human.id === selfId)?.name.trim() ?? "";
   const [query, setQuery] = useState("");
   const [selectedOption, setSelectedOption] =
     useState<SpeakerParticipantOption | null>(null);
@@ -403,24 +457,45 @@ export function SpeakerParticipantPicker({
     [participants],
   );
 
+  const selfOptions = useMemo(
+    () =>
+      buildSelfSpeakerOptions({
+        selfId,
+        selfName,
+        query,
+        youLabel: t`You`,
+        youWithNameLabel: (name) => t`${name} (you)`,
+      }),
+    [query, selfId, selfName, t],
+  );
+
   const groups = useMemo(
     () =>
       buildSpeakerParticipantGroups({
-        sessionParticipants: participants,
+        sessionParticipants: participants.filter(
+          (option) => option.id !== selfId,
+        ),
         eventParticipants,
-        contacts,
+        contacts: contacts.filter((option) => option.id !== selfId),
         query,
       }),
-    [contacts, eventParticipants, participants, query],
+    [contacts, eventParticipants, participants, query, selfId],
   );
 
   const createOption = useMemo(
     () =>
       buildCreateSpeakerParticipantOption({
         query,
-        existingOptions: [...participants, ...eventParticipants, ...contacts],
+        existingOptions: [
+          ...participants,
+          ...eventParticipants,
+          ...contacts,
+          ...(selfName && selfId
+            ? [{ id: selfId, name: selfName, isSessionParticipant: true }]
+            : []),
+        ],
       }),
-    [contacts, eventParticipants, participants, query],
+    [contacts, eventParticipants, participants, query, selfId, selfName],
   );
   const hasPeopleGroup = groups.some((group) => group.title === "People");
 
@@ -441,6 +516,10 @@ export function SpeakerParticipantPicker({
 
   const getCurrentHumanId = useCallback(
     async (option: SpeakerParticipantOption) => {
+      if (option.claimsName) {
+        await updateHuman(option.id, { name: option.name.trim() });
+        return option.id;
+      }
       if (!option.isNew) {
         return option.id;
       }
@@ -523,6 +602,18 @@ export function SpeakerParticipantPicker({
         </div>
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="py-1 pb-3">
+            {selfOptions.length > 0 && (
+              <div>
+                {selfOptions.map((option) => (
+                  <ParticipantOptionButton
+                    key={option.claimsName ? "claim" : "you"}
+                    option={option}
+                    selected={selectedOption === option}
+                    onSelect={handleSelect}
+                  />
+                ))}
+              </div>
+            )}
             {groups.map((group) => (
               <div key={group.title}>
                 <div className="text-muted-foreground px-3 pt-2 pb-1 text-[11px] font-medium uppercase">
@@ -558,15 +649,17 @@ export function SpeakerParticipantPicker({
               </div>
             )}
 
-            {!createOption && groups.length === 0 && (
-              <p className="text-muted-foreground px-3 py-2 text-xs">
-                {query.trim() ? (
-                  <Trans>No matching people</Trans>
-                ) : (
-                  <Trans>No people</Trans>
-                )}
-              </p>
-            )}
+            {!createOption &&
+              groups.length === 0 &&
+              selfOptions.length === 0 && (
+                <p className="text-muted-foreground px-3 py-2 text-xs">
+                  {query.trim() ? (
+                    <Trans>No matching people</Trans>
+                  ) : (
+                    <Trans>No people</Trans>
+                  )}
+                </p>
+              )}
 
             {!query.trim() && (
               <button
@@ -653,8 +746,17 @@ function ParticipantOptionButton({
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">
-          {option.isCreateOption ? t`Add "${option.name}"` : option.name}
+          {option.isCreateOption
+            ? t`Add "${option.name}"`
+            : option.claimsName
+              ? t`"${option.name}" is me`
+              : option.name}
         </span>
+        {option.claimsName && (
+          <span className="text-muted-foreground block truncate text-xs">
+            {t`Saved as your name`}
+          </span>
+        )}
         {option.email && (
           <span className="text-muted-foreground block truncate text-xs">
             {option.email}

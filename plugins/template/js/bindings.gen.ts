@@ -100,7 +100,11 @@ async getTemplateSource(template: EditableTemplate) : Promise<Result<string, str
 
 export type ActivityCaptureSystem = { language: string | null }
 export type ActivityCaptureUser = { appName: string; windowTitle: string | null; reason: string; fingerprint: string }
-export type ChatSystem = { language: string | null }
+export type ChatSystem = { language: string | null; 
+/**
+ * The name of the person using Mirna, who made the recordings.
+ */
+userName?: string | null }
 export type ComposeGeneratedSummaryRequest = { text: string; title: string | null; tag_names: string[] }
 export type ContextBlock = { contexts: SessionContext[]; currentSessionId: string | null }
 export type DailySummaryAnalysis = { time: string; appName: string; windowTitle: string | null; reason: string; summary: string }

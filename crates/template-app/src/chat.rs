@@ -21,6 +21,9 @@ common_derives! {
     #[template(path = "chat.system.md.jinja")]
     pub struct ChatSystem {
         pub language: Option<String>,
+        /// The name of the person using Mirna, who made the recordings.
+        #[serde(default)]
+        pub user_name: Option<String>,
     }
 }
 
@@ -43,6 +46,26 @@ impl ContextBlock {
 mod tests {
     use super::*;
     use anlg_askama_utils::tpl_snapshot_with_assert;
+
+    #[test]
+    fn chat_system_knows_who_is_asking() {
+        let named = askama::Template::render(&ChatSystem {
+            language: Some("en".to_string()),
+            user_name: Some("Vinicius".to_string()),
+        })
+        .unwrap();
+        assert!(named.contains("You are Mirna"));
+        assert!(named.contains("The person you're talking with is Vinicius"));
+        assert!(named.contains("they mean Vinicius"));
+        assert!(!named.contains("Anarlog"));
+
+        let unnamed = askama::Template::render(&ChatSystem {
+            language: Some("en".to_string()),
+            user_name: None,
+        })
+        .unwrap();
+        assert!(unnamed.contains("labelled \"You\""));
+    }
 
     tpl_snapshot_with_assert!(
         test_context_block_wrapped,

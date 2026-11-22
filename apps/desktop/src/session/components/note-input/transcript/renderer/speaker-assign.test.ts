@@ -14,6 +14,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  buildSelfSpeakerOptions,
   buildEventSpeakerParticipantOptions,
   buildCreateSpeakerParticipantOption,
   buildSpeakerParticipantGroups,
@@ -582,5 +583,60 @@ describe("getAssignmentWordIds", () => {
     } as Segment;
 
     expect(getAssignmentWordIds(segment)).toEqual(["word-1", "word-2"]);
+  });
+});
+
+describe("buildSelfSpeakerOptions", () => {
+  const labels = {
+    youLabel: "You",
+    youWithNameLabel: (name: string) => `${name} (you)`,
+  };
+
+  it("puts you first, by name once you have one", () => {
+    expect(
+      buildSelfSpeakerOptions({
+        selfId: "me",
+        selfName: "",
+        query: "",
+        ...labels,
+      }).map((option) => option.name),
+    ).toEqual(["You"]);
+    expect(
+      buildSelfSpeakerOptions({
+        selfId: "me",
+        selfName: "Vinicius Werneck",
+        query: "vini",
+        ...labels,
+      }).map((option) => option.name),
+    ).toEqual(["Vinicius Werneck (you)"]);
+  });
+
+  it("offers a typed name as yours while you have none", () => {
+    const options = buildSelfSpeakerOptions({
+      selfId: "me",
+      selfName: "",
+      query: "Vinicius Werneck",
+      ...labels,
+    });
+    expect(options).toEqual([
+      {
+        id: "me",
+        name: "Vinicius Werneck",
+        isSessionParticipant: true,
+        isSelf: true,
+        claimsName: true,
+      },
+    ]);
+  });
+
+  it("never offers to rename you once you have a name", () => {
+    expect(
+      buildSelfSpeakerOptions({
+        selfId: "me",
+        selfName: "Vinicius Werneck",
+        query: "Yan",
+        ...labels,
+      }),
+    ).toEqual([]);
   });
 });

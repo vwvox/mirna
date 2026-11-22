@@ -23,6 +23,7 @@ import { SpokenLanguagesView } from "./spoken-languages";
 import { StorageSettingsView } from "./storage";
 import { TimezoneSelector } from "./timezone";
 import { WeekStartSelector } from "./week-start";
+import { YourNameSetting } from "./your-name";
 
 import { SettingsPageTitle } from "~/settings/page-title";
 import {
@@ -219,6 +220,8 @@ function SettingsSectionContent({
 
       {section === "app" && (
         <>
+          <YourNameSetting />
+
           <form.Subscribe selector={(state) => state.values}>
             {(values) => (
               <AppSettingsView

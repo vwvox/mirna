@@ -552,3 +552,60 @@ fn assigned_speakers_stay_merged_across_context_intervals() {
         serde_json::to_value(preview).unwrap()
     );
 }
+
+#[test]
+fn a_single_voice_mic_without_capture_evidence_is_the_person_recording() {
+    let mut no_evidence = request(context(), &[]);
+    no_evidence.speaker_context = Some(SpeakerContext {
+        intervals: vec![],
+        meetings: vec![],
+    });
+    no_evidence.transcripts[0].words = vec![
+        RenderTranscriptWordInput {
+            id: "mic".into(),
+            text: "大家好 ".into(),
+            start_ms: 0,
+            end_ms: 500,
+            channel: 0,
+            speaker_index: None,
+            synthetic_timing: None,
+        },
+        RenderTranscriptWordInput {
+            id: "remote".into(),
+            text: "你好 ".into(),
+            start_ms: 1000,
+            end_ms: 1500,
+            channel: 1,
+            speaker_index: None,
+            synthetic_timing: None,
+        },
+    ];
+    let segments = render_transcript_segments(no_evidence.clone());
+    assert_eq!(
+        segments
+            .iter()
+            .map(|s| s.speaker_label.as_str())
+            .collect::<Vec<_>>(),
+        ["John", "Speaker 1"]
+    );
+
+    // Without a name yet, the mic is "You".
+    no_evidence.humans.clear();
+    let segments = render_transcript_segments(no_evidence);
+    assert_eq!(segments[0].speaker_label, "You");
+}
+
+#[test]
+fn a_mic_with_several_voices_stays_anonymous_without_evidence() {
+    let mut no_evidence = request(context(), &[(0, 0), (0, 1)]);
+    no_evidence.speaker_context = Some(SpeakerContext {
+        intervals: vec![],
+        meetings: vec![],
+    });
+    let segments = render_transcript_segments(no_evidence);
+    assert!(
+        segments
+            .iter()
+            .all(|s| s.speaker_label.starts_with("Speaker"))
+    );
+}

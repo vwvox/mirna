@@ -166,6 +166,8 @@ impl SpeakerContext {
         }
 
         let mut result = Vec::new();
+        // Parts with no capture evidence at all, in step with `result`.
+        let mut without_evidence = Vec::new();
         for segment in segments {
             // Context boundaries only affect inferred names, not explicit assignments.
             if segment.key.speaker_human_id.is_some() {
@@ -173,6 +175,7 @@ impl SpeakerContext {
                     provisional_speaker: None,
                     ..segment
                 });
+                without_evidence.push(false);
                 continue;
             }
 
@@ -233,13 +236,37 @@ impl SpeakerContext {
                 if let Some(label) = &part.provisional_speaker {
                     part.speaker_label = label.name.clone();
                 }
+                without_evidence.push(interval.is_none());
                 result.push(part);
             }
         }
 
+        // With nothing captured about the microphone either way, a mic that carries a single
+        // voice is the person recording, as the plain renderer already says. Evidence of a
+        // room or shared microphone, or several mic voices, keeps it anonymous.
+        let self_label = self_human_id.filter(|id| !id.trim().is_empty()).map(|id| {
+            humans
+                .iter()
+                .find(|human| human.human_id == id)
+                .map(|human| human.name.trim())
+                .filter(|name| !name.is_empty())
+                .unwrap_or("You")
+                .to_owned()
+        });
+
         // Provisional names do not consume anonymous speaker numbers or become identity hints.
         let mut unknown = std::collections::HashMap::new();
-        for segment in &mut result {
+        for (segment, no_evidence) in result.iter_mut().zip(without_evidence) {
+            if let Some(label) = &self_label
+                && no_evidence
+                && segment.key.channel == ChannelProfile::DirectMic
+                && segment.key.speaker_index.is_none()
+                && segment.key.speaker_human_id.is_none()
+                && segment.provisional_speaker.is_none()
+            {
+                segment.speaker_label = label.clone();
+                continue;
+            }
             if segment.key.speaker_human_id.is_none() && segment.provisional_speaker.is_none() {
                 let next = unknown.len() + 1;
                 let number = unknown
