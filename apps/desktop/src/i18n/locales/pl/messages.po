@@ -13,6 +13,11 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: option.name
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "\"{0}\" is me"
+msgstr ""
+
 #: src/services/enhancer/summary-notification.ts
 msgid "\"{title}\" is ready to read."
 msgstr ""
@@ -122,6 +127,10 @@ msgstr ""
 
 #: src/sidebar/timeline/utils/index.ts
 msgid "{months} months ago"
+msgstr ""
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "{name} (you)"
 msgstr ""
 
 #: src/settings/stats/insights.tsx
@@ -3032,6 +3041,14 @@ msgstr ""
 msgid "Hold your shortcut while speaking, then release it to finish."
 msgstr ""
 
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "Home"
+msgstr ""
+
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "Home and questions about all your notes ({homeShortcut})"
+msgstr ""
+
 #: src/settings/stats/index.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Hours transcribed"
@@ -3320,6 +3337,10 @@ msgstr ""
 msgid "Keep notes encrypted and synced across your devices."
 msgstr ""
 
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+msgid "Keep this one"
+msgstr ""
+
 #: src/session/components/note-conflict-banner.tsx
 msgid "Keep this version"
 msgstr ""
@@ -3346,6 +3367,10 @@ msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
 msgid "Kimi Code API key"
+msgstr ""
+
+#: src/settings/general/your-name.tsx
+msgid "Labels your side of transcripts, and tells the AI who's asking."
 msgstr ""
 
 #: src/settings/general/index.tsx
@@ -4776,6 +4801,10 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Pinyin on"
+msgstr ""
+
 #: src/settings/general/billing.tsx
 msgid "Plan limits"
 msgstr ""
@@ -5482,6 +5511,10 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Saved as your name"
+msgstr ""
+
 #: src/settings/sync/index.tsx
 msgid "Saved locally"
 msgstr ""
@@ -5915,6 +5948,10 @@ msgstr ""
 
 #: src/sidebar/note-filter-menu.tsx
 msgid "Show notes: {label}"
+msgstr ""
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Show pinyin"
 msgstr ""
 
 #: src/settings/general/app-settings.tsx
@@ -6598,6 +6635,14 @@ msgstr ""
 msgid "The recording reached the 12-hour limit."
 msgstr ""
 
+#: src/session/components/note-input/transcript/actions.ts
+msgid "The summary still reflects the old transcript."
+msgstr ""
+
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+msgid "The transcript was redone after this summary was written."
+msgstr ""
+
 #: src/sidebar/toast/registry.tsx
 msgid "The update download failed"
 msgstr ""
@@ -6750,6 +6795,10 @@ msgstr ""
 #: src/session/components/outer-header/overflow/export-modal.tsx
 #: src/settings/automations/markdown-export-options.tsx
 msgid "Transcript"
+msgstr ""
+
+#: src/session/components/note-input/transcript/actions.ts
+msgid "Transcript updated"
 msgstr ""
 
 #: src/settings/ai/stt/index.tsx
@@ -6976,6 +7025,11 @@ msgstr ""
 
 #: src/automations/starters.tsx
 msgid "Update project notes in Notion"
+msgstr ""
+
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+#: src/session/components/note-input/transcript/actions.ts
+msgid "Update summary"
 msgstr ""
 
 #: src/settings/general/account-profile.tsx
@@ -7338,6 +7392,7 @@ msgid "Yesterday"
 msgstr ""
 
 #: src/session-sharing/comments.tsx
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/settings/team/index.tsx
 msgid "You"
 msgstr ""
@@ -7426,6 +7481,10 @@ msgstr ""
 
 #: src/settings/stats/index.tsx
 msgid "Your insights"
+msgstr ""
+
+#: src/settings/general/your-name.tsx
+msgid "Your name"
 msgstr ""
 
 #: src/billing/trial-ended-dialog.tsx

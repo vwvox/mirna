@@ -13,6 +13,11 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: option.name
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "\"{0}\" is me"
+msgstr "\"{0}\" is me"
+
 #: src/services/enhancer/summary-notification.ts
 msgid "\"{title}\" is ready to read."
 msgstr "\"{title}\" is ready to read."
@@ -123,6 +128,10 @@ msgstr "{model} can't transcribe all selected languages together. Try another mo
 #: src/sidebar/timeline/utils/index.ts
 msgid "{months} months ago"
 msgstr "{months} months ago"
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "{name} (you)"
+msgstr "{name} (you)"
 
 #: src/settings/stats/insights.tsx
 msgid "{peakCount} of {total} conversations ({share}) started on this weekday in the selected period."
@@ -3032,6 +3041,14 @@ msgstr "History {0}/{1}"
 msgid "Hold your shortcut while speaking, then release it to finish."
 msgstr "Hold your shortcut while speaking, then release it to finish."
 
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "Home"
+msgstr "Home"
+
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "Home and questions about all your notes ({homeShortcut})"
+msgstr "Home and questions about all your notes ({homeShortcut})"
+
 #: src/settings/stats/index.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Hours transcribed"
@@ -3320,6 +3337,10 @@ msgstr "Keep notes current automatically."
 msgid "Keep notes encrypted and synced across your devices."
 msgstr "Keep notes encrypted and synced across your devices."
 
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+msgid "Keep this one"
+msgstr "Keep this one"
+
 #: src/session/components/note-conflict-banner.tsx
 msgid "Keep this version"
 msgstr "Keep this version"
@@ -3347,6 +3368,10 @@ msgstr "Key name (e.g. Claude Code)"
 #: src/settings/ai/llm/subscriptions/connect.tsx
 msgid "Kimi Code API key"
 msgstr "Kimi Code API key"
+
+#: src/settings/general/your-name.tsx
+msgid "Labels your side of transcripts, and tells the AI who's asking."
+msgstr "Labels your side of transcripts, and tells the AI who's asking."
 
 #: src/settings/general/index.tsx
 #: src/sidebar/settings-nav-groups.ts
@@ -4776,6 +4801,10 @@ msgstr "Pick Mirna Camera as your camera. Mirna couldn't switch it in {app}."
 msgid "Pin"
 msgstr "Pin"
 
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Pinyin on"
+msgstr "Pinyin on"
+
 #: src/settings/general/billing.tsx
 msgid "Plan limits"
 msgstr "Plan limits"
@@ -5482,6 +5511,10 @@ msgstr "Save visible chat from supported meetings using Accessibility."
 msgid "Saved"
 msgstr "Saved"
 
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Saved as your name"
+msgstr "Saved as your name"
+
 #: src/settings/sync/index.tsx
 msgid "Saved locally"
 msgstr "Saved locally"
@@ -5916,6 +5949,10 @@ msgstr "Show Mirna in the Dock and app switcher."
 #: src/sidebar/note-filter-menu.tsx
 msgid "Show notes: {label}"
 msgstr "Show notes: {label}"
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Show pinyin"
+msgstr "Show pinyin"
 
 #: src/settings/general/app-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
@@ -6598,6 +6635,14 @@ msgstr "The page you're looking for doesn't exist."
 msgid "The recording reached the 12-hour limit."
 msgstr "The recording reached the 12-hour limit."
 
+#: src/session/components/note-input/transcript/actions.ts
+msgid "The summary still reflects the old transcript."
+msgstr "The summary still reflects the old transcript."
+
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+msgid "The transcript was redone after this summary was written."
+msgstr "The transcript was redone after this summary was written."
+
 #: src/sidebar/toast/registry.tsx
 msgid "The update download failed"
 msgstr "The update download failed"
@@ -6751,6 +6796,10 @@ msgstr "Transcribing…"
 #: src/settings/automations/markdown-export-options.tsx
 msgid "Transcript"
 msgstr "Transcript"
+
+#: src/session/components/note-input/transcript/actions.ts
+msgid "Transcript updated"
+msgstr "Transcript updated"
 
 #: src/settings/ai/stt/index.tsx
 #: src/sidebar/settings-nav-groups.ts
@@ -6977,6 +7026,11 @@ msgstr "Update Mirna to keep syncing"
 #: src/automations/starters.tsx
 msgid "Update project notes in Notion"
 msgstr "Update project notes in Notion"
+
+#: src/session/components/note-input/enhanced/outdated-notice.tsx
+#: src/session/components/note-input/transcript/actions.ts
+msgid "Update summary"
+msgstr "Update summary"
 
 #: src/settings/general/account-profile.tsx
 msgid "Update your personal contact card. Your sign-in email is managed separately."
@@ -7338,6 +7392,7 @@ msgid "Yesterday"
 msgstr "Yesterday"
 
 #: src/session-sharing/comments.tsx
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/settings/team/index.tsx
 msgid "You"
 msgstr "You"
@@ -7427,6 +7482,10 @@ msgstr "Your info"
 #: src/settings/stats/index.tsx
 msgid "Your insights"
 msgstr "Your insights"
+
+#: src/settings/general/your-name.tsx
+msgid "Your name"
+msgstr "Your name"
 
 #: src/billing/trial-ended-dialog.tsx
 msgid "Your notes and recordings are safe. Free local transcription still works. Upgrade anytime to keep Pro features."
