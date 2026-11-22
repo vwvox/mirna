@@ -44,6 +44,10 @@ const hoisted = vi.hoisted(() => ({
   generate: vi.fn(),
 }));
 
+vi.mock("./outdated-notice", () => ({
+  SummaryOutdatedNotice: () => null,
+}));
+
 vi.mock("~/services/enhancer", () => ({
   getEnhancerService: () => ({ enhance: hoisted.generate }),
 }));

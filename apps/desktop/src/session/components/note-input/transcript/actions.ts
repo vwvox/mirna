@@ -6,6 +6,10 @@ import { toast } from "@anlg/ui/components/ui/toast";
 
 import { withCloudsyncActivity } from "~/db/cloudsync-activity";
 import { getEnhancerService } from "~/services/enhancer";
+import {
+  clearSummaryOutdated,
+  markSummaryOutdated,
+} from "~/session/summary-outdated";
 import { useListener } from "~/stt/contexts";
 import { isStoppedTranscriptionError, useRunBatch } from "~/stt/useRunBatch";
 
@@ -19,6 +23,22 @@ function isEngineChoice(value: unknown): value is TranscriptEngineChoice {
     typeof (value as TranscriptEngineChoice).provider === "string" &&
     typeof (value as TranscriptEngineChoice).model === "string"
   );
+}
+
+/** The summary was written from the old transcript: offer to write it again. */
+function offerSummaryUpdate(sessionId: string) {
+  toast.success(t`Transcript updated`, {
+    id: `summary-outdated-${sessionId}`,
+    description: t`The summary still reflects the old transcript.`,
+    duration: 12_000,
+    action: {
+      label: t`Update summary`,
+      onClick: () => {
+        void clearSummaryOutdated(sessionId);
+        void getEnhancerService()?.requestAutoEnhance(sessionId, "refresh");
+      },
+    },
+  });
 }
 
 export function useRegenerateTranscript(sessionId: string) {
@@ -50,9 +70,14 @@ export function useRegenerateTranscript(sessionId: string) {
               promotion: { scope: "whole_session" },
               ...choice,
             });
-            await getEnhancerService()?.queueAutoEnhanceIfSummaryEmpty(
-              sessionId,
-            );
+            const summary =
+              await getEnhancerService()?.queueAutoEnhanceIfSummaryEmpty(
+                sessionId,
+              );
+            if (summary?.type === "summary_exists") {
+              await markSummaryOutdated(sessionId);
+              offerSummaryUpdate(sessionId);
+            }
           },
         );
       } catch (error) {

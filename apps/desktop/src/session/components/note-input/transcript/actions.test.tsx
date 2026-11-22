@@ -9,6 +9,15 @@ const mocks = vi.hoisted(() => ({
   queueAutoEnhanceIfSummaryEmpty: vi.fn(),
   runBatch: vi.fn(),
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+  markSummaryOutdated: vi.fn(),
+  clearSummaryOutdated: vi.fn(),
+  requestAutoEnhance: vi.fn(),
+}));
+
+vi.mock("~/session/summary-outdated", () => ({
+  markSummaryOutdated: mocks.markSummaryOutdated,
+  clearSummaryOutdated: mocks.clearSummaryOutdated,
 }));
 
 vi.mock("@anlg/plugin-fs-sync", () => ({
@@ -16,12 +25,13 @@ vi.mock("@anlg/plugin-fs-sync", () => ({
 }));
 
 vi.mock("@anlg/ui/components/ui/toast", () => ({
-  toast: { error: mocks.toastError },
+  toast: { error: mocks.toastError, success: mocks.toastSuccess },
 }));
 
 vi.mock("~/services/enhancer", () => ({
   getEnhancerService: () => ({
     queueAutoEnhanceIfSummaryEmpty: mocks.queueAutoEnhanceIfSummaryEmpty,
+    requestAutoEnhance: mocks.requestAutoEnhance,
   }),
 }));
 
@@ -45,6 +55,44 @@ describe("useRegenerateTranscript", () => {
       status: "ok",
       data: "/tmp/session.wav",
     });
+  });
+
+  it("offers to update a summary written from the old transcript", async () => {
+    mocks.runBatch.mockResolvedValue(undefined);
+    mocks.queueAutoEnhanceIfSummaryEmpty.mockResolvedValue({
+      type: "summary_exists",
+      noteId: "summary:session-1",
+    });
+    const { result } = renderHook(() => useRegenerateTranscript("session-1"));
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mocks.markSummaryOutdated).toHaveBeenCalledWith("session-1");
+    const [title, options] = mocks.toastSuccess.mock.calls[0]!;
+    expect(title).toBe("Transcript updated");
+    expect(options.action.label).toBe("Update summary");
+
+    options.action.onClick();
+    expect(mocks.clearSummaryOutdated).toHaveBeenCalledWith("session-1");
+    expect(mocks.requestAutoEnhance).toHaveBeenCalledWith(
+      "session-1",
+      "refresh",
+    );
+  });
+
+  it("doesn't offer an update when the summary is written fresh", async () => {
+    mocks.runBatch.mockResolvedValue(undefined);
+    mocks.queueAutoEnhanceIfSummaryEmpty.mockResolvedValue({ type: "queued" });
+    const { result } = renderHook(() => useRegenerateTranscript("session-1"));
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(mocks.markSummaryOutdated).not.toHaveBeenCalled();
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
   it("shows batch transcription failures even when an old transcript exists", async () => {

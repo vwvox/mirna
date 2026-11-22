@@ -10,6 +10,7 @@ import { defaultSummaryDocumentId } from "@anlg/utils/session";
 import { ConfigError } from "./config-error";
 import { EnhancedEditor } from "./editor";
 import { EnhanceError } from "./enhance-error";
+import { SummaryOutdatedNotice } from "./outdated-notice";
 import { StreamingView } from "./streaming";
 
 import { useAITaskTask } from "~/ai/hooks";
@@ -103,16 +104,22 @@ export const Enhanced = forwardRef<
     }
 
     return (
-      <EnhancedEditor
-        ref={ref}
-        sessionId={sessionId}
-        sessionTitle={sessionTitle}
-        enhancedNoteId={enhancedNoteId}
-        content={enhancedNote.content}
-        onNavigateToTitle={onNavigateToTitle}
-        onViewReady={onViewReady}
-        onViewDisposed={onViewDisposed}
-      />
+      <>
+        <SummaryOutdatedNotice
+          sessionId={sessionId}
+          enhancedNoteId={enhancedNoteId}
+        />
+        <EnhancedEditor
+          ref={ref}
+          sessionId={sessionId}
+          sessionTitle={sessionTitle}
+          enhancedNoteId={enhancedNoteId}
+          content={enhancedNote.content}
+          onNavigateToTitle={onNavigateToTitle}
+          onViewReady={onViewReady}
+          onViewDisposed={onViewDisposed}
+        />
+      </>
     );
   },
 );
