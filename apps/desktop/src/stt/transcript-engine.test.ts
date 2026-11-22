@@ -18,6 +18,7 @@ describe("summarizeTranscriptEngine", () => {
       reroutedFrom: undefined,
       qwen3Suggested: false,
       echoRemovedSeconds: 0,
+      hasChinese: false,
     });
   });
 
@@ -56,6 +57,15 @@ describe("summarizeTranscriptEngine", () => {
     ]);
     expect(summary?.qwen3Suggested).toBe(true);
     expect(summary?.echoRemovedSeconds).toBe(5.5);
+  });
+
+  it("knows when the transcript has Chinese", () => {
+    expect(
+      summarizeTranscriptEngine([row({ has_han: 1 } as never)])?.hasChinese,
+    ).toBe(true);
+    expect(
+      summarizeTranscriptEngine([row({ language: "zh" })])?.hasChinese,
+    ).toBe(true);
   });
 
   it("shows nothing without a batch transcript", () => {

@@ -9,6 +9,8 @@ type TranscriptEngineRow = {
   model: string | null;
   language: string | null;
   metadata_json: string | null;
+  /** 1 when the transcript contains Chinese characters. */
+  has_han?: number | null;
 };
 
 /** What made a note's transcript, for the line above it. */
@@ -22,10 +24,13 @@ export type TranscriptEngineSummary = {
   qwen3Suggested: boolean;
   /** Seconds of mic audio silenced because they echoed the speakers. */
   echoRemovedSeconds: number;
+  /** The transcript has Chinese characters, so pinyin can be shown. */
+  hasChinese: boolean;
 };
 
 const TRANSCRIPT_ENGINE_SQL = `
-  SELECT provider, model, language, metadata_json
+  SELECT provider, model, language, metadata_json,
+    words_json GLOB '*[一-鿿]*' AS has_han
   FROM transcripts
   WHERE session_id = ?
     AND deleted_at IS NULL
@@ -86,6 +91,8 @@ export function summarizeTranscriptEngine(
     reroutedFrom,
     qwen3Suggested: routing.qwen3_suggested === true,
     echoRemovedSeconds,
+    hasChinese:
+      latest.language === "zh" || rows.some((row) => Boolean(row.has_han)),
   };
 }
 

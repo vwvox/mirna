@@ -5,6 +5,12 @@ import { cn } from "@anlg/utils";
 import type { HighlightSegment } from "./utils";
 
 import type { SegmentWord } from "~/stt/live-segment";
+import {
+  annotatePinyin,
+  hasHan,
+  usePinyinModule,
+  usePinyinPreference,
+} from "~/stt/pinyin";
 import { isTranscriptWordSeekable } from "~/stt/timing";
 
 interface WordSpanProps {
@@ -17,11 +23,35 @@ interface WordSpanProps {
 }
 
 export const WordSpan = memo(function WordSpan(props: WordSpanProps) {
-  const content = useHighlightedContent(
+  const highlighted = useHighlightedContent(
     props.word,
     props.displayText,
     props.highlightSegments,
     props.isActiveMatch ?? false,
+  );
+  // Search highlighting wins over pinyin, so matches stay visible.
+  const wantsPinyin =
+    usePinyinPreference((state) => state.show) &&
+    !props.highlightSegments &&
+    hasHan(props.displayText);
+  const pinyin = usePinyinModule(wantsPinyin);
+  const content = useMemo(
+    () =>
+      pinyin
+        ? annotatePinyin(props.displayText, pinyin).map((part, index) =>
+            part.pinyin ? (
+              <ruby key={index} className="mx-[0.12em]">
+                {part.text}
+                <rt className="text-muted-foreground text-[0.72em] font-normal tracking-normal">
+                  {part.pinyin}
+                </rt>
+              </ruby>
+            ) : (
+              <Fragment key={index}>{part.text}</Fragment>
+            ),
+          )
+        : highlighted,
+    [highlighted, pinyin, props.displayText],
   );
   const canSeek = props.audioExists && isTranscriptWordSeekable(props.word);
   const className = useMemo(

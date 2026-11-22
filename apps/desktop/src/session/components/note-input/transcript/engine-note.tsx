@@ -5,6 +5,7 @@ import { commands as localSttCommands } from "@anlg/plugin-local-stt";
 import { Cloud, Headphones, Laptop } from "@anlg/ui/components/icons";
 import { toast } from "@anlg/ui/components/ui/toast";
 
+import { usePinyinPreference } from "~/stt/pinyin";
 import { languageName, useTranscriptEngine } from "~/stt/transcript-engine";
 
 /**
@@ -15,6 +16,8 @@ export function TranscriptEngineNote({ sessionId }: { sessionId: string }) {
   const { t, i18n } = useLingui();
   const summary = useTranscriptEngine(sessionId);
   const [downloading, setDownloading] = useState(false);
+  const showPinyin = usePinyinPreference((state) => state.show);
+  const setShowPinyin = usePinyinPreference((state) => state.setShow);
   if (!summary) return null;
 
   const engine = summary.engine.label;
@@ -58,7 +61,22 @@ export function TranscriptEngineNote({ sessionId }: { sessionId: string }) {
         ) : (
           <Cloud size={13} aria-hidden />
         )}
-        {madeWith}
+        <span className="min-w-0 flex-1">{madeWith}</span>
+        {summary.hasChinese ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showPinyin}
+            onClick={() => setShowPinyin(!showPinyin)}
+            className={
+              showPinyin
+                ? "bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-mist shrink-0 rounded-md px-2 py-0.5 font-semibold"
+                : "border-border hover:text-foreground shrink-0 rounded-md border px-2 py-0.5 font-medium"
+            }
+          >
+            {showPinyin ? t`Pinyin on` : t`Show pinyin`}
+          </button>
+        ) : null}
       </p>
       {summary.qwen3Suggested && language ? (
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pl-[19px]">
