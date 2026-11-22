@@ -327,6 +327,10 @@ pub fn refine_batch_transcript(request: BatchRefinementRequest) -> BatchRefineme
         previous_transcripts
             .iter()
             .find(|source| &source.id == replace_transcript_id)
+    } else if replace_session && previous_transcripts.len() == 1 {
+        // Transcribing a note again replaces its one transcript: keep the speakers the
+        // user named on it, mapped onto the new words by time and channel.
+        previous_transcripts.first()
     } else {
         None
     };
@@ -2023,6 +2027,66 @@ mod tests {
                 .map(|hint| speaker_value(hint)["speaker_index"].as_i64().unwrap())
                 .collect::<Vec<_>>(),
             [1, 2, 3, 4]
+        );
+    }
+
+    #[test]
+    fn transcribing_a_note_again_keeps_the_speakers_the_user_named() {
+        // The teacher on Mac audio was named "yan"; the new transcript cuts her
+        // speech differently but at the same times and channel.
+        let previous = vec![
+            word("old-a", 0.0, 1_000.0, 1.0),
+            word("old-b", 1_000.0, 2_000.0, 1.0),
+        ];
+        let previous_hints = vec![
+            provider(&previous[0], 0),
+            provider(&previous[1], 0),
+            hint(
+                "old-a:user_speaker_assignment",
+                Some("old-a"),
+                "user_speaker_assignment",
+                serde_json::json!({
+                    "scope": "speaker",
+                    "channel": 1,
+                    "speaker_index": 0,
+                    "human_id": "yan",
+                }),
+            ),
+        ];
+        let replacement = vec![
+            word("new-a", 0.0, 600.0, 1.0),
+            word("new-b", 600.0, 1_400.0, 1.0),
+            word("new-c", 1_400.0, 2_000.0, 1.0),
+        ];
+        let hints = replacement.iter().map(|word| provider(word, 0)).collect();
+        let (words, hints, _, _, _) = ready(refine_batch_transcript(BatchRefinementRequest {
+            words: replacement,
+            hints,
+            promotion: BatchTranscriptPromotion::WholeSession,
+            previous_transcripts: vec![source(previous, previous_hints)],
+        }));
+
+        let rendered = crate::render_transcript_segments(crate::RenderTranscriptRequest {
+            transcripts: vec![render_input_from_stored(Some(0), &words, &hints).unwrap()],
+            participant_human_ids: vec![],
+            self_human_id: Some("owner".to_string()),
+            humans: vec![crate::RenderTranscriptHuman {
+                human_id: "yan".to_string(),
+                name: "Yan".to_string(),
+            }],
+            speaker_context: None,
+            preview: None,
+        });
+        assert!(!rendered.is_empty());
+        assert!(
+            rendered
+                .iter()
+                .all(|segment| segment.speaker_label == "Yan"),
+            "{:?}",
+            rendered
+                .iter()
+                .map(|s| &s.speaker_label)
+                .collect::<Vec<_>>()
         );
     }
 
