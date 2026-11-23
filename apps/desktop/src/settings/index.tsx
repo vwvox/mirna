@@ -21,6 +21,7 @@ import { SettingsHydrationBoundary } from "~/settings/hydration-boundary";
 import { SettingsImports } from "~/settings/imports";
 import { SettingsPrivacy } from "~/settings/privacy";
 import { SettingsReferrals } from "~/settings/referrals";
+import { SettingsPhone } from "~/settings/phone";
 import { SettingsInsights } from "~/settings/stats";
 import { SettingsSync } from "~/settings/sync";
 import { SettingsTeam } from "~/settings/team";
@@ -89,6 +90,8 @@ function SettingsView({ tab }: { tab: Extract<Tab, { type: "settings" }> }) {
         return <SettingsDictionary />;
       case "dictation":
         return <SettingsDictation />;
+      case "phone":
+        return <SettingsPhone />;
       case "transcription":
         return <STT />;
       case "intelligence":

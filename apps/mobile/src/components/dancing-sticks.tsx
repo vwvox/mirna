@@ -11,8 +11,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { LEVEL_BAR_COUNT } from "@/audio/level-meter";
 import { CornerCurve } from "@/constants/theme";
 import { useMountEffect } from "@/lib/use-mount-effect";
+import { useColors } from "@/settings/theme-provider";
 
 function mulberry32(seed: number): () => number {
   let value = seed;
@@ -182,5 +184,71 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
     borderCurve: CornerCurve.squircle,
+  },
+});
+
+const LEVEL_MIN_HEIGHT = 4;
+const LEVEL_MAX_HEIGHT = 44;
+// The newest bars are drawn darker, so the strip reads as moving.
+const LEVEL_RECENT_BARS = 12;
+
+/**
+ * The recording screen's level strip: one bar per audio buffer, newest on the
+ * right. Paused, the bars go grey and low.
+ */
+export const LevelStrip = memo(function LevelStrip({
+  levels,
+  paused,
+}: {
+  levels: readonly number[];
+  paused: boolean;
+}) {
+  const Colors = useColors();
+  const offset = levels.length - LEVEL_BAR_COUNT;
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={levelStyles.levelStrip}
+    >
+      {Array.from({ length: LEVEL_BAR_COUNT }, (_, index) => {
+        const level = levels[offset + index] ?? 0;
+        const height =
+          LEVEL_MIN_HEIGHT + level * (LEVEL_MAX_HEIGHT - LEVEL_MIN_HEIGHT);
+        const recent = index >= LEVEL_BAR_COUNT - LEVEL_RECENT_BARS;
+        return (
+          <View
+            key={index}
+            style={[
+              levelStyles.levelBar,
+              paused
+                ? {
+                    height: Math.max(LEVEL_MIN_HEIGHT, Math.round(height / 4)),
+                    backgroundColor: Colors.muted,
+                    opacity: 0.3,
+                  }
+                : {
+                    height: Math.round(height),
+                    backgroundColor: Colors.primary,
+                    opacity: recent ? 1 : 0.4,
+                  },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+});
+
+const levelStyles = StyleSheet.create({
+  levelStrip: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  levelBar: {
+    width: 3,
+    borderRadius: 2,
   },
 });

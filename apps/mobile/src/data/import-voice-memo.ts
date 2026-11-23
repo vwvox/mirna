@@ -3,7 +3,7 @@ import { Directory, File, Paths } from "expo-file-system";
 
 import { catalogSessionAudio } from "@/data/audio-catalog";
 import { createSession, deleteSession } from "@/data/session";
-import { transcribeSession } from "@/data/transcribe";
+import { sendRecordingsToMac } from "@/mac-link/sender";
 import { execute } from "@/db";
 import { captureAnalytics } from "@/lib/analytics";
 import { captureOperationalError } from "@/lib/error-reporting";
@@ -139,9 +139,23 @@ async function importAsset(
     throw error;
   }
 
-  void transcribeSession(sessionId);
+  // The Mac transcribes it once it arrives.
+  void sendRecordingsToMac();
 
   return sessionId;
+}
+
+/** Picks an audio file (for example the phone's own call recording) as a new note. */
+export async function importRecordingAsNewNote(
+  ownerUserId?: string,
+): Promise<string | null> {
+  const result = await getDocumentAsync({
+    type: ["audio/*"],
+    multiple: false,
+    copyToCacheDirectory: true,
+  });
+  if (result.canceled) return null;
+  return importAsset(result.assets[0], "voice_memo_import", { ownerUserId });
 }
 
 export async function importRecordingIntoSession(
@@ -211,7 +225,7 @@ export async function importWatchRecording(
     }
     if (existing.has_audio === 1) {
       if (existing.transcript_status !== "complete") {
-        void transcribeSession(recording.id);
+        void sendRecordingsToMac();
       }
       return recording.id;
     }

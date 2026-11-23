@@ -118,3 +118,17 @@ test("temporary request failures remain eligible for automatic retry", async () 
   assert.equal(fixture.pending, false);
   assert.ok(fixture.summaries.includes(fixture.sessionId));
 });
+
+test("without a provider of the user's own nothing is sent and no failure is reported", async () => {
+  fixture.sessionId = "no-provider-recording";
+  fixture.provider = null;
+  fixture.pending = true;
+  fixture.requestError = null;
+  const requests = fixture.requests;
+  const failures = fixture.failures.length;
+  await transcribeSession(fixture.sessionId);
+  await retryPendingTranscriptions();
+  assert.equal(fixture.requests, requests);
+  assert.equal(fixture.failures.length, failures);
+  assert.equal(fixture.pending, true);
+});

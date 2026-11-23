@@ -10,22 +10,12 @@ export default function SettingsScreen() {
     <SettingsPage title="Settings" layout="menu">
       <SettingsMenuGroup>
         <SettingsMenuLink
-          title="Account"
+          title="Mac"
           icon={Icon.select({
-            ios: "person.crop.circle",
-            android: import("@expo/material-symbols/account_circle.xml"),
+            ios: "laptopcomputer",
+            android: import("@expo/material-symbols/laptop_mac.xml"),
           })}
-          onPress={() => router.push("/settings/account")}
-        />
-      </SettingsMenuGroup>
-      <SettingsMenuGroup>
-        <SettingsMenuLink
-          title="Sync & storage"
-          icon={Icon.select({
-            ios: "icloud",
-            android: import("@expo/material-symbols/cloud.xml"),
-          })}
-          onPress={() => router.push("/settings/sync")}
+          onPress={() => router.push("/settings/mac")}
         />
       </SettingsMenuGroup>
       <SettingsMenuGroup>
@@ -38,7 +28,7 @@ export default function SettingsScreen() {
           onPress={() => router.push("/settings/recording")}
         />
         <SettingsMenuLink
-          title="Transcription & summaries"
+          title="Language & dictionary"
           icon={Icon.select({
             ios: "text.bubble",
             android: import("@expo/material-symbols/subtitles.xml"),
@@ -64,10 +54,10 @@ export default function SettingsScreen() {
           onPress={() => router.push("/settings/privacy")}
         />
         <SettingsMenuLink
-          title="Help & about"
+          title="About"
           icon={Icon.select({
-            ios: "questionmark.circle",
-            android: import("@expo/material-symbols/help.xml"),
+            ios: "info.circle",
+            android: import("@expo/material-symbols/info.xml"),
           })}
           onPress={() => router.push("/settings/help")}
         />

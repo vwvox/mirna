@@ -100,7 +100,7 @@ const MeetingRecordingActivity = (
             <Text
               modifiers={[font({ size: 13 }), foregroundStyle(SECONDARY_COLOR)]}
             >
-              Anarlog is listening
+              Mirna is listening
             </Text>
           </HStack>
         </VStack>
@@ -125,7 +125,7 @@ const MeetingRecordingActivity = (
             foregroundStyle(PRIMARY_COLOR),
           ]}
         >
-          Anarlog
+          Mirna
         </Text>
       </HStack>
     ),

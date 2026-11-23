@@ -19,10 +19,10 @@ index 48026058e83c7f8ce462dc26227996b7c76b06c8..17d5b6765f5e3b7312d4760bcae63b8e
 +internal class AudioStreamStartCancelledException :
 +  CodedException("Audio stream startup was cancelled")
 diff --git a/android/src/main/java/expo/modules/audio/AudioModule.kt b/android/src/main/java/expo/modules/audio/AudioModule.kt
-index 992239ba7631ce0c97c0b41c5fbf61cc842386fe..eaac6ecf77b75a5d2cbed816f6a68f2af9aaa630 100644
+index 992239ba7631ce0c97c0b41c5fbf61cc842386fe..5cc9043f349a47f4a8b963f84fcc441fcfa0cf3c 100644
 --- a/android/src/main/java/expo/modules/audio/AudioModule.kt
 +++ b/android/src/main/java/expo/modules/audio/AudioModule.kt
-@@ -652,7 +652,7 @@ class AudioModule : Module() {
+@@ -652,12 +652,29 @@ class AudioModule : Module() {
  
        AsyncFunction("start") Coroutine { stream: AudioStream ->
          checkRecordingPermission()
@@ -31,6 +31,28 @@ index 992239ba7631ce0c97c0b41c5fbf61cc842386fe..eaac6ecf77b75a5d2cbed816f6a68f2a
        }
  
        Function("stop") { stream: AudioStream ->
+         stream.stop()
+       }
++
++      Property("isPaused") { stream: AudioStream ->
++        stream.isPaused
++      }
++
++      Function("pause") { stream: AudioStream ->
++        stream.pause()
++      }
++
++      AsyncFunction("resume") Coroutine { stream: AudioStream ->
++        checkRecordingPermission()
++        stream.resume()
++      }
++
++      Function("setNotificationTitle") { stream: AudioStream, title: String? ->
++        stream.setNotificationTitle(title)
++      }
+     }
+ 
+     Class(AudioPlaylist::class) {
 diff --git a/android/src/main/java/expo/modules/audio/AudioRecorder.kt b/android/src/main/java/expo/modules/audio/AudioRecorder.kt
 index 9a7683666fe0838b21ed4b8502b91d151f76d601..35026446b76b3a632367b9fa267f883ad599b276 100644
 --- a/android/src/main/java/expo/modules/audio/AudioRecorder.kt
@@ -63,10 +85,10 @@ index 9a7683666fe0838b21ed4b8502b91d151f76d601..35026446b76b3a632367b9fa267f883a
      val url = currentFileUrl()
      var durationMillis: Long
 diff --git a/android/src/main/java/expo/modules/audio/AudioStream.kt b/android/src/main/java/expo/modules/audio/AudioStream.kt
-index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b2e5125f1 100644
+index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..63d4c8b3ffdac237163c48626fdf06bb108de7fe 100644
 --- a/android/src/main/java/expo/modules/audio/AudioStream.kt
 +++ b/android/src/main/java/expo/modules/audio/AudioStream.kt
-@@ -1,10 +1,17 @@
+@@ -1,10 +1,19 @@
  package expo.modules.audio
  
  import android.Manifest
@@ -77,22 +99,34 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
  import android.media.MediaRecorder
 +import android.os.Build
 +import android.os.PowerManager
++import android.util.Log
  import androidx.annotation.RequiresPermission
 +import androidx.core.content.ContextCompat
 +import expo.modules.audio.service.AudioRecordingServiceConnection
 +import expo.modules.audio.service.BackgroundRecording
++import expo.modules.audio.service.RecordingNotificationState
  import expo.modules.kotlin.AppContext
  import expo.modules.kotlin.jni.NativeArrayBuffer
  import expo.modules.kotlin.sharedobjects.SharedObject
-@@ -15,6 +22,7 @@ import kotlinx.coroutines.isActive
+@@ -13,12 +22,17 @@ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.isActive
  import kotlinx.coroutines.launch
++import kotlinx.coroutines.withTimeoutOrNull
  import java.nio.ByteBuffer
  import java.nio.ByteOrder
 +import java.lang.ref.WeakReference
  
  internal const val AUDIO_STREAM_BUFFER = "audioStreamBuffer"
  internal const val AUDIO_STREAM_STATUS = "audioStreamStatus"
-@@ -34,60 +42,122 @@ private data class ResolvedAudioConfig(
+ private const val DEFAULT_BUFFER_DURATION_MS = 100
++private const val MAX_NOTIFICATION_TITLE_LENGTH = 80
++private const val RESUME_JOIN_TIMEOUT_MS = 1_000L
++private const val TAG = "AudioStream"
+ private val FALLBACK_SAMPLE_RATES = intArrayOf(48000, 44100, 16000, 22050, 8000)
+ 
+ private data class ResolvedAudioConfig(
+@@ -34,60 +48,271 @@ private data class ResolvedAudioConfig(
  class AudioStream(
    appContext: AppContext,
    private val options: AudioStreamOptions
@@ -102,11 +136,18 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
    val id: String = java.util.UUID.randomUUID().toString()
  
    private var audioRecord: AudioRecord? = null
++  private var activeConfig: ResolvedAudioConfig? = null
    private var captureJob: Job? = null
++  // The loop that pause() cancelled. resume() waits for it to finish reading
++  // so two loops never read the same AudioRecord.
++  private var pausedCaptureJob: Job? = null
++  // Bumped whenever a capture loop must stop emitting (pause, stop, new loop).
++  private var captureGeneration = 0
    private val coroutineScope = CoroutineScope(Dispatchers.IO)
 +  private val serviceConnection = AudioRecordingServiceConnection(WeakReference(this), appContext)
 +  private var wakeLock: PowerManager.WakeLock? = null
 +  private var isStarting = false
++  private var isResuming = false
 +  private var stopRequested = false
 +  private var isReleased = false
  
@@ -118,12 +159,51 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
    var isStreaming: Boolean = false
      private set
  
++  /** True while the mic is off but the stream, its service and wake lock stay up. */
++  @Volatile
++  var isPaused: Boolean = false
++    private set
++
++  // Read by the notification from other threads without taking this lock.
++  @Volatile
++  private var recordedBytes: Long = 0
++  @Volatile
++  private var bytesPerSecond: Int = 0
++  @Volatile
++  private var timerBaseMillis: Long = 0
++  @Volatile
++  private var notificationTitle: String? = null
++
    private var startTimeNanos: Long = 0
  
-   @RequiresPermission(Manifest.permission.RECORD_AUDIO)
+-  @RequiresPermission(Manifest.permission.RECORD_AUDIO)
 -  fun start() {
 -    if (isStreaming) {
 -      return
+-    }
++  override val notificationState: RecordingNotificationState
++    get() = RecordingNotificationState(
++      isPaused = isPaused,
++      recordedMillis = recordedMillis(),
++      timerBaseMillis = timerBaseMillis,
++      title = notificationTitle
++    )
+ 
+-    val config = resolveAudioConfig()
+-    val recorder = createAudioRecord(config)
++  private fun recordedMillis(): Long {
++    val rate = bytesPerSecond
++    return if (rate > 0) recordedBytes * 1000 / rate else 0
++  }
+ 
+-    try {
+-      recorder.startRecording()
+-    } catch (e: IllegalStateException) {
+-      recorder.release()
+-      throw AudioStreamInitializationException(
+-        "Failed to start the audio stream. The microphone is likely held by another app or by the system"
+-      )
++  @RequiresPermission(Manifest.permission.RECORD_AUDIO)
 +  suspend fun start(allowsBackgroundRecording: Boolean = false) {
 +    synchronized(this) {
 +      if (isReleased) throw AudioStreamInitializationException("The audio stream was released")
@@ -132,25 +212,14 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
 +      stopRequested = false
      }
  
--    val config = resolveAudioConfig()
--    val recorder = createAudioRecord(config)
--
-+    var pendingRecorder: AudioRecord? = null
-     try {
--      recorder.startRecording()
--    } catch (e: IllegalStateException) {
--      recorder.release()
--      throw AudioStreamInitializationException(
--        "Failed to start the audio stream. The microphone is likely held by another app or by the system"
--      )
--    }
--
 -    sampleRate = config.sampleRate
 -    channels = config.channelCount
 -    audioRecord = recorder
 -    startTimeNanos = System.nanoTime()
 -    isStreaming = true
 -    emitStatus()
++    var pendingRecorder: AudioRecord? = null
++    try {
 +      val config = resolveAudioConfig()
 +      val recorder = createAudioRecord(config)
 +      pendingRecorder = recorder
@@ -171,6 +240,11 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
 +        if (stopRequested || isReleased) {
 +          throw AudioStreamStartCancelledException()
 +        }
++        // The notification reads these as soon as the service registers us.
++        recordedBytes = 0
++        bytesPerSecond = config.sampleRate * config.channelCount * config.bytesPerSample
++        timerBaseMillis = System.currentTimeMillis()
++        isPaused = false
 +        if (allowsBackgroundRecording) {
 +          val context = appContext?.reactContext ?: throw AudioStreamInitializationException("React context is unavailable")
 +          val service = serviceConnection.recordingServiceBinder?.service
@@ -186,6 +260,7 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
 +        sampleRate = config.sampleRate
 +        channels = config.channelCount
 +        audioRecord = recorder
++        activeConfig = config
 +        startTimeNanos = System.nanoTime()
 +        isStreaming = true
 +        isStarting = false
@@ -212,24 +287,132 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
 +    }
      if (!isStreaming) return
      isStreaming = false
++    isPaused = false
++    captureGeneration += 1
      captureJob?.cancel()
      captureJob = null
 -    audioRecord?.stop()
 -    audioRecord?.release()
 -    audioRecord = null
 -    emitStatus()
++    pausedCaptureJob = null
 +    try {
 +      audioRecord?.stop()
++    } catch (e: IllegalStateException) {
++      Log.w(TAG, "The microphone was already stopped", e)
 +    } finally {
 +      audioRecord?.release()
 +      audioRecord = null
++      activeConfig = null
 +      releaseBackgroundService()
 +      emitStatus()
 +    }
 +  }
 +
++  /**
++   * Turns the microphone off without ending the stream. The foreground service
++   * and the wake lock stay, so resume() works from the background. No buffers
++   * are emitted while paused, so the recording has no gap and no filler.
++   */
++  fun pause(): Boolean {
++    synchronized(this) {
++      if (!isStreaming || isPaused) return false
++      isPaused = true
++      captureGeneration += 1
++      pausedCaptureJob = captureJob
++      captureJob?.cancel()
++      captureJob = null
++      try {
++        // Also wakes the capture loop from its blocking read.
++        audioRecord?.stop()
++      } catch (e: IllegalStateException) {
++        Log.w(TAG, "Could not stop the microphone for a pause", e)
++      }
++      emitStatus()
++    }
++    refreshServiceNotification()
++    return true
++  }
++
++  /** Turns the microphone back on after pause(). */
++  suspend fun resume() {
++    val previousLoop = synchronized(this) {
++      if (!isStreaming || !isPaused || isResuming) return
++      isResuming = true
++      pausedCaptureJob
++    }
++    try {
++      // stop() on the AudioRecord ends the old loop's blocking read quickly.
++      withTimeoutOrNull(RESUME_JOIN_TIMEOUT_MS) { previousLoop?.join() }
++      synchronized(this) {
++        if (!isStreaming || !isPaused) return
++        val recorder = audioRecord ?: return
++        val config = activeConfig ?: return
++        try {
++          recorder.startRecording()
++        } catch (e: IllegalStateException) {
++          throw AudioStreamInitializationException(
++            "Failed to resume the audio stream. The microphone is likely held by another app or by the system"
++          )
++        }
++        if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
++          try {
++            recorder.stop()
++          } catch (ignored: IllegalStateException) {
++          }
++          throw AudioStreamInitializationException(
++            "Failed to resume the audio stream. The microphone is likely held by another app or by the system"
++          )
++        }
++        isPaused = false
++        pausedCaptureJob = null
++        // The notification timer counts from here, minus what was already recorded.
++        timerBaseMillis = System.currentTimeMillis() - recordedMillis()
++        startCaptureLoop(recorder, config)
++        emitStatus()
++      }
++    } finally {
++      synchronized(this) { isResuming = false }
++    }
++    refreshServiceNotification()
++  }
++
++  /**
++   * The note title shown in the recording notification. Always re-posts the
++   * notification, so Android re-reads it (for example after Live Updates
++   * were allowed in Settings).
++   */
++  fun setNotificationTitle(title: String?) {
++    notificationTitle = title?.trim()?.takeIf { it.isNotEmpty() }?.take(MAX_NOTIFICATION_TITLE_LENGTH)
++    refreshServiceNotification()
++  }
++
 +  override fun stopFromNotification() {
 +    stop()
++  }
++
++  override fun pauseFromNotification() {
++    pause()
++  }
++
++  override fun resumeFromNotification() {
++    coroutineScope.launch {
++      val context = appContext?.reactContext
++      if (context == null ||
++        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
++      ) {
++        return@launch
++      }
++      try {
++        resume()
++      } catch (e: Exception) {
++        Log.w(TAG, "Could not resume from the notification", e)
++      }
++    }
++  }
++
++  private fun refreshServiceNotification() {
++    serviceConnection.recordingServiceBinder?.service?.refreshNotification()
 +  }
 +
 +  private fun releaseBackgroundService() {
@@ -241,26 +424,69 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
    }
  
    private fun resolveAudioConfig(): ResolvedAudioConfig {
-@@ -179,14 +249,17 @@ class AudioStream(
-     if (bytesRead > 0) {
-       byteBuffer.limit(bytesRead)
-       emitBufferEvent(NativeArrayBuffer(byteBuffer), channels, sampleRate)
-+    } else if (bytesRead < 0) {
-+      stop()
+@@ -158,35 +383,53 @@ class AudioStream(
+     return recorder
+   }
+ 
++  // Called with this object's lock held.
+   private fun startCaptureLoop(recorder: AudioRecord, config: ResolvedAudioConfig) {
++    val generation = ++captureGeneration
+     captureJob = coroutineScope.launch {
+       val readSizeBytes = config.readSize
+ 
+-      while (isActive && isStreaming) {
+-        readAndEmit(recorder, readSizeBytes, config.channelCount, config.sampleRate)
++      while (isActive) {
++        if (!readAndEmit(recorder, readSizeBytes, config.channelCount, config.sampleRate, generation)) break
+       }
+     }
+   }
+ 
++  /** Returns false when this capture loop should end. */
+   private fun readAndEmit(
+     recorder: AudioRecord,
+     readSizeBytes: Int,
+     channels: Int,
+-    sampleRate: Int
+-  ) {
++    sampleRate: Int,
++    generation: Int
++  ): Boolean {
+     val byteBuffer = ByteBuffer.allocateDirect(readSizeBytes).order(ByteOrder.nativeOrder())
+     val bytesRead = recorder.read(byteBuffer, readSizeBytes, AudioRecord.READ_BLOCKING)
+-    if (bytesRead > 0) {
+-      byteBuffer.limit(bytesRead)
+-      emitBufferEvent(NativeArrayBuffer(byteBuffer), channels, sampleRate)
++    return synchronized(this) {
++      // A read that a pause or a stop cut short is dropped.
++      if (generation != captureGeneration || !isStreaming || isPaused) {
++        false
++      } else if (bytesRead > 0) {
++        byteBuffer.limit(bytesRead)
++        recordedBytes += bytesRead
++        emitBufferEvent(NativeArrayBuffer(byteBuffer), channels, sampleRate)
++        true
++      } else if (bytesRead < 0) {
++        stop()
++        false
++      } else {
++        true
++      }
      }
    }
  
    private fun emitStatus() {
 +    val streaming = isStreaming
++    val paused = isPaused
      appContext?.mainQueue?.launch {
        emit(
          AUDIO_STREAM_STATUS,
 -        mapOf("isStreaming" to isStreaming)
-+        mapOf("isStreaming" to streaming)
++        mapOf("isStreaming" to streaming, "isPaused" to paused)
        )
      }
    }
-@@ -209,6 +282,10 @@ class AudioStream(
+@@ -209,6 +452,10 @@ class AudioStream(
  
    override fun sharedObjectDidRelease() {
      super.sharedObjectDidRelease()
@@ -273,18 +499,24 @@ index 8ecdcc126876853204ba8b92ec4ccfaef6faadb0..771612dad7c6fdcc97657d229a15dd2b
    }
  }
 diff --git a/android/src/main/java/expo/modules/audio/service/AudioRecordingService.kt b/android/src/main/java/expo/modules/audio/service/AudioRecordingService.kt
-index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a25569835271990 100644
+index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..f01301072c92de7c09d7825371812318fd270c2a 100644
 --- a/android/src/main/java/expo/modules/audio/service/AudioRecordingService.kt
 +++ b/android/src/main/java/expo/modules/audio/service/AudioRecordingService.kt
-@@ -12,7 +12,6 @@ import android.os.Build
+@@ -9,10 +9,12 @@ import android.content.Context
+ import android.content.Intent
+ import android.content.pm.ServiceInfo
+ import android.os.Build
++import android.os.Bundle
  import android.os.IBinder
++import android.text.format.DateUtils
  import android.util.Log
  import androidx.core.app.NotificationCompat
 -import expo.modules.audio.AudioRecorder
++import expo.modules.audio.R
  import expo.modules.audio.getRecordingServiceErrorMessage
  import expo.modules.kotlin.AppContext
  import java.lang.ref.WeakReference
-@@ -21,7 +20,7 @@ private const val TAG = "AudioRecordingService"
+@@ -21,9 +23,10 @@ private const val TAG = "AudioRecordingService"
  
  class AudioRecordingService : Service() {
    private val binder = AudioRecordingServiceBinder(this)
@@ -292,9 +524,232 @@ index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a255698
 +  private val activeRecorders = mutableSetOf<WeakReference<BackgroundRecording>>()
    private val recorderLock = Any()
    private var notificationId = NOTIFICATION_ID
++  private var foregroundStartedAt = 0L
  
-@@ -141,12 +140,12 @@ class AudioRecordingService : Service() {
-     isRunningForeground = false
+   @Volatile
+   private var isRunningForeground = false
+@@ -51,6 +54,16 @@ class AudioRecordingService : Service() {
+       ACTION_STOP_RECORDING -> {
+         stopRecordingAndService()
+       }
++      ACTION_PAUSE_RECORDING -> {
++        val recordings = currentRecordings()
++        if (recordings.isEmpty()) stopSelf()
++        recordings.forEach { it.pauseFromNotification() }
++      }
++      ACTION_RESUME_RECORDING -> {
++        val recordings = currentRecordings()
++        if (recordings.isEmpty()) stopSelf()
++        recordings.forEach { it.resumeFromNotification() }
++      }
+     }
+     return START_NOT_STICKY
+   }
+@@ -58,33 +71,53 @@ class AudioRecordingService : Service() {
+   private fun createNotificationChannelIfNeeded() {
+     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+       val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++      // The old channel was IMPORTANCE_LOW, which kept the recording off the
++      // status bar and the lock screen.
++      notificationManager.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+       if (notificationManager.getNotificationChannel(CHANNEL_ID) == null) {
+         val channel = NotificationChannel(
+           CHANNEL_ID,
+-          "Audio Recording",
+-          NotificationManager.IMPORTANCE_LOW
++          "Recording",
++          NotificationManager.IMPORTANCE_DEFAULT
+         ).apply {
+-          description = "Shows when audio is being recorded in the background"
++          description = "Shows the timer while Mirna records"
+           setShowBadge(false)
+           enableVibration(false)
+           enableLights(false)
+           setSound(null, null)
++          lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+         }
+         notificationManager.createNotificationChannel(channel)
+       }
+     }
+   }
+ 
+-  private fun buildNotification(): Notification {
+-    val stopIntent = Intent(this, AudioRecordingService::class.java).apply {
+-      action = ACTION_STOP_RECORDING
++  private fun currentRecordings(): List<BackgroundRecording> =
++    synchronized(recorderLock) { activeRecorders.mapNotNull { it.get() } }
++
++  private fun servicePendingIntent(action: String, requestCode: Int): PendingIntent {
++    val intent = Intent(this, AudioRecordingService::class.java).apply {
++      this.action = action
+     }
+-    val stopPendingIntent = PendingIntent.getService(
++    return PendingIntent.getService(
+       this,
+-      0,
+-      stopIntent,
++      requestCode,
++      intent,
+       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+     )
++  }
++
++  private fun buildNotification(): Notification {
++    val state = currentRecordings().firstNotNullOfOrNull { it.notificationState }
++    val paused = state?.isPaused == true
++    val noteTitle = state?.title?.takeIf { it.isNotBlank() }
++    val heading = if (paused) "Paused" else "Recording"
++    val title = if (noteTitle != null) "$heading · $noteTitle" else heading
++    val text = if (state != null && paused) {
++      "Mic is off · ${DateUtils.formatElapsedTime(state.recordedMillis / 1000)} recorded"
++    } else {
++      "Tap to open the note"
++    }
+ 
+     val contentIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { appIntent ->
+       PendingIntent.getActivity(
+@@ -95,58 +128,119 @@ class AudioRecordingService : Service() {
+       )
+     }
+ 
+-    return NotificationCompat.Builder(this, CHANNEL_ID)
+-      .setContentTitle("Recording audio")
+-      .setContentText("Tap to return to app")
+-      .setSmallIcon(android.R.drawable.ic_btn_speak_now)
++    // Android 16 shows a promotable ongoing notification as a Live Update: a
++    // status bar chip with the timer and a card on the lock screen. It has to
++    // be ongoing, titled, not colorized and use a standard style.
++    val extras = Bundle().apply {
++      putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true)
++      if (paused) putString(EXTRA_SHORT_CRITICAL_TEXT, "Paused")
++    }
++
++    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
++      .setContentTitle(title)
++      .setContentText(text)
++      .setStyle(NotificationCompat.BigTextStyle().bigText(text))
++      .setSmallIcon(R.drawable.mirna_recording_notification)
++      .setColor(BRAND_COLOR)
++      .setColorized(false)
+       .setOngoing(true)
++      .setOnlyAlertOnce(true)
+       .setContentIntent(contentIntent)
+-      .addAction(
+-        android.R.drawable.ic_delete,
+-        "Stop",
+-        stopPendingIntent
+-      )
+-      .setCategory(NotificationCompat.CATEGORY_SERVICE)
+-      .setSilent(true)
+-      .setShowWhen(false)
+-      .setVisibility(NotificationCompat.VISIBILITY_SECRET) // Hide from lock screen on secure devices
+-      .build()
++      .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
++      .setPriority(NotificationCompat.PRIORITY_DEFAULT)
++      .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
++      .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
++      .addExtras(extras)
++
++    if (paused) {
++      builder.setShowWhen(false).setUsesChronometer(false)
++    } else {
++      // The chronometer counts from `when`. Resume moves it forward, so paused
++      // time is not counted.
++      builder
++        .setWhen(state?.timerBaseMillis ?: foregroundStartedAt)
++        .setShowWhen(true)
++        .setUsesChronometer(true)
++    }
++
++    if (state != null) {
++      if (paused) {
++        builder.addAction(
++          android.R.drawable.ic_media_play,
++          "Resume",
++          servicePendingIntent(ACTION_RESUME_RECORDING, REQUEST_RESUME)
++        )
++      } else {
++        builder.addAction(
++          android.R.drawable.ic_media_pause,
++          "Pause",
++          servicePendingIntent(ACTION_PAUSE_RECORDING, REQUEST_PAUSE)
++        )
++      }
++    }
++    builder.addAction(
++      android.R.drawable.ic_menu_save,
++      "Stop & save",
++      servicePendingIntent(ACTION_STOP_RECORDING, REQUEST_STOP)
++    )
++
++    return builder.build()
+   }
+ 
+   private fun startForegroundWithNotification() {
+-    val notification = buildNotification()
+-
+-    try {
+-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+-        startForeground(
+-          notificationId,
+-          notification,
+-          ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
++    synchronized(recorderLock) {
++      if (!isRunningForeground) foregroundStartedAt = System.currentTimeMillis()
++      val notification = buildNotification()
++
++      try {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
++          startForeground(
++            notificationId,
++            notification,
++            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
++          )
++        } else {
++          startForeground(notificationId, notification)
++        }
++        isRunningForeground = true
++      } catch (e: Exception) {
++        appContext?.jsLogger?.error(
++          getRecordingServiceErrorMessage("Failed to start the expo-audio foreground service for background recording"),
++          e
+         )
+-      } else {
+-        startForeground(notificationId, notification)
++        isRunningForeground = false
++      }
++    }
++  }
++
++  /** Rebuilds the notification after a pause, a resume or a title change. */
++  fun refreshNotification() {
++    // Same lock as stopForeground, so a late update can never leave an
++    // ongoing notification behind once the recording has ended.
++    synchronized(recorderLock) {
++      if (!isRunningForeground) return
++      try {
++        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++        notificationManager.notify(notificationId, buildNotification())
++      } catch (e: Exception) {
++        Log.w(TAG, "Could not update the recording notification", e)
+       }
+-      isRunningForeground = true
+-    } catch (e: Exception) {
+-      appContext?.jsLogger?.error(
+-        getRecordingServiceErrorMessage("Failed to start the expo-audio foreground service for background recording"),
+-        e
+-      )
+-      isRunningForeground = false
+     }
+   }
+ 
+   private fun stopForegroundWithNotification() {
+-    stopForeground(STOP_FOREGROUND_REMOVE)
+-    isRunningForeground = false
++    synchronized(recorderLock) {
++      stopForeground(STOP_FOREGROUND_REMOVE)
++      isRunningForeground = false
++    }
    }
  
 -  fun registerRecorder(recorder: AudioRecorder) {
@@ -308,7 +763,7 @@ index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a255698
        }
  
        activeRecorders.add(WeakReference(recorder))
-@@ -154,10 +153,11 @@ class AudioRecordingService : Service() {
+@@ -154,10 +248,11 @@ class AudioRecordingService : Service() {
        if (activeRecorders.size == 1 || !isRunningForeground) {
          startForegroundWithNotification()
        }
@@ -321,7 +776,7 @@ index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a255698
      synchronized(recorderLock) {
        activeRecorders.removeAll { it.get() == recorder || it.get() == null }
  
-@@ -169,12 +169,10 @@ class AudioRecordingService : Service() {
+@@ -169,12 +264,10 @@ class AudioRecordingService : Service() {
    }
  
    private fun stopRecordingAndService() {
@@ -337,7 +792,7 @@ index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a255698
  
      stopForegroundWithNotification()
      stopSelf()
-@@ -186,11 +184,7 @@ class AudioRecordingService : Service() {
+@@ -186,17 +279,26 @@ class AudioRecordingService : Service() {
  
    override fun onDestroy() {
      super.onDestroy()
@@ -350,8 +805,28 @@ index 2c9230336efc5c2ba9d5c6e5d35bd84a02dfd369..ab7bd9d18c5df8e5fed785747a255698
    }
  
    companion object {
+-    private const val CHANNEL_ID = "expo_audio_recording_channel"
++    private const val CHANNEL_ID = "mirna_recording"
++    private const val LEGACY_CHANNEL_ID = "expo_audio_recording_channel"
+     private const val NOTIFICATION_ID = 2001
++    private const val REQUEST_STOP = 0
++    private const val REQUEST_PAUSE = 1
++    private const val REQUEST_RESUME = 2
++    private const val BRAND_COLOR = 0xFF2E4A3B.toInt()
++
++    // Notification.EXTRA_REQUEST_PROMOTED_ONGOING and EXTRA_SHORT_CRITICAL_TEXT
++    // from API 36, spelled out so this builds against older SDKs.
++    private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
++    private const val EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText"
++
+     internal const val ACTION_START_RECORDING = "expo.modules.audio.action.START_RECORDING"
+     internal const val ACTION_STOP_RECORDING = "expo.modules.audio.action.STOP_RECORDING"
++    internal const val ACTION_PAUSE_RECORDING = "expo.modules.audio.action.PAUSE_RECORDING"
++    internal const val ACTION_RESUME_RECORDING = "expo.modules.audio.action.RESUME_RECORDING"
+   }
+ }
 diff --git a/android/src/main/java/expo/modules/audio/service/AudioRecordingServiceConnection.kt b/android/src/main/java/expo/modules/audio/service/AudioRecordingServiceConnection.kt
-index 28be72f2207e55ff24604f03a573660fb303d7d9..9c6b15fcdb080368e11428d2cc17f3905158f245 100644
+index 28be72f2207e55ff24604f03a573660fb303d7d9..792816f49ffe3df06b48b9c4a9dd374afcf8c711 100644
 --- a/android/src/main/java/expo/modules/audio/service/AudioRecordingServiceConnection.kt
 +++ b/android/src/main/java/expo/modules/audio/service/AudioRecordingServiceConnection.kt
 @@ -2,7 +2,6 @@ package expo.modules.audio.service
@@ -362,12 +837,28 @@ index 28be72f2207e55ff24604f03a573660fb303d7d9..9c6b15fcdb080368e11428d2cc17f390
  import expo.modules.audio.AudioRecordingServiceException
  import expo.modules.audio.getRecordingServiceErrorMessage
  import expo.modules.kotlin.AppContext
-@@ -19,8 +18,12 @@ import kotlin.coroutines.suspendCoroutine
+@@ -19,8 +18,28 @@ import kotlin.coroutines.suspendCoroutine
  
  class AudioRecordingServiceBinder(val service: AudioRecordingService) : android.os.Binder()
  
++/** What the recording notification shows for a recording. */
++data class RecordingNotificationState(
++  val isPaused: Boolean,
++  /** Audio captured so far, without the paused time. */
++  val recordedMillis: Long,
++  /** Wall-clock time the running timer counts from. */
++  val timerBaseMillis: Long,
++  val title: String?
++)
++
 +interface BackgroundRecording {
 +  fun stopFromNotification()
++  fun pauseFromNotification() {}
++  fun resumeFromNotification() {}
++
++  /** Null shows the plain notification, without Pause. */
++  val notificationState: RecordingNotificationState?
++    get() = null
 +}
 +
  class AudioRecordingServiceConnection(
@@ -376,7 +867,7 @@ index 28be72f2207e55ff24604f03a573660fb303d7d9..9c6b15fcdb080368e11428d2cc17f390
    appContext: AppContext
  ) : BaseServiceConnection<AudioRecordingServiceBinder>(appContext) {
    var recordingServiceBinder: AudioRecordingServiceBinder? = null
-@@ -104,9 +107,10 @@ class AudioRecordingServiceConnection(
+@@ -104,9 +123,10 @@ class AudioRecordingServiceConnection(
      }
      transitionToState(ServiceBindingState.BOUND)
  
@@ -388,3 +879,103 @@ index 28be72f2207e55ff24604f03a573660fb303d7d9..9c6b15fcdb080368e11428d2cc17f390
    }
  
    override fun onServiceDisconnected(componentName: ComponentName) {
+diff --git a/android/src/main/res/drawable/mirna_recording_notification.xml b/android/src/main/res/drawable/mirna_recording_notification.xml
+new file mode 100644
+index 0000000000000000000000000000000000000000..f938bde0f5f21f5d284dafed5c5f6ae7aae44ac3
+--- /dev/null
++++ b/android/src/main/res/drawable/mirna_recording_notification.xml
+@@ -0,0 +1,28 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Mirna's one-colour mark (two ridges and the sun), as the status bar icon
++     of the recording notification. Android tints it. -->
++<vector xmlns:android="http://schemas.android.com/apk/res/android"
++    android:width="24dp"
++    android:height="24dp"
++    android:viewportWidth="112"
++    android:viewportHeight="112">
++  <group android:translateY="1.25">
++    <path
++        android:fillColor="#00000000"
++        android:pathData="M6,74 L17,63 L28,67 L43,48 L54,56 L66,44 L82,58 L93,53 L106,62"
++        android:strokeColor="#FFFFFFFF"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:strokeWidth="9" />
++    <path
++        android:fillColor="#00000000"
++        android:pathData="M6,92 L20,80 L33,86 L52,71 L65,81 L80,75 L106,89"
++        android:strokeColor="#FFFFFFFF"
++        android:strokeLineCap="round"
++        android:strokeLineJoin="round"
++        android:strokeWidth="9" />
++    <path
++        android:fillColor="#FFFFFFFF"
++        android:pathData="M65,24 A11,11 0 1,0 87,24 A11,11 0 1,0 65,24 Z" />
++  </group>
++</vector>
+diff --git a/build/AudioStream.types.d.ts b/build/AudioStream.types.d.ts
+index da91d060bbf66fe6e5a8c890d12609ef20d1ea93..1736e95aa05b9ed4f101e69bfaf8b54697b29d27 100644
+--- a/build/AudioStream.types.d.ts
++++ b/build/AudioStream.types.d.ts
+@@ -40,6 +40,11 @@ export type AudioStreamBuffer = {
+ };
+ export type AudioStreamStatus = {
+     isStreaming: boolean;
++    /**
++     * True while the stream is paused: the mic is off, but the stream and its
++     * background service stay up. Android only.
++     */
++    isPaused?: boolean;
+ };
+ export type AudioStreamEvents = {
+     audioStreamBuffer(buffer: AudioStreamBuffer): void;
+@@ -72,5 +77,16 @@ export declare class AudioStream extends SharedObject<AudioStreamEvents> {
+     start(): Promise<void>;
+     /** Stops capturing and releases native audio resources. */
+     stop(): void;
++    /** Android only. */
++    readonly isPaused?: boolean;
++    /**
++     * Turns the mic off without ending the stream. No buffers arrive until
++     * `resume()`. Returns false when there was nothing to pause. Android only.
++     */
++    pause?(): boolean;
++    /** Turns the mic back on after `pause()`. Android only. */
++    resume?(): Promise<void>;
++    /** The title shown in the background recording notification. Android only. */
++    setNotificationTitle?(title: string | null): void;
+ }
+ //# sourceMappingURL=AudioStream.types.d.ts.map
+\ No newline at end of file
+diff --git a/src/AudioStream.types.ts b/src/AudioStream.types.ts
+index 1f4bc46b849eca460723284c5c48ac95308b21bf..b6d491ee782512c3442083db75f232e690320ac9 100644
+--- a/src/AudioStream.types.ts
++++ b/src/AudioStream.types.ts
+@@ -50,6 +50,11 @@ export type AudioStreamBuffer = {
+ 
+ export type AudioStreamStatus = {
+   isStreaming: boolean;
++  /**
++   * True while the stream is paused: the mic is off, but the stream and its
++   * background service stay up. Android only.
++   */
++  isPaused?: boolean;
+ };
+ 
+ export type AudioStreamEvents = {
+@@ -87,4 +92,15 @@ export declare class AudioStream extends SharedObject<AudioStreamEvents> {
+ 
+   /** Stops capturing and releases native audio resources. */
+   stop(): void;
++  /** Android only. */
++  readonly isPaused?: boolean;
++  /**
++   * Turns the mic off without ending the stream. No buffers arrive until
++   * `resume()`. Returns false when there was nothing to pause. Android only.
++   */
++  pause?(): boolean;
++  /** Turns the mic back on after `pause()`. Android only. */
++  resume?(): Promise<void>;
++  /** The title shown in the background recording notification. Android only. */
++  setNotificationTitle?(title: string | null): void;
+ }

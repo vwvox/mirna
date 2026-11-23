@@ -1,38 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { useEffect } from "react";
+import { Pressable, Text, View } from "react-native";
 
-import { CornerCurve, Radius, Spacing, Typography } from "@/constants/theme";
+import { ControlSize, FontFamily } from "@/constants/theme";
 import { captureOperationalError } from "@/lib/error-reporting";
-import { useMountEffect } from "@/lib/use-mount-effect";
+import { formatClock } from "@/note/mac-progress";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
-function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
-}
-
-function formatSeconds(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
-export function AudioChip({
-  uri,
-  filename,
-  sizeBytes,
-}: {
-  uri: string;
-  filename: string;
-  sizeBytes: number;
-}) {
-  const styles = useStyles();
-  const Colors = useColors();
+/**
+ * Plays the note's recording from this phone. One player per note, so the
+ * recordings bar and the failed card's "Play it" control the same audio.
+ */
+export function useRecordingPlayer(uri: string | null) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);
 
-  useMountEffect(() => {
+  // A new recording gets a new player; report its playback errors once each.
+  useEffect(() => {
     let lastError: string | null = null;
     const subscription = player.addListener(
       "playbackStatusUpdate",
@@ -57,14 +42,11 @@ export function AudioChip({
       },
     );
     return () => subscription.remove();
-  });
+  }, [player]);
 
-  const toggle = async () => {
+  const play = async () => {
+    if (!uri) return;
     try {
-      if (status.playing) {
-        player.pause();
-        return;
-      }
       if (status.duration > 0 && status.currentTime >= status.duration - 0.05) {
         await player.seekTo(0);
       }
@@ -76,50 +58,153 @@ export function AudioChip({
     }
   };
 
-  const detail =
-    status.playing || status.currentTime > 0
-      ? `${formatSeconds(status.currentTime)} / ${formatSeconds(status.duration)}`
-      : formatBytes(sizeBytes);
+  return {
+    available: uri !== null,
+    playing: status.playing,
+    currentTime: status.currentTime,
+    /** Seconds; 0 until the file has loaded. */
+    duration: status.duration,
+    play,
+    toggle: async () => {
+      if (!status.playing) return play();
+      try {
+        player.pause();
+      } catch (error) {
+        captureOperationalError(error, {
+          operation: "audio_playback_control",
+        });
+      }
+    },
+  };
+}
+
+export type RecordingPlayer = ReturnType<typeof useRecordingPlayer>;
+
+/**
+ * One recording in the note's recordings bar: this phone's, with play, or one
+ * added on the Mac, whose audio stays there.
+ */
+export function RecordingRow({
+  title,
+  detail,
+  durationSeconds,
+  player,
+  kind,
+}: {
+  title: string;
+  detail?: string;
+  durationSeconds: number | null;
+  /** Only for this phone's recording. */
+  player?: RecordingPlayer;
+  kind: "phone" | "mac" | "missing";
+}) {
+  const styles = useStyles();
+  const Colors = useColors();
+  const playing = player?.playing ?? false;
+  const total =
+    durationSeconds && durationSeconds > 0
+      ? formatClock(durationSeconds)
+      : null;
+  const time =
+    player && (playing || player.currentTime > 0)
+      ? `${formatClock(player.currentTime)}${total ? ` / ${total}` : ""}`
+      : total;
 
   return (
-    <Pressable
-      onPress={() => void toggle()}
-      style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
-    >
-      <Ionicons
-        name={status.playing ? "pause-outline" : "play-outline"}
-        size={14}
-        color={Colors.accent}
-      />
-      <Text style={styles.label} numberOfLines={1}>
-        {filename} · {detail}
-      </Text>
-    </Pressable>
+    <View style={styles.row}>
+      {kind === "phone" && player ? (
+        <Pressable
+          accessibilityLabel={`${playing ? "Pause" : "Play"} ${title.toLowerCase()}`}
+          accessibilityRole="button"
+          onPress={() => void player.toggle()}
+          style={({ pressed }) => [styles.play, pressed && styles.pressed]}
+        >
+          <Ionicons
+            name={playing ? "pause" : "play"}
+            size={20}
+            color={Colors.primaryForeground}
+            style={!playing && styles.playGlyph}
+          />
+        </Pressable>
+      ) : (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.badge}
+        >
+          <Ionicons
+            name={kind === "mac" ? "laptop-outline" : "cloud-offline-outline"}
+            size={20}
+            color={Colors.muted}
+          />
+        </View>
+      )}
+      <View
+        accessible
+        accessibilityLabel={[title, detail, total].filter(Boolean).join(", ")}
+        style={styles.copy}
+      >
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+        {detail ? (
+          <Text style={styles.detail} numberOfLines={2}>
+            {detail}
+          </Text>
+        ) : null}
+      </View>
+      {time ? <Text style={styles.time}>{time}</Text> : null}
+    </View>
   );
 }
 
 const useStyles = createStyleHook((Colors) => ({
-  chip: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+    paddingVertical: 8,
+    paddingLeft: 8,
+    paddingRight: 16,
+  },
+  play: {
+    width: ControlSize.default,
+    height: ControlSize.default,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: ControlSize.default / 2,
+    backgroundColor: Colors.primary,
+  },
+  playGlyph: { marginLeft: 2 },
+  pressed: { opacity: 0.7 },
+  badge: {
+    width: ControlSize.default,
+    height: ControlSize.default,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: ControlSize.default / 2,
+    borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.pill,
-    borderCurve: CornerCurve.squircle,
     backgroundColor: Colors.mutedSurface,
-    alignSelf: "flex-start",
   },
-  pressed: {
-    opacity: 0.6,
-  },
-  label: {
-    ...Typography.captionStrong,
+  copy: { flex: 1, gap: 1 },
+  title: {
+    fontFamily: FontFamily.text,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "500",
     color: Colors.ink,
-    maxWidth: 180,
+  },
+  detail: {
+    fontFamily: FontFamily.text,
+    fontSize: 12,
+    lineHeight: 16,
+    color: Colors.muted,
+  },
+  time: {
+    fontFamily: FontFamily.mono,
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.muted,
   },
 }));

@@ -5,8 +5,44 @@ import {
   beginMobileCapture,
   endMobileCapture,
   getMobileCaptureActive,
+  isCapturingSession,
+  isRecordingNow,
+  setSessionRecording,
   stopMobileCapture,
+  subscribeRecordingNow,
 } from "./capture-lifecycle.ts";
+
+test("is recording while any session records or is paused", () => {
+  const changes = [];
+  const unsubscribe = subscribeRecordingNow(() =>
+    changes.push(isRecordingNow()),
+  );
+  assert.equal(isRecordingNow(), false);
+
+  setSessionRecording("session-1", true);
+  setSessionRecording("session-2", true);
+  assert.equal(isRecordingNow(), true);
+
+  // Pausing keeps the session recording; only saving or failing ends it.
+  setSessionRecording("session-1", true);
+  setSessionRecording("session-1", false);
+  assert.equal(isRecordingNow(), true);
+  setSessionRecording("session-2", false);
+  assert.equal(isRecordingNow(), false);
+
+  unsubscribe();
+  setSessionRecording("session-3", true);
+  setSessionRecording("session-3", false);
+  assert.deepEqual(changes, [true, false]);
+});
+
+test("knows which session is still capturing", () => {
+  beginMobileCapture("session-a");
+  assert.equal(isCapturingSession("session-a"), true);
+  assert.equal(isCapturingSession("session-b"), false);
+  endMobileCapture("session-a");
+  assert.equal(isCapturingSession("session-a"), false);
+});
 
 test("keeps the mobile gate open until every active capture is settled", () => {
   beginMobileCapture("session-1");

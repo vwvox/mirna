@@ -1,6 +1,4 @@
-import * as Sentry from "@sentry/react-native";
 import { useMutation, QueryClientProvider } from "@tanstack/react-query";
-import { useFonts } from "expo-font";
 import { type ErrorBoundaryProps, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -29,8 +27,12 @@ import {
 } from "@/lib/error-reporting";
 import { queryClient } from "@/lib/query-client";
 import { useMountEffect } from "@/lib/use-mount-effect";
+// Registers the background job when the bundle loads (expo-task-manager needs it at top level).
+import "@/mac-link/background";
+import { MacLinkLifecycle } from "@/mac-link/lifecycle";
 import { QuickActionLifecycle } from "@/quick-actions/quick-action-lifecycle";
 import { AppLock } from "@/settings/app-lock";
+import { usePrivacyPreferences } from "@/settings/privacy-store";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 import { ThemeProvider, useAppColorScheme } from "@/settings/theme-provider";
 import { MobileSyncLifecycle } from "@/sync/mobile-sync-lifecycle";
@@ -88,6 +90,7 @@ function Screens({ accountUserId }: { accountUserId: string | null }) {
   return (
     <>
       <QuickActionLifecycle accountUserId={accountUserId} />
+      <MacLinkLifecycle />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -108,15 +111,20 @@ function Gate() {
   );
   const signIn = useMutation({ mutationFn: auth.signIn });
   const cloudSyncEnabled = useCloudSyncOptIn(auth.session?.user.id ?? null);
+  const loading =
+    !captureActive &&
+    (auth.status === "loading" ||
+      (auth.status === "signed_in" && !auth.billingReady));
+  // The loading view stays until its mist has settled back to full colour.
+  const [loadingDone, setLoadingDone] = useState(!loading);
 
   if (auth.bypass) return <Screens accountUserId={null} />;
 
-  if (
-    !captureActive &&
-    (auth.status === "loading" ||
-      (auth.status === "signed_in" && !auth.billingReady))
-  ) {
-    return <BrandLoadingView />;
+  if (loading && loadingDone) setLoadingDone(false);
+  if (!loadingDone) {
+    return (
+      <BrandLoadingView ready={!loading} onDone={() => setLoadingDone(true)} />
+    );
   }
 
   if (!captureActive && auth.status === "signed_out") {
@@ -208,17 +216,17 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 function RootLayout() {
   const styles = useStyles();
-  const [fontsLoaded, fontError] = useFonts({
-    CaveatSemiBold: require("../../assets/fonts/Caveat-SemiBold.ttf"),
-  });
-  const [startupAnimationComplete, setStartupAnimationComplete] =
-    useState(false);
+  // Privacy preferences start loading with the bundle (initializeErrorReporting).
+  // Waiting for them keeps the app lock's "not ready" cover from flashing over
+  // the splash.
+  const privacy = usePrivacyPreferences();
+  const [startupDone, setStartupDone] = useState(false);
 
-  if (!startupAnimationComplete || (!fontsLoaded && !fontError)) {
+  if (!startupDone) {
     return (
       <BrandLoadingView
-        animated={!startupAnimationComplete}
-        onAnimationComplete={() => setStartupAnimationComplete(true)}
+        ready={privacy.ready}
+        onDone={() => setStartupDone(true)}
       />
     );
   }
@@ -246,7 +254,7 @@ function AppStatusBar() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+export default RootLayout;
 
 const useStyles = createStyleHook((Colors) => ({
   root: {

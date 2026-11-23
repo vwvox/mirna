@@ -3,6 +3,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { useSyncExternalStore } from "react";
 import { AppState, Modal, Text, View } from "react-native";
 
+import { MirnaWordmark } from "@/components/mirna-wordmark";
 import { Button } from "@/components/ui/button";
 import { Spacing, Typography } from "@/constants/theme";
 import { useMountEffect } from "@/lib/use-mount-effect";
@@ -18,7 +19,7 @@ export async function authenticateForAppLock(): Promise<boolean> {
   let success = false;
   try {
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: "Unlock Anarlog",
+      promptMessage: "Unlock Mirna",
       cancelLabel: "Cancel",
       fallbackLabel: "Use passcode",
       biometricsSecurityLevel: "strong",
@@ -53,7 +54,7 @@ export function AppLock() {
   return (
     <Modal visible animationType="none" onRequestClose={() => {}}>
       <View style={styles.cover}>
-        <Text style={styles.title}>Anarlog</Text>
+        <MirnaWordmark size={40} align="center" />
         {preferences.ready ? (
           <Button
             label="Unlock"
@@ -81,6 +82,5 @@ const useStyles = createStyleHook((Colors) => ({
     gap: Spacing.lg,
     backgroundColor: Colors.background,
   },
-  title: { ...Typography.title, color: Colors.ink },
   copy: { ...Typography.body, color: Colors.muted },
 }));

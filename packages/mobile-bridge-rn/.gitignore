@@ -2,3 +2,4 @@
 /node_modules/
 /android/.cxx/
 /android/src/main/jniLibs/
+/android/build/

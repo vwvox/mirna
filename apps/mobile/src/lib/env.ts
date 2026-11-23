@@ -7,16 +7,16 @@ const read = (key: string, fallback = ""): string => {
   return typeof value === "string" && value ? value : fallback;
 };
 
+// Mirna sends nothing to hosted services: no account backend, hosted models,
+// analytics or crash reporting. Recordings go only to the user's own Mac, and
+// transcripts or summaries only to a provider the user sets up with their own key.
 export const env = {
   appVariant: read("appVariant", __DEV__ ? "dev" : "stable"),
-  appScheme: read("appScheme", "anarlog"),
-  supabaseUrl: read("supabaseUrl"),
-  supabaseAnonKey: read("supabaseAnonKey"),
-  apiUrl: read("apiUrl", "https://api.anarlog.so"),
-  appUrl: read("appUrl", "https://anarlog.so"),
-  posthogApiKey: read("posthogApiKey"),
-  posthogHost: read("posthogHost", "https://us.i.posthog.com"),
-  sentryDsn: read("sentryDsn"),
+  appScheme: read("appScheme", "mirna"),
+  supabaseUrl: "",
+  supabaseAnonKey: "",
+  apiUrl: "",
+  appUrl: "",
 };
 
-export const hasSupabaseEnv = Boolean(env.supabaseUrl && env.supabaseAnonKey);
+export const hasSupabaseEnv: boolean = false;

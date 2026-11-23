@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Mirna themed (monochrome) icon: the one-colour outline used in the Mac
+       menu bar, inside the adaptive icon safe zone. Android tints it. -->
+  <g transform="translate(230.4 230.4) scale(5.0285714)">
+    <path d="M6 74 L17 63 L28 67 L43 48 L54 56 L66 44 L82 58 L93 53 L106 62" fill="none" stroke="#000" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M6 92 L20 80 L33 86 L52 71 L65 81 L80 75 L106 89" fill="none" stroke="#000" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="76" cy="24" r="11" fill="#000"/>
+  </g>
+</svg>

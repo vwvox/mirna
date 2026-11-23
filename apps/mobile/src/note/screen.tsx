@@ -1,21 +1,27 @@
-import SegmentedControl from "@expo/ui/community/segmented-control";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, Keyboard, Share, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  Keyboard,
+  Pressable,
+  Share,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSessionRecorder } from "@/audio/use-session-recorder";
 import { FolderPickerSheet } from "@/components/folder-picker-sheet";
-import { ListeningSheet } from "@/components/listening-sheet";
 import { NoteActionsSheet } from "@/components/note-actions-sheet";
 import { NoteConflictBanner } from "@/components/note-conflict-banner";
 import { SessionTranscript } from "@/components/session-transcript";
 import { StartListeningButton } from "@/components/start-listening-button";
 import { IconButton } from "@/components/ui/icon-button";
 import { VersionHistorySheet } from "@/components/version-history-sheet";
-import { Spacing, Typography } from "@/constants/theme";
+import { FontFamily, Spacing, Typography } from "@/constants/theme";
 import { useNoteAttachments } from "@/data/note-attachment-catalog";
 import { pickAndCatalogNoteAttachment } from "@/data/note-attachments";
 import { deleteSession, useSessionDetail } from "@/data/session";
@@ -33,8 +39,12 @@ import { createStyleHook, useColors } from "@/settings/theme-provider";
 
 import { BodyEditor } from "./body-editor";
 import { NoteFiles } from "./note-files";
+import { NoteMeta } from "./note-meta";
+import { NoteRecordings } from "./note-recordings";
 import { NoteSummary } from "./note-summary";
+import { NoteTabs } from "./note-tabs";
 import { RecordingDetails } from "./recording-details";
+import { RecordingPanel } from "./recording-panel";
 import { useNoteAudio } from "./use-note-audio";
 import { useNoteDraft } from "./use-note-draft";
 
@@ -228,21 +238,58 @@ export function NoteScreen({
     setSheet("actions");
   };
 
+  // While recording, the note is the recording screen: timer, title, notes.
+  if (active) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <RecordingPanel
+          recorder={recorder}
+          note={isLoading ? null : data}
+          titleKey={`${id}:${restored?.titleToken ?? 0}`}
+          initialTitle={restored?.title ?? data?.title ?? ""}
+          body={bodyDraft?.text ?? data?.noteText ?? ""}
+          bodyFormat={bodyDraft?.format ?? data?.bodyFormat ?? "markdown"}
+          onEdit={onEdit}
+          onCommit={() => void flush()}
+          onBack={() => void handleBack()}
+          onStop={() => void handleStop()}
+          onRetry={() => void handleRetryRecording()}
+          onOpenSettings={() => void handleOpenSettings()}
+        />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <IconButton
-          accessibilityLabel="Back"
-          icon="back"
-          iconSize={22}
+        <Pressable
+          accessibilityLabel="Back to notes"
+          accessibilityRole="button"
           onPress={() => void handleBack()}
+          style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
+        >
+          <Ionicons name="chevron-back" size={22} color={Colors.primary} />
+          <Text style={styles.backLabel}>Notes</Text>
+        </Pressable>
+        <IconButton
+          accessibilityLabel="More actions"
+          disabled={!data}
+          icon="more"
+          iconSize={22}
+          onPress={handleMoreActions}
         />
+      </View>
+      <View style={styles.titleBlock}>
         {!isLoading && data ? (
           <TextInput
             key={`${data.id}:${restored?.titleToken ?? 0}`}
             accessibilityLabel="Note title"
             style={styles.title}
             defaultValue={restored?.title ?? data.title}
+            multiline
+            scrollEnabled={false}
+            submitBehavior="blurAndSubmit"
             placeholder="Untitled"
             placeholderTextColor={Colors.muted}
             returnKeyType="done"
@@ -255,36 +302,31 @@ export function NoteScreen({
             onFocus={() => setEditorFocused(true)}
           />
         ) : (
-          <View style={styles.title} />
+          <View style={styles.titlePlaceholder} />
         )}
-        <IconButton
-          accessibilityLabel="More actions"
-          disabled={!data}
-          icon="more"
-          iconSize={22}
-          onPress={handleMoreActions}
-          tone="muted"
-        />
+        {!isLoading && data && (
+          <NoteMeta sessionId={id} createdAt={data.createdAt} audio={audio} />
+        )}
       </View>
 
       {!isLoading && data && (
         <View key={data.id} style={styles.editor}>
           {tabs.length > 1 && (
             <View style={styles.tabs}>
-              <SegmentedControl
-                values={tabs.map((tab) =>
+              <NoteTabs
+                labels={tabs.map((tab) =>
                   tab.type === "enhanced"
                     ? "Summary"
                     : tab.type === "raw"
-                      ? "Memos"
+                      ? "Notes"
                       : "Transcript",
                 )}
                 selectedIndex={selectedIndex}
-                onChange={(event) => {
+                onChange={(index) => {
                   void flush();
                   Keyboard.dismiss();
                   setEditorFocused(false);
-                  const view = tabs[event.nativeEvent.selectedSegmentIndex];
+                  const view = tabs[index];
                   if (view) setSelection({ sessionId: id, active, view });
                 }}
               />
@@ -363,6 +405,10 @@ export function NoteScreen({
         </View>
       )}
 
+      {!active && !keyboardVisible && (
+        <NoteRecordings sessionId={id} audio={audio} />
+      )}
+
       {showEmptyNoteCta && (
         <StartListeningButton onPress={handleListeningAction} />
       )}
@@ -393,18 +439,6 @@ export function NoteScreen({
         onClose={() => closeSheet("versions")}
         onRestored={handleRestored}
       />
-
-      {active && !keyboardVisible && (
-        <ListeningSheet
-          phase={recorder.phase}
-          failure={recorder.failure}
-          amplitude={recorder.amplitude}
-          durationMs={recorder.durationMs}
-          onStop={() => void handleStop()}
-          onRetry={() => void handleRetryRecording()}
-          onOpenSettings={() => void handleOpenSettings()}
-        />
-      )}
     </SafeAreaView>
   );
 }
@@ -418,21 +452,45 @@ const useStyles = createStyleHook((Colors) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.compact,
+    paddingTop: Spacing.sm,
+  },
+  back: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingLeft: Spacing.xs,
+    paddingRight: 10,
+    borderRadius: 22,
+  },
+  backPressed: { opacity: 0.6 },
+  backLabel: {
+    fontFamily: FontFamily.text,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "500",
+    color: Colors.primary,
+  },
+  titleBlock: {
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingTop: 6,
   },
   editor: {
     flex: 1,
   },
   title: {
-    flex: 1,
-    minWidth: 0,
-    paddingHorizontal: Spacing.sm,
-    ...Typography.bodyStrong,
-    textAlign: "center",
+    padding: 0,
+    fontFamily: FontFamily.heading,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "600",
+    letterSpacing: -0.3,
     color: Colors.ink,
   },
-  tabs: { marginHorizontal: Spacing.md, marginVertical: Spacing.md },
+  titlePlaceholder: { height: 32 },
+  tabs: { marginHorizontal: 20, marginTop: Spacing.md, marginBottom: 14 },
   hidden: { display: "none" },
   readOnlyChip: {
     flexDirection: "row",

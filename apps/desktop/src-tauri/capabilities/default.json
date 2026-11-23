@@ -87,6 +87,7 @@
     "permissions:default",
     "settings:default",
     "sfx:default",
+    "phone-link:default",
     "path2:default",
     "export:default",
     "autostart:default",

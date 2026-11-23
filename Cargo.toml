@@ -123,6 +123,7 @@ anlg-opencode = { path = "crates/opencode", package = "opencode" }
 anlg-openrouter = { path = "crates/openrouter", package = "openrouter" }
 anlg-outlook-calendar = { path = "crates/outlook-calendar", package = "outlook-calendar" }
 anlg-overlay-kit = { path = "crates/overlay-kit", package = "overlay-kit" }
+anlg-phone-link = { path = "crates/phone-link", package = "phone-link" }
 anlg-pyannote-cloud = { path = "crates/pyannote-cloud", package = "pyannote-cloud" }
 anlg-pyannote-local = { path = "crates/pyannote-local", package = "pyannote-local" }
 anlg-resampler = { path = "crates/resampler", package = "resampler" }
@@ -224,6 +225,7 @@ tauri-plugin-permissions = { path = "plugins/permissions" }
 tauri-plugin-relay = { path = "plugins/relay" }
 tauri-plugin-session = { path = "plugins/session" }
 tauri-plugin-settings = { path = "plugins/settings" }
+tauri-plugin-phone-link = { path = "plugins/phone-link" }
 tauri-plugin-sfx = { path = "plugins/sfx" }
 tauri-plugin-shortcut = { path = "plugins/shortcut" }
 tauri-plugin-sidecar2 = { path = "plugins/sidecar2" }

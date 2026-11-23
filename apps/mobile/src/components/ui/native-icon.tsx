@@ -10,6 +10,10 @@ const nativeIcons = {
     ios: "xmark",
     android: import("@expo/material-symbols/close.xml"),
   }),
+  import: Icon.select({
+    ios: "square.and.arrow.down",
+    android: import("@expo/material-symbols/audio_file.xml"),
+  }),
   more: Icon.select({
     ios: "ellipsis",
     android: import("@expo/material-symbols/more_horiz.xml"),

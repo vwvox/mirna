@@ -7,6 +7,7 @@ mod db;
 mod error;
 mod listener;
 mod live_transcription;
+mod phone_link;
 mod transcript;
 mod transcription;
 

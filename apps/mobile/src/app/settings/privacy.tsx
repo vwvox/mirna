@@ -40,31 +40,19 @@ export default function PrivacySettings() {
         <FieldGroup.SectionFooter>
           <Text>
             {security.data === LocalAuthentication.SecurityLevel.NONE
-              ? "Set up a device passcode to lock Anarlog."
-              : "Require Face ID, fingerprint, or your device passcode to open Anarlog. Recording continues while the app is locked."}
-          </Text>
-        </FieldGroup.SectionFooter>
-      </FieldGroup.Section>
-      <FieldGroup.Section title="Help improve Anarlog">
-        <Switch
-          label="Usage analytics"
-          value={preferences.analytics}
-          disabled={save.isPending}
-          onValueChange={(value) => save.mutate({ key: "analytics", value })}
-        />
-        <Switch
-          label="Error reports"
-          value={preferences.errorReports}
-          disabled={save.isPending}
-          onValueChange={(value) => save.mutate({ key: "errorReports", value })}
-        />
-        <FieldGroup.SectionFooter>
-          <Text>
-            Share anonymous usage and sanitized error reports. Notes,
-            transcripts, recordings, and API keys are excluded.
+              ? "Set up a device passcode to lock Mirna."
+              : "Require Face ID, fingerprint, or your device passcode to open Mirna. Recording continues while the app is locked."}
           </Text>
         </FieldGroup.SectionFooter>
         <SettingsError error={save.error || security.error} />
+      </FieldGroup.Section>
+      <FieldGroup.Section>
+        <FieldGroup.SectionFooter>
+          <Text>
+            Mirna has no account, analytics, or crash reports. Recordings go
+            only to your own Mac.
+          </Text>
+        </FieldGroup.SectionFooter>
       </FieldGroup.Section>
     </SettingsPage>
   );

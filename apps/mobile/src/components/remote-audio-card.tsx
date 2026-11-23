@@ -34,8 +34,8 @@ export function RemoteAudioCard({
         <Text style={styles.title}>Recording not on this phone</Text>
         <Text style={styles.description}>
           {cloudAvailable
-            ? "Download the encrypted recording from your Anarlog sync."
-            : "Anarlog has the meeting details, but the recording has not synced yet."}
+            ? "Download the encrypted recording from sync."
+            : "Mirna has the meeting details, but the recording is not on this phone."}
         </Text>
         {errorMessage && <Text style={styles.error}>{errorMessage}</Text>}
         <Button

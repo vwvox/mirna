@@ -81,7 +81,7 @@ export default function ActionButtonScreen() {
           />
           <Text style={styles.title}>Start listening in one press</Text>
           <Text style={styles.description}>
-            Your iPhone Action Button can start a new Anarlog recording or stop
+            Your iPhone Action Button can start a new Mirna recording or stop
             the one already in progress.
           </Text>
         </View>
@@ -93,8 +93,8 @@ export default function ActionButtonScreen() {
             title="Allow microphone access"
             description={
               microphoneAllowed
-                ? "Anarlog can start listening as soon as it opens."
-                : "Anarlog needs the microphone to record when you press the button."
+                ? "Mirna can start listening as soon as it opens."
+                : "Mirna needs the microphone to record when you press the button."
             }
           >
             {!microphoneAllowed && permission.data && (
@@ -116,7 +116,7 @@ export default function ActionButtonScreen() {
             number={2}
             done={false}
             title="Assign Start Listening"
-            description="In iPhone Settings, tap Action Button, swipe to Shortcut, tap Choose a Shortcut, then pick Anarlog › Start Listening."
+            description="In iPhone Settings, tap Action Button, swipe to Shortcut, tap Choose a Shortcut, then pick Mirna › Start Listening."
           >
             <AnarlogShortcutsButton style={styles.shortcutsButton} />
           </SetupStep>
@@ -127,7 +127,7 @@ export default function ActionButtonScreen() {
             description={
               shortcutRan
                 ? "Start Listening works. Press and hold the Action Button to start listening, and again to stop."
-                : "Press and hold the Action Button. Anarlog opens and starts listening; press and hold again to stop."
+                : "Press and hold the Action Button. Mirna opens and starts listening; press and hold again to stop."
             }
           />
         </Card>

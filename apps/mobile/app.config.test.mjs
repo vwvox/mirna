@@ -13,22 +13,22 @@ const releaseVersion = JSON.parse(
 
 const expectedVariants = {
   dev: {
-    name: "Anarlog Dev",
+    name: "Mirna Dev",
     icon: "./assets/images/icon-dev.png",
-    scheme: "anarlog-dev",
-    bundleIdentifier: "so.anarlog.mobile.dev",
+    scheme: "mirna-dev",
+    bundleIdentifier: "app.mirna.mobile.dev",
   },
   staging: {
-    name: "Anarlog Staging",
+    name: "Mirna Staging",
     icon: "./assets/images/icon-staging.png",
-    scheme: "anarlog-staging",
-    bundleIdentifier: "so.anarlog.mobile.staging",
+    scheme: "mirna-staging",
+    bundleIdentifier: "app.mirna.mobile.staging",
   },
   stable: {
-    name: "Anarlog",
+    name: "Mirna",
     icon: "./assets/images/icon.png",
-    scheme: "anarlog",
-    bundleIdentifier: "so.anarlog.mobile",
+    scheme: "mirna",
+    bundleIdentifier: "app.mirna.mobile",
   },
 };
 
@@ -59,10 +59,7 @@ test("configures distinct app identities for every build profile", () => {
       assert.equal(config.android.icon, expected.icon);
       const { foregroundImage, backgroundColor, monochromeImage } =
         config.android.adaptiveIcon;
-      assert.equal(
-        backgroundColor,
-        { dev: "#0099FF", staging: "#D1D1D1", stable: "#F7E7B0" }[appVariant],
-      );
+      assert.equal(backgroundColor, "#2E4A3B");
       for (const asset of [foregroundImage, monochromeImage]) {
         const png = readFileSync(new URL(asset, import.meta.url));
         assert.equal(png.toString("hex", 0, 8), "89504e470d0a1a0a");
@@ -90,6 +87,44 @@ test("configures distinct app identities for every build profile", () => {
     } else {
       process.env.APP_VARIANT = originalVariant;
     }
+  }
+});
+
+test("hosted endpoints stay empty even when the environment sets them", () => {
+  const originalEnv = { ...process.env };
+  try {
+    Object.assign(process.env, {
+      APP_VARIANT: "stable",
+      EXPO_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: "synthetic-anon-key",
+      EXPO_PUBLIC_API_URL: "https://api.example.test",
+      EXPO_PUBLIC_APP_URL: "https://example.test",
+      EXPO_PUBLIC_POSTHOG_API_KEY: "synthetic-analytics-key",
+      EXPO_PUBLIC_SENTRY_DSN: "https://synthetic@example.test/1",
+    });
+    const { extra } = configureMobileApp({ config: baseConfig });
+    for (const key of [
+      "supabaseUrl",
+      "supabaseAnonKey",
+      "apiUrl",
+      "appUrl",
+      "posthogApiKey",
+      "posthogHost",
+      "sentryDsn",
+    ]) {
+      assert.equal(extra[key], "", key);
+    }
+    assert.equal(
+      baseConfig.plugins.some((plugin) =>
+        String(Array.isArray(plugin) ? plugin[0] : plugin).includes("sentry"),
+      ),
+      false,
+    );
+  } finally {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) delete process.env[key];
+    }
+    Object.assign(process.env, originalEnv);
   }
 });
 

@@ -343,6 +343,7 @@ pub fn main() {
         .plugin(tauri_plugin_tray::init(!cfg!(feature = "app-store")))
         .plugin(tauri_plugin_settings::init())
         .plugin(tauri_plugin_sfx::init())
+        .plugin(tauri_plugin_phone_link::init())
         .plugin(tauri_plugin_shortcut::init())
         .plugin(tauri_plugin_dictation::init())
         .plugin(tauri_plugin_windows::init())

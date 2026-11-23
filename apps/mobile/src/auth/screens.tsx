@@ -78,11 +78,7 @@ export function SignInScreen({
   return (
     <SafeAreaView style={[styles.safeArea, styles.brandBackground]}>
       <View style={styles.signInBrand} testID="sign-in-screen">
-        <Image
-          contentFit="contain"
-          source={require("../../assets/images/anarlog-wordmark.png")}
-          style={styles.wordmark}
-        />
+        <Text style={styles.wordmark}>mirna</Text>
         <Text style={styles.signInTitle}>
           The AI notepad for{"\n"}private meetings.
         </Text>
@@ -125,29 +121,6 @@ export function SignInScreen({
                   lastSignInMethod={lastSignInMethod}
                 />
               ))}
-            <Text style={styles.legalNotice}>
-              By signing up, you agree to our{" "}
-              <Text
-                accessibilityRole="link"
-                onPress={() =>
-                  void WebBrowser.openBrowserAsync("https://anarlog.so/terms")
-                }
-                style={styles.legalLink}
-              >
-                Terms of Service
-              </Text>{" "}
-              and{" "}
-              <Text
-                accessibilityRole="link"
-                onPress={() =>
-                  void WebBrowser.openBrowserAsync("https://anarlog.so/privacy")
-                }
-                style={styles.legalLink}
-              >
-                Privacy Policy
-              </Text>
-              .
-            </Text>
           </View>
         </RNHostView>
       </BottomSheet>
@@ -441,15 +414,13 @@ const useStyles = createStyleHook((Colors) => ({
     gap: Spacing.lg,
   },
   wordmark: {
-    width: 200,
-    height: 56,
+    ...Typography.wordmark,
+    color: Colors.primary,
   },
   signInTitle: {
     maxWidth: 340,
-    color: "#272321",
-    fontFamily: "CaveatSemiBold",
-    fontSize: 38,
-    lineHeight: 44,
+    ...Typography.title,
+    color: Colors.ink,
     textAlign: "center",
   },
   signInMethodList: {
@@ -486,18 +457,6 @@ const useStyles = createStyleHook((Colors) => ({
   providerIcon: {
     width: 18,
     height: 18,
-  },
-  legalNotice: {
-    alignSelf: "center",
-    maxWidth: 320,
-    marginTop: Spacing.sm,
-    ...Typography.caption,
-    color: Colors.muted,
-    textAlign: "center",
-  },
-  legalLink: {
-    color: Colors.muted,
-    textDecorationLine: "underline",
   },
   titleRow: {
     flexDirection: "row",

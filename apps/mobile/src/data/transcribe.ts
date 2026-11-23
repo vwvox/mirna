@@ -1,19 +1,13 @@
 import { File, Paths } from "expo-file-system";
-import { fetch } from "expo/fetch";
 import { useSyncExternalStore } from "react";
-import { Platform } from "react-native";
 
 import { ProRequiredError } from "@/auth/billing";
 import { execute, executeTransaction } from "@/db";
 import { captureAnalytics } from "@/lib/analytics";
-import { env } from "@/lib/env";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { id, nowIso } from "@/lib/ids";
 import { readPreferences } from "@/settings/preferences";
-import {
-  applyTranscriptionPreferences,
-  type Preferences,
-} from "@/settings/preferences-model";
+import type { Preferences } from "@/settings/preferences-model";
 import { resolveProvider } from "@/settings/providers";
 import {
   normalizeTranscriptionResponse,
@@ -26,17 +20,15 @@ import { generateSummaryAfterTranscription } from "./summarize";
 import { pendingSummaryStatement } from "./summary-job";
 import { TranscriptionAdmission } from "./transcription-admission";
 import {
-  assertBoundedTranscriptionResponse,
   boundedSyntheticTokens,
   MAX_TRANSCRIPTION_AUDIO_BYTES,
-  MAX_TRANSCRIPTION_RESPONSE_BYTES,
   MAX_TRANSCRIPTION_WORDS,
-  readBoundedTranscriptionResponse,
 } from "./transcription-response";
 
-// Client-driven batch STT, mirroring desktop's useRunBatch: POST the audio to
-// the transcribe proxy, then persist the transcript exactly like desktop's
+// Client-driven batch STT, mirroring desktop's useRunBatch: send the audio to
+// the user's own provider, then persist the transcript exactly like desktop's
 // createTranscript (source batch_transcription, whole-session replace).
+// Without a provider of the user's own, nothing is sent and no error is shown.
 export type TranscriptionState = "idle" | "running" | "failed";
 
 const states = new Map<string, TranscriptionState>();
@@ -337,8 +329,16 @@ function isPermanentTranscriptionFailure(error: unknown): boolean {
   ].includes(String(code));
 }
 
+function isNoProviderFailure(error: unknown): boolean {
+  return (
+    Boolean(error) &&
+    typeof error === "object" &&
+    (error as { code?: unknown }).code === "stt_no_provider"
+  );
+}
+
 function requestTimeoutMs(sizeBytes: number): number {
-  // The abort covers the whole /stt/listen round trip, not just the upload, so
+  // The abort covers the whole provider round trip, not just the upload, so
   // budgeting for transfer alone aborts long recordings the provider is still
   // transcribing and reports them as failures.
   const kib = sizeBytes / 1024;
@@ -349,68 +349,26 @@ function requestTimeoutMs(sizeBytes: number): number {
   );
 }
 
-// Native uses File.upload (streams from disk, honors explicit Content-Type,
-// iOS background session survives the 60s idle timeout). Web passes the Blob
-// directly so the browser can stream it without first materializing its bytes.
 async function requestTranscription(
   file: File,
   contentType: string,
-  token: string | undefined,
   timeoutMs: number,
   provider: ProviderConfig & { apiKey: string },
   preferences: Preferences,
 ): Promise<{ status: number; body: string }> {
-  const url = applyTranscriptionPreferences(
-    new URL(
-      `${env.apiUrl}/stt/listen?provider=anarlog&max_response_bytes=${MAX_TRANSCRIPTION_RESPONSE_BYTES}`,
-    ),
-    preferences,
-  ).toString();
-  const headers = {
-    "Content-Type": contentType,
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(new Error("stt timeout")),
     timeoutMs,
   );
   try {
-    if (provider.provider !== "anarlog")
-      return await requestProviderTranscription(
-        file,
-        contentType,
-        provider,
-        preferences,
-        controller.signal,
-      );
-    if (Platform.OS === "web") {
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: file,
-        signal: controller.signal,
-      });
-      return {
-        status: response.status,
-        body: await readBoundedTranscriptionResponse(response),
-      };
-    }
-    // Expo's native upload API streams the request from disk but returns the
-    // response as one materialized string and exposes no response-size option.
-    // The proxy cap is therefore the hard native boundary; this assertion also
-    // rejects a misconfigured or older proxy after it returns.
-    const result = await file.upload(url, {
-      httpMethod: "POST",
-      headers,
-      signal: controller.signal,
-    });
-    const contentLength =
-      Object.entries(result.headers).find(
-        ([name]) => name.toLowerCase() === "content-length",
-      )?.[1] ?? null;
-    assertBoundedTranscriptionResponse(result.body, contentLength);
-    return { status: result.status, body: result.body };
+    return await requestProviderTranscription(
+      file,
+      contentType,
+      provider,
+      preferences,
+      controller.signal,
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -445,6 +403,10 @@ async function runTranscription(sessionId: string): Promise<void> {
   }
 
   const selected = await resolveProvider("stt");
+  if (!selected || selected.provider === "anarlog")
+    throw transcriptionFailure("No transcription provider", "auth", {
+      code: "stt_no_provider",
+    });
   const model = batchTranscriptionModel(selected.provider, selected.model);
   if (!model)
     throw transcriptionFailure(
@@ -454,13 +416,11 @@ async function runTranscription(sessionId: string): Promise<void> {
     );
   const provider = { ...selected, model };
   const preferences = await readPreferences();
-  const token = provider.provider === "anarlog" ? provider.apiKey : undefined;
   const startedAtMs = audio.capture_started_at_ms ?? Date.now();
 
   const response = await requestTranscription(
     file,
     audio.content_type || "application/octet-stream",
-    token,
     requestTimeoutMs(sizeBytes),
     provider,
     preferences,
@@ -551,7 +511,7 @@ export function transcribeSession(sessionId: string): Promise<void> {
         clearStateSilently(sessionId);
       })
       .catch((error: unknown) => {
-        if (error instanceof ProRequiredError) {
+        if (error instanceof ProRequiredError || isNoProviderFailure(error)) {
           setState(sessionId, "idle");
           return;
         }

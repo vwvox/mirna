@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-list-phones"
+description = "Enables the list_phones command without any pre-configured scope."
+commands.allow = ["list_phones"]
+
+[[permission]]
+identifier = "deny-list-phones"
+description = "Denies the list_phones command without any pre-configured scope."
+commands.deny = ["list_phones"]

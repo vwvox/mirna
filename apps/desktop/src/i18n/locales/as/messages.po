@@ -633,6 +633,10 @@ msgstr ""
 msgid "Anarlog Pro coordinates recording across your devices."
 msgstr ""
 
+#: src/sidebar/settings-nav-groups.ts
+msgid "Android"
+msgstr ""
+
 #: src/templates/template-icon-picker.tsx
 msgid "Animals & Nature"
 msgstr ""
@@ -973,6 +977,7 @@ msgstr ""
 #: src/settings/dictionary/index.tsx
 #: src/settings/general/e2ee-setup.tsx
 #: src/settings/general/storage/legacy-cleanup.tsx
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 #: src/settings/team/index.tsx
 #: src/settings/todo/github.tsx
@@ -1745,6 +1750,10 @@ msgstr ""
 
 #: src/chat/components/message/normal.tsx
 msgid "Copy message"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Copy pairing link"
 msgstr ""
 
 #: src/settings/general/e2ee-setup.tsx
@@ -3419,6 +3428,8 @@ msgid "Last run failed {relative}: {0}"
 msgstr ""
 
 #. placeholder {0}: formatDistanceToNow(new Date(device.lastSeenAt))
+#. placeholder {0}: formatDistanceToNow(new Date(phone.last_seen_ms), { addSuffix: true })
+#: src/settings/phone/index.tsx
 #: src/settings/sync/index.tsx
 msgid "Last seen {0}"
 msgstr ""
@@ -3976,6 +3987,10 @@ msgstr ""
 msgid "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Mirna only listens on your network while a phone is paired or this code is showing."
+msgstr ""
+
 #. placeholder {0}: statuses[0].displayName
 #: src/settings/developers/skills.tsx
 msgid "Mirna skill added to {0}"
@@ -4377,6 +4392,10 @@ msgstr ""
 msgid "None"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "None yet. The phone shows up here once it has scanned the code."
+msgstr ""
+
 #: src/settings/stats/insights.tsx
 msgid "Not available"
 msgstr ""
@@ -4404,6 +4423,10 @@ msgstr ""
 
 #: src/settings/developers/webhooks.tsx
 msgid "not receiving events"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Not seen yet"
 msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
@@ -4476,6 +4499,10 @@ msgstr ""
 #: src/contacts/shared.tsx
 #: src/sidebar/note-filter-menu.tsx
 msgid "Oldest"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "On the phone, open <0>Settings › Mac</0> and tap <1>Scan pairing code</1>. Both need to be on the same Wi-Fi."
 msgstr ""
 
 #: src/sidebar/footer.tsx
@@ -4691,6 +4718,33 @@ msgstr ""
 msgid "Page not found"
 msgstr ""
 
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Pair a phone"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pair another phone"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Paired phones"
+msgstr ""
+
+#. placeholder {0}: event.payload.name
+#: src/settings/phone/index.tsx
+msgid "Paired with {0}"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pairing code"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Pairing link copied. Paste it in Mirna on your phone."
+msgstr ""
+
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/session/components/outer-header/overflow/export-modal.tsx
 msgid "Participants"
@@ -4790,6 +4844,8 @@ msgstr ""
 
 #: src/contacts/details.tsx
 #: src/settings/general/account-profile.tsx
+#: src/settings/phone/index.tsx
+#: src/sidebar/settings-nav-groups.ts
 msgid "Phone"
 msgstr ""
 
@@ -5153,6 +5209,7 @@ msgstr ""
 
 #: src/resource-sharing/share-dialog.tsx
 #: src/session-sharing/access-management.tsx
+#: src/settings/phone/index.tsx
 #: src/sidebar/automations.tsx
 msgid "Remove"
 msgstr ""
@@ -5524,6 +5581,10 @@ msgstr ""
 msgid "Saving..."
 msgstr ""
 
+#: src/settings/phone/index.tsx
+msgid "Scan with Mirna on your phone"
+msgstr ""
+
 #: src/settings/team/index.tsx
 msgid "SCIM bearer token"
 msgstr ""
@@ -5887,6 +5948,10 @@ msgstr ""
 
 #: src/session-sharing/management-panel.tsx
 msgid "Sharing paused to protect your edits"
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Show a pairing code here, then scan it with Mirna on your phone."
 msgstr ""
 
 #: src/sidebar/timeline/item.tsx
@@ -6670,6 +6735,10 @@ msgstr ""
 
 #: src/resource-sharing/library.tsx
 msgid "This adds a copy you can edit without changing the shared item."
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "This code works for {countdown} and only once."
 msgstr ""
 
 #: src/session/components/version-history-dialog.tsx
@@ -7509,6 +7578,10 @@ msgstr ""
 
 #: src/auth/connect-local-library-dialog.tsx
 msgid "Your personal notes and recordings stay on this device. Sync will connect them to this account and bring in its existing notes. Copies already in your previous account remain there. Team and shared notes stay with their workspace. Reconnect integrations for this account. After connecting, this library requires an app version that supports account switching."
+msgstr ""
+
+#: src/settings/phone/index.tsx
+msgid "Your phone records and sends the audio here over your Wi-Fi. This Mac writes the transcript and summary, then sends them back."
 msgstr ""
 
 #: src/settings/general/billing.tsx

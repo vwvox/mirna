@@ -42,6 +42,41 @@ export function getMobileCaptureActive(): boolean {
   return activeSessions.size > 0;
 }
 
+/** Whether this session's recording is still in progress (not yet saved). */
+export function isCapturingSession(sessionId: string): boolean {
+  return activeSessions.has(sessionId);
+}
+
+// Sessions whose mic is on, about to be, or paused. Narrower than the active
+// captures above, which also cover saving and failed recordings.
+const recordingSessions = new Set<string>();
+const recordingListeners = new Set<() => void>();
+
+export function setSessionRecording(
+  sessionId: string,
+  recording: boolean,
+): void {
+  const wasRecording = recordingSessions.size > 0;
+  if (recording) recordingSessions.add(sessionId);
+  else recordingSessions.delete(sessionId);
+  if (wasRecording !== recordingSessions.size > 0) {
+    for (const listener of recordingListeners) listener();
+  }
+}
+
+/**
+ * True while a recording is running or paused. Saving is not recording, so
+ * a recording that has just stopped can be sent to the Mac straight away.
+ */
+export function isRecordingNow(): boolean {
+  return recordingSessions.size > 0;
+}
+
+export function subscribeRecordingNow(listener: () => void): () => void {
+  recordingListeners.add(listener);
+  return () => recordingListeners.delete(listener);
+}
+
 export async function stopMobileCapture(): Promise<boolean> {
   const registeredStop = stopHandlers.values().next().value;
   if (registeredStop) {

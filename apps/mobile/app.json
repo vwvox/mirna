@@ -1,14 +1,22 @@
 {
   "expo": {
-    "name": "Anarlog",
-    "slug": "anarlog-mobile",
+    "name": "Mirna",
+    "slug": "mirna",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "usesAppleSignIn": true
-    },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+        "android.permission.INTERNET",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_PROMOTED_NOTIFICATIONS",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ]
     },
     "web": {
       "output": "single",
@@ -16,44 +24,126 @@
     },
     "plugins": [
       "./app.plugin.js",
+      "./plugins/with-mirna-release-signing.js",
       "./modules/quick-actions/app.plugin.js",
       "expo-asset",
       "expo-dev-client",
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Fraunces",
+                "fontDefinitions": [
+                  {
+                    "path": "./node_modules/@expo-google-fonts/fraunces/400Regular/Fraunces_400Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/fraunces/600SemiBold/Fraunces_600SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/fraunces/700Bold/Fraunces_700Bold.ttf",
+                    "weight": 700
+                  }
+                ]
+              },
+              {
+                "fontFamily": "Figtree",
+                "fontDefinitions": [
+                  {
+                    "path": "./node_modules/@expo-google-fonts/figtree/400Regular/Figtree_400Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/figtree/500Medium/Figtree_500Medium.ttf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/figtree/600SemiBold/Figtree_600SemiBold.ttf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/figtree/700Bold/Figtree_700Bold.ttf",
+                    "weight": 700
+                  }
+                ]
+              },
+              {
+                "fontFamily": "IBM Plex Mono",
+                "fontDefinitions": [
+                  {
+                    "path": "./node_modules/@expo-google-fonts/ibm-plex-mono/400Regular/IBMPlexMono_400Regular.ttf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./node_modules/@expo-google-fonts/ibm-plex-mono/500Medium/IBMPlexMono_500Medium.ttf",
+                    "weight": 500
+                  }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./node_modules/@expo-google-fonts/fraunces/400Regular/Fraunces_400Regular.ttf",
+              "./node_modules/@expo-google-fonts/fraunces/600SemiBold/Fraunces_600SemiBold.ttf",
+              "./node_modules/@expo-google-fonts/fraunces/700Bold/Fraunces_700Bold.ttf",
+              "./node_modules/@expo-google-fonts/figtree/400Regular/Figtree_400Regular.ttf",
+              "./node_modules/@expo-google-fonts/figtree/500Medium/Figtree_500Medium.ttf",
+              "./node_modules/@expo-google-fonts/figtree/600SemiBold/Figtree_600SemiBold.ttf",
+              "./node_modules/@expo-google-fonts/figtree/700Bold/Figtree_700Bold.ttf",
+              "./node_modules/@expo-google-fonts/ibm-plex-mono/400Regular/IBMPlexMono_400Regular.ttf",
+              "./node_modules/@expo-google-fonts/ibm-plex-mono/500Medium/IBMPlexMono_500Medium.ttf"
+            ]
+          }
+        }
+      ],
       "expo-image",
       "expo-router",
       "expo-sharing",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F7E7B0",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
-          "resizeMode": "contain"
+          "backgroundColor": "#FBFAF6",
+          "image": "./assets/images/splash-wordmark.png",
+          "imageWidth": 164,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#1A1F1C",
+            "image": "./assets/images/splash-wordmark-dark.png"
+          }
         }
       ],
       [
         "expo-audio",
         {
-          "microphonePermission": "Anarlog uses the microphone to capture and transcribe your meetings.",
+          "microphonePermission": "Mirna uses the microphone to record your meetings and voice notes.",
           "enableBackgroundRecording": true,
           "enableBackgroundPlayback": false
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Mirna uses the camera to scan the pairing code shown on your Mac.",
+          "microphonePermission": "Mirna uses the microphone to record your meetings and voice notes.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ],
       "expo-widgets",
       "expo-secure-store",
-      ["expo-local-authentication", { "faceIDPermission": "Use Face ID to unlock your Anarlog notes." }],
-      "@sentry/react-native/expo"
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "Use Face ID to unlock your Mirna notes." }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "fcaa4e46-0da5-4dfc-a9e2-6447de0030d2"
-      }
-    },
-    "owner": "john_fastrepl"
+    }
   }
 }

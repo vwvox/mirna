@@ -19,17 +19,7 @@ export default function TranscriptionSettings() {
     ...new Set([preferences.ai_language, ...LANGUAGE_CODES]),
   ].sort((a, b) => languageName(a).localeCompare(languageName(b)));
   return (
-    <SettingsPage title="Transcription & summaries">
-      <FieldGroup.Section>
-        <SettingsRow
-          title="Transcription provider"
-          onPress={() => router.push("/settings/transcription-provider")}
-        />
-        <SettingsRow
-          title="Summary provider"
-          onPress={() => router.push("/settings/summary-provider")}
-        />
-      </FieldGroup.Section>
+    <SettingsPage title="Language & dictionary">
       <FieldGroup.Section title="Language">
         <Row alignment="center">
           <Text>Main language</Text>

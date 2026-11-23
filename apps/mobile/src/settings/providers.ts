@@ -3,11 +3,6 @@ import { fetch } from "expo/fetch";
 
 import { verifyProviderCredentials } from "@anlg/provider-validation";
 
-import {
-  decodeJwtPayload,
-  deriveBillingInfo,
-  ProRequiredError,
-} from "@/auth/billing";
 import { supabase } from "@/auth/client";
 import { execute, executeTransaction } from "@/db";
 
@@ -119,7 +114,7 @@ export async function readProviderStatus(
     readProviderKey(accountId, kind, provider),
   ]);
   let hasKey = false;
-  let isConfigured = provider === "anarlog";
+  let isConfigured = false;
   let verificationError: string | undefined;
   try {
     validateProviderApiKey(apiKey ?? "");
@@ -268,15 +263,9 @@ export async function resolveProvider(kind: ProviderKind) {
       accountId: credential.accountId,
     };
   }
-  if (config.provider === "anarlog") {
-    if (session?.access_token) {
-      if (!deriveBillingInfo(decodeJwtPayload(session.access_token)).isPro)
-        throw new ProRequiredError();
-      return { ...config, apiKey: session.access_token };
-    }
-    if (!supabase) return { ...config, apiKey: "" };
-    throw new Error("Sign in to use Anarlog Pro.");
-  }
+  // "anarlog" is the stored default and means no provider has been set up.
+  // Mirna never uses Anarlog's hosted models, so there is nothing to call.
+  if (config.provider === "anarlog") return null;
   const key = await readProviderKey(
     session?.user.id ?? null,
     kind,

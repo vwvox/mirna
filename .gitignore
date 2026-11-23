@@ -41,3 +41,4 @@ internal
 .vercel/
 .output/
 .nitro/
+/dist/

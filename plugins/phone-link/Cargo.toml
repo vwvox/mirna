@@ -1,0 +1,28 @@
+[package]
+name = "tauri-plugin-phone-link"
+version = "0.1.0"
+authors = ["Mirna"]
+edition = "2024"
+exclude = ["/js", "/node_modules"]
+links = "tauri-plugin-phone-link"
+description = "Receives recordings from the paired Mirna phone app over the local network"
+
+[build-dependencies]
+tauri-plugin = { workspace = true, features = ["build"] }
+
+[dev-dependencies]
+specta-typescript = { workspace = true }
+
+[dependencies]
+anlg-phone-link = { workspace = true, features = ["server"] }
+
+tauri = { workspace = true, features = ["test"] }
+tauri-specta = { workspace = true, features = ["derive", "typescript"] }
+
+if-addrs = "0.15"
+mdns-sd = { version = "0.22", default-features = false }
+qrcode = { version = "0.15", default-features = false, features = ["svg"] }
+serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true }
+tokio = { workspace = true, features = ["net", "sync", "time"] }
+tracing = { workspace = true }

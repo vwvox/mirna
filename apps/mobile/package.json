@@ -17,20 +17,22 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anlg/provider-validation": "workspace:*",
     "@anlg/db-react": "workspace:*",
     "@anlg/db-runtime": "workspace:*",
     "@anlg/design-system": "workspace:^",
     "@anlg/mobile-bridge": "workspace:*",
+    "@anlg/provider-validation": "workspace:*",
     "@anlg/supabase": "workspace:*",
     "@anlg/user-error": "workspace:*",
     "@anlg/utils": "workspace:*",
+    "@expo-google-fonts/figtree": "^0.4.1",
+    "@expo-google-fonts/fraunces": "^0.4.1",
+    "@expo-google-fonts/ibm-plex-mono": "^0.4.2",
     "@expo/material-symbols": "^0.1.1",
     "@expo/metro-runtime": "^57.0.14",
     "@expo/ui": "~57.0.14",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@sentry/react-native": "^8.20.0",
     "@supabase/supabase-js": "^2.103.0",
     "@tanstack/react-form": "^1.29.0",
     "@tanstack/react-query": "^5.99.0",
@@ -38,6 +40,8 @@
     "expo-apple-authentication": "~57.0.1",
     "expo-asset": "~57.0.15",
     "expo-audio": "~57.0.4",
+    "expo-background-task": "~57.0.14",
+    "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.16",
     "expo-crypto": "~57.0.2",
     "expo-dev-client": "~57.0.16",
@@ -56,6 +60,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.3",
+    "expo-task-manager": "~57.0.14",
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "~57.0.15",
     "js-sha256": "0.10.1",
@@ -72,13 +77,14 @@
   "expo": {
     "autolinking": {
       "android": {
-        "buildFromSource": ["expo-audio"]
+        "buildFromSource": [
+          "expo-audio",
+          "expo-camera"
+        ],
+        "exclude": [
+          "expo-widgets"
+        ]
       }
-    },
-    "install": {
-      "exclude": [
-        "@sentry/react-native"
-      ]
     }
   },
   "devDependencies": {

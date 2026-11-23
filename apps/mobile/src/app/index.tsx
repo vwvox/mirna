@@ -1,7 +1,8 @@
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
-import { RefreshControl, Text, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Pressable, RefreshControl, Text, View } from "react-native";
 import Animated, {
   Easing,
   ReduceMotion,
@@ -21,34 +22,51 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import { useAuth } from "@/auth/context";
 import { ActionButtonCard } from "@/components/action-button-card";
+import { MirnaWordmark } from "@/components/mirna-wordmark";
 import { SearchPalette } from "@/components/search-palette";
-import { SessionCard } from "@/components/session-card";
-import { StartListeningButton } from "@/components/start-listening-button";
+import { SessionCard, useSessionCardDetails } from "@/components/session-card";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
-import { UserAvatarButton } from "@/components/user-avatar";
 import {
-  LISTENING_CONTROL_HEIGHT,
+  ControlSize,
+  CornerCurve,
+  FontFamily,
+  Radius,
   Spacing,
   Typography,
 } from "@/constants/theme";
+import { importRecordingAsNewNote } from "@/data/import-voice-memo";
 import { createSession, deleteSession } from "@/data/session";
 import { useSidebarItemPreferences } from "@/data/sidebar-preferences";
 import { useTimelineSessions, type TimelineSession } from "@/data/timeline";
 import { confirmDestructive } from "@/lib/confirm";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { scrollVisibility } from "@/lib/scroll-visibility";
+import { usePairedMac } from "@/mac-link/pairing";
+import {
+  type MacReachability,
+  useMacReachability,
+} from "@/mac-link/reachability";
+import { sendRecordingsToMac } from "@/mac-link/sender";
+import { useMacLinkStatuses } from "@/mac-link/status";
 import {
   deviceHasActionButton,
   dismissActionButtonCard,
   useActionButtonSetup,
 } from "@/quick-actions/action-button-setup";
-import { createStyleHook, useColors } from "@/settings/theme-provider";
-import { syncMobileNow } from "@/sync/mobile-sync";
+import {
+  createStyleHook,
+  useAppColorScheme,
+  useColors,
+} from "@/settings/theme-provider";
+import { useProviderAccess } from "@/settings/use-provider-access";
+
+const START_BAR_HEIGHT = 56 + 14 + Spacing.sm;
 
 export default function HomeScreen() {
   const styles = useStyles();
   const Colors = useColors();
+  const scheme = useAppColorScheme();
   const router = useRouter();
   const auth = useAuth();
   const { items, isLoading, error, hasMore, loadMore, retry } =
@@ -57,15 +75,39 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const [searching, setSearching] = useState(false);
-  const refresh = useMutation({ mutationFn: syncMobileNow });
+  const refresh = useMutation({
+    mutationFn: () => sendRecordingsToMac("user"),
+  });
+  const { mac, loading: macLoading } = usePairedMac();
+  const reachability = useMacReachability();
+  const macStatuses = useMacLinkStatuses();
+  const transcribesHere = useProviderAccess("stt");
+  const sessionIds = useMemo(
+    () =>
+      items.flatMap((item) =>
+        item.type === "session" ? [item.session.id] : [],
+      ),
+    [items],
+  );
+  const cardDetails = useSessionCardDetails(sessionIds);
+  const importRecording = useMutation({
+    mutationFn: () => importRecordingAsNewNote(auth.session?.user.id),
+    onSuccess: (sessionId) => {
+      if (sessionId) router.push(`/note/${sessionId}`);
+    },
+    onError: (error) => {
+      captureOperationalError(error, {
+        operation: "session_import",
+        tags: { entry_point: "mobile_home" },
+      });
+    },
+  });
   const actionButtonSetup = useActionButtonSetup();
   const showActionButtonCard =
     deviceHasActionButton &&
     actionButtonSetup.data !== undefined &&
     !actionButtonSetup.data.cardDismissed;
-  const [buttonHeight, setButtonHeight] = useState(
-    LISTENING_CONTROL_HEIGHT + Spacing.xs,
-  );
+  const [buttonHeight, setButtonHeight] = useState(START_BAR_HEIGHT);
   const [buttonHidden, setButtonHidden] = useState(false);
   const scrollState = useSharedValue({ anchor: 0, hidden: false });
   const contentHeight = useSharedValue(0);
@@ -164,24 +206,50 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <UserAvatarButton
-          accessibilityLabel="Open settings"
-          onPress={() => router.push("/settings")}
-          user={auth.session?.user ?? null}
-        />
+        <View accessibilityRole="header">
+          <MirnaWordmark size={32} dark={scheme === "dark"} />
+        </View>
         <View style={styles.headerActions}>
           <IconButton
-            accessibilityLabel="Create new note"
-            icon="new-note"
-            onPress={() => void createAndOpen()}
+            accessibilityLabel="Import a recording"
+            disabled={importRecording.isPending}
+            icon="import"
+            iconSize={22}
+            onPress={() => importRecording.mutate()}
           />
           <IconButton
-            accessibilityLabel="Search meetings"
+            accessibilityLabel="Search notes"
             icon="search"
+            iconSize={22}
             onPress={() => setSearching(true)}
           />
+          <IconButton
+            accessibilityLabel="Write a note"
+            icon="new-note"
+            iconSize={22}
+            onPress={() => void createAndOpen()}
+          />
+          <Pressable
+            accessibilityLabel="Settings"
+            accessibilityRole="button"
+            onPress={() => router.push("/settings")}
+            style={({ pressed }) => [
+              styles.headerButton,
+              pressed && styles.headerButtonPressed,
+            ]}
+          >
+            <Ionicons name="options-outline" size={22} color={Colors.ink} />
+          </Pressable>
         </View>
       </View>
+
+      {mac && (
+        <MacPill
+          macName={mac.mac_name}
+          reachability={reachability}
+          onPress={() => router.push("/settings/mac")}
+        />
+      )}
 
       <View style={styles.timeline}>
         <Animated.FlatList
@@ -211,12 +279,14 @@ export default function HomeScreen() {
                 if (!refresh.isPending) refresh.mutate();
               }}
               tintColor={Colors.muted}
-              colors={[Colors.muted]}
-              progressBackgroundColor={Colors.background}
+              colors={[Colors.primary]}
+              progressBackgroundColor={Colors.surface}
             />
           }
           ListHeaderComponent={
-            showActionButtonCard ? (
+            !macLoading && !mac ? (
+              <PairCard onPair={() => router.push("/settings/mac")} />
+            ) : showActionButtonCard ? (
               <ActionButtonCard
                 onConfigure={() => router.push("/action-button")}
                 onDismiss={() => void dismissActionButtonCard()}
@@ -227,14 +297,15 @@ export default function HomeScreen() {
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>
                 {isLoading
-                  ? "Loading meetings…"
+                  ? "Loading notes…"
                   : error
-                    ? "Couldn't load meetings"
-                    : "No meetings yet"}
+                    ? "Couldn't load notes"
+                    : "No notes yet"}
               </Text>
               {!isLoading && !error && (
                 <Text style={styles.emptyBody}>
-                  Start listening or create a new note.
+                  Start recording, or import a recording such as a call recorded
+                  by your phone.
                 </Text>
               )}
             </View>
@@ -242,13 +313,13 @@ export default function HomeScreen() {
           ListFooterComponent={
             error ? (
               <Button
-                label="Retry loading meetings"
+                label="Retry loading notes"
                 onPress={retry}
                 variant="ghost"
               />
             ) : items.length > 0 && (isLoading || hasMore) ? (
               <Button
-                label="Load more meetings"
+                label="Load more notes"
                 onPress={loadMore}
                 loading={isLoading}
                 variant="ghost"
@@ -257,10 +328,26 @@ export default function HomeScreen() {
           }
           renderItem={({ item }) => {
             if (item.type === "header") {
-              return <Text style={styles.sectionLabel}>{item.label}</Text>;
+              return (
+                <Text accessibilityRole="header" style={styles.sectionLabel}>
+                  {item.label}
+                </Text>
+              );
             }
+            const details = cardDetails.get(item.session.id);
             return (
               <SessionCard
+                details={details}
+                macAway={reachability === "no_wifi"}
+                macStatus={mac ? macStatuses.get(item.session.id) : undefined}
+                macName={mac?.mac_name}
+                needsPairing={
+                  !macLoading &&
+                  !mac &&
+                  !transcribesHere &&
+                  details?.hasRecording === true &&
+                  !details.transcribed
+                }
                 session={item.session}
                 showFolder={sidebarPreferences.showFolder}
                 showTags={sidebarPreferences.showTags}
@@ -272,7 +359,7 @@ export default function HomeScreen() {
         />
 
         <Animated.View
-          style={[styles.listeningButton, buttonStyle]}
+          style={[styles.startBar, buttonStyle]}
           onLayout={(event) => setButtonHeight(event.nativeEvent.layout.height)}
           pointerEvents={buttonHidden ? "none" : "box-none"}
           accessibilityElementsHidden={buttonHidden}
@@ -280,7 +367,21 @@ export default function HomeScreen() {
             buttonHidden ? "no-hide-descendants" : "auto"
           }
         >
-          <StartListeningButton onPress={() => void createAndOpen(true)} />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void createAndOpen(true)}
+            style={({ pressed }) => [
+              styles.startButton,
+              pressed && styles.startButtonPressed,
+            ]}
+          >
+            <Ionicons
+              name="mic-outline"
+              size={22}
+              color={Colors.primaryForeground}
+            />
+            <Text style={styles.startLabel}>Start recording</Text>
+          </Pressable>
         </Animated.View>
       </View>
       {searching && (
@@ -302,6 +403,129 @@ export default function HomeScreen() {
   );
 }
 
+/** Whether the paired Mac answers, linking to Settings › Mac. */
+function MacPill({
+  macName,
+  reachability,
+  onPress,
+}: {
+  macName: string;
+  reachability: MacReachability;
+  onPress: () => void;
+}) {
+  const styles = useStyles();
+  const Colors = useColors();
+  const tone =
+    reachability === "ok"
+      ? "connected"
+      : reachability === "no_wifi" || reachability === "checking"
+        ? "away"
+        : reachability === "not_paired"
+          ? null
+          : "problem";
+  if (!tone) return null;
+  const color =
+    tone === "connected"
+      ? Colors.primary
+      : tone === "problem"
+        ? Colors.alertForeground
+        : Colors.muted;
+  const label =
+    reachability === "ok"
+      ? `${macName} · Connected`
+      : reachability === "checking"
+        ? `Looking for ${macName}…`
+        : reachability === "no_wifi"
+          ? "Away from your Mac · recordings wait here"
+          : `Can't reach ${macName} · see why`;
+  return (
+    <View style={styles.pillRow}>
+      <Pressable
+        accessibilityHint="Opens Mac settings"
+        accessibilityLabel={label}
+        accessibilityRole="button"
+        accessibilityLiveRegion="polite"
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.pill,
+          tone === "connected"
+            ? styles.pillConnected
+            : tone === "problem"
+              ? styles.pillProblem
+              : styles.pillAway,
+          pressed && styles.pillPressed,
+        ]}
+      >
+        {tone === "connected" ? (
+          <Ionicons name="laptop-outline" size={18} color={color} />
+        ) : tone === "problem" ? (
+          <Ionicons name="alert-circle-outline" size={18} color={color} />
+        ) : reachability === "no_wifi" ? (
+          <MaterialIcons name="wifi-off" size={18} color={color} />
+        ) : (
+          <Ionicons name="laptop-outline" size={18} color={color} />
+        )}
+        <Text style={[styles.pillText, { color }]} numberOfLines={1}>
+          {reachability === "ok" ? (
+            <>
+              <Text style={styles.pillName}>{macName}</Text> · Connected
+            </>
+          ) : (
+            label
+          )}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** First run: what pairing gives you, and the way to do it. */
+function PairCard({ onPair }: { onPair: () => void }) {
+  const styles = useStyles();
+  const Colors = useColors();
+  return (
+    <View style={styles.pairCard}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={styles.pairIcons}
+      >
+        <Ionicons
+          name="phone-portrait-outline"
+          size={26}
+          color={Colors.primary}
+        />
+        <View style={styles.pairDots}>
+          <View style={[styles.pairDot, { opacity: 1 }]} />
+          <View style={[styles.pairDot, { opacity: 0.6 }]} />
+          <View style={[styles.pairDot, { opacity: 0.3 }]} />
+        </View>
+        <Ionicons name="laptop-outline" size={28} color={Colors.primary} />
+      </View>
+      <View style={styles.pairCopy}>
+        <Text accessibilityRole="header" style={styles.pairTitle}>
+          Pair with your Mac
+        </Text>
+        <Text style={styles.pairBody}>
+          Record here. Your Mac turns it into a transcript and a summary, and
+          sends them back. Nothing goes to the cloud.
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel="Pair now with your Mac"
+        accessibilityRole="button"
+        onPress={onPair}
+        style={({ pressed }) => [
+          styles.pairButton,
+          pressed && styles.startButtonPressed,
+        ]}
+      >
+        <Text style={styles.pairButtonLabel}>Pair now</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const useStyles = createStyleHook((Colors) => ({
   safeArea: {
     flex: 1,
@@ -311,13 +535,110 @@ const useStyles = createStyleHook((Colors) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.md,
+    paddingLeft: 20,
+    paddingRight: Spacing.compact,
+    paddingTop: Spacing.md,
+    paddingBottom: 6,
   },
   headerActions: {
     flexDirection: "row",
-    gap: Spacing.xs,
+    gap: 2,
+  },
+  headerButton: {
+    width: ControlSize.default,
+    height: ControlSize.default,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: Radius.pill,
+  },
+  headerButtonPressed: {
+    backgroundColor: Colors.accentSurface,
+  },
+  pillRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.xs,
+  },
+  pill: {
+    flexShrink: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    minHeight: ControlSize.default,
+    paddingLeft: 14,
+    paddingRight: Spacing.md,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  pillConnected: { backgroundColor: Colors.accentSurface },
+  pillAway: {
+    backgroundColor: Colors.mutedSurface,
+    borderColor: Colors.border,
+  },
+  pillProblem: {
+    backgroundColor: Colors.alert,
+    borderColor: Colors.alertBorder,
+  },
+  pillPressed: { opacity: 0.7 },
+  pillText: {
+    flexShrink: 1,
+    fontFamily: FontFamily.text,
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+  pillName: { fontWeight: "600" },
+  pairCard: {
+    gap: 14,
+    padding: 20,
+    marginTop: Spacing.compact,
+    marginBottom: Spacing.xs,
+    borderRadius: 20,
+    borderCurve: CornerCurve.squircle,
+    backgroundColor: Colors.accentSurface,
+  },
+  pairIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  pairDots: { flexDirection: "row", gap: 5 },
+  pairDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.primary,
+  },
+  pairCopy: { gap: 6 },
+  pairTitle: {
+    fontFamily: FontFamily.heading,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  pairBody: {
+    fontFamily: FontFamily.text,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink,
+  },
+  pairButton: {
+    alignSelf: "flex-start",
+    minHeight: ControlSize.default,
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    backgroundColor: Colors.primary,
+  },
+  pairButtonLabel: {
+    fontFamily: FontFamily.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: Colors.primaryForeground,
   },
   list: {
     flex: 1,
@@ -325,15 +646,41 @@ const useStyles = createStyleHook((Colors) => ({
   timeline: {
     flex: 1,
   },
-  listeningButton: {
+  listContent: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.md,
+  },
+  startBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
   },
-  listContent: {
-    flexGrow: 1,
-    paddingHorizontal: Spacing.md,
+  startButton: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderRadius: 28,
+    borderCurve: CornerCurve.squircle,
+    backgroundColor: Colors.primary,
+  },
+  startButtonPressed: {
+    opacity: 0.75,
+  },
+  startLabel: {
+    fontFamily: FontFamily.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "600",
+    color: Colors.primaryForeground,
   },
   empty: {
     flex: 1,
@@ -352,10 +699,14 @@ const useStyles = createStyleHook((Colors) => ({
     textAlign: "center",
   },
   sectionLabel: {
-    ...Typography.section,
+    fontFamily: FontFamily.text,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "600",
+    letterSpacing: 0.2,
     color: Colors.muted,
-    paddingHorizontal: Spacing.compact,
-    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    marginTop: Spacing.compact,
     marginBottom: Spacing.sm,
   },
 }));
