@@ -9,9 +9,22 @@ export type DiscoveredMac = {
   id: string | null;
 };
 
+/** A subnet this phone serves as a hotspot (Wi-Fi, USB or Bluetooth). */
+export type HotspotSubnet = {
+  interface: string;
+  /** The phone's own IPv4 address on it. */
+  address: string;
+  prefix_length: number;
+};
+
+/** currentNetworkKey() while the phone is the hotspot, rather than on Wi-Fi. */
+export const PHONE_HOTSPOT_NETWORK = "phone-hotspot";
+
 declare class MirnaMacDiscoveryModule extends NativeModule {
   isOnLocalNetwork(): boolean;
   currentNetworkKey(): string | null;
+  hotspotSubnets(): HotspotSubnet[];
+  probe(hosts: string[], port: number, timeoutMs: number): Promise<string[]>;
   discover(timeoutMs: number): Promise<DiscoveredMac[]>;
   isIgnoringBatteryOptimizations(): boolean;
   requestIgnoreBatteryOptimizations(): boolean;
@@ -56,7 +69,10 @@ export function openPromotedNotificationSettings(): boolean {
 const native =
   requireOptionalNativeModule<MirnaMacDiscoveryModule>("MirnaMacDiscovery");
 
-/** Wi-Fi or Ethernet, as opposed to mobile data or no network. */
+/**
+ * On Wi-Fi or Ethernet, or serving a hotspot the Mac could be on; as opposed
+ * to mobile data alone or no network.
+ */
 export function isOnLocalNetwork(): boolean {
   try {
     return native?.isOnLocalNetwork() ?? true;
@@ -66,8 +82,9 @@ export function isOnLocalNetwork(): boolean {
 }
 
 /**
- * A rough fingerprint of the current Wi-Fi (router address and subnet), or
- * null when not on Wi-Fi or Ethernet. Used to tell home from elsewhere.
+ * A rough fingerprint of the current Wi-Fi (router address and subnet),
+ * PHONE_HOTSPOT_NETWORK while the phone is the hotspot, or null when neither.
+ * Used to tell home from elsewhere.
  */
 export function currentNetworkKey(): string | null {
   try {
@@ -82,6 +99,25 @@ export async function discoverMacs(timeoutMs = 4000): Promise<DiscoveredMac[]> {
   if (!native) return [];
   try {
     return await native.discover(timeoutMs);
+  } catch {
+    return [];
+  }
+}
+
+/** Subnets this phone serves as a hotspot; empty when it isn't one. */
+export function hotspotSubnets(): HotspotSubnet[] {
+  return callNative((module) => module.hotspotSubnets(), []);
+}
+
+/** Which of these addresses accept a connection on the port (all tried at once). */
+export async function probePort(
+  hosts: string[],
+  port: number,
+  timeoutMs = 1500,
+): Promise<string[]> {
+  if (!native || hosts.length === 0) return [];
+  try {
+    return await native.probe(hosts, port, timeoutMs);
   } catch {
     return [];
   }

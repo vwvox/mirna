@@ -130,6 +130,44 @@ export function isHomeNetwork(known: string[], network: string | null) {
   return known.length === 0 || known.includes(network);
 }
 
+/**
+ * Addresses the Mac could have on this phone's hotspot: every other address
+ * in each hotspot subnet. Subnets wider than /24 are narrowed to the /24
+ * around the phone, where Android hands out addresses.
+ */
+export function hotspotCandidates(
+  subnets: Array<{ address: string; prefix_length: number }>,
+  max = 512,
+): string[] {
+  const candidates: string[] = [];
+  for (const subnet of subnets) {
+    const parts = subnet.address.split(".").map(Number);
+    if (
+      parts.length !== 4 ||
+      parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+    ) {
+      continue;
+    }
+    const prefix = Math.min(Math.max(subnet.prefix_length, 24), 30);
+    const own = ((parts[0] * 256 + parts[1]) * 256 + parts[2]) * 256 + parts[3];
+    const size = 2 ** (32 - prefix);
+    const first = own - (own % size);
+    // Skip the subnet's own address and its broadcast address.
+    for (let host = first + 1; host < first + size - 1; host += 1) {
+      if (host === own) continue;
+      const address = [
+        Math.floor(host / 2 ** 24),
+        Math.floor(host / 2 ** 16) % 256,
+        Math.floor(host / 256) % 256,
+        host % 256,
+      ].join(".");
+      if (!candidates.includes(address)) candidates.push(address);
+      if (candidates.length >= max) return candidates;
+    }
+  }
+  return candidates;
+}
+
 // --- Notes coming back from the Mac -----------------------------------------
 
 export type RemoteTranscript = {

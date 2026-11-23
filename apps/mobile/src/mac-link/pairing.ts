@@ -136,9 +136,11 @@ export function targetFor(
   mac: PairedMac,
   discovered: { hosts: string[]; port: number } | null,
 ): MacTarget {
+  // Where the Mac was just found comes first: it's newer than where it last
+  // answered (which may be another network, like home Wi-Fi vs. a hotspot).
   const hosts = [
-    ...(mac.last_host ? [mac.last_host] : []),
     ...(discovered?.hosts ?? []),
+    ...(mac.last_host ? [mac.last_host] : []),
     ...mac.addresses,
   ].filter((host, index, all) => all.indexOf(host) === index);
   return {

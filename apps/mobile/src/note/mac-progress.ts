@@ -268,7 +268,7 @@ export function retryProblem(
     case "not_on_wifi":
       return {
         title: "Not on Wi-Fi",
-        description: `Join the same Wi-Fi as ${macName}, then try again.`,
+        description: `Join the same Wi-Fi as ${macName}, or connect ${macName} to this phone’s hotspot, then try again.`,
       };
     case "unpaired_by_mac":
     case "other_mac":

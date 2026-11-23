@@ -8,8 +8,8 @@
 //   only follow recordings still on their way. They wait longer each time the
 //   Mac doesn't answer, and the background job never looks for the Mac on a
 //   Wi-Fi where it has never answered.
-// Only on Wi-Fi or Ethernet: the Mac is on the local network, so mobile data
-// could never reach it anyway.
+// Only on Wi-Fi or Ethernet, or when the Mac has joined this phone's hotspot:
+// the Mac is on the local network, so mobile data could never reach it anyway.
 import { File, Paths } from "expo-file-system";
 
 import { defaultSummaryDocumentId } from "@anlg/utils/session";
@@ -21,11 +21,14 @@ import { nowIso } from "@/lib/ids";
 import {
   currentNetworkKey,
   discoverMacs,
+  hotspotSubnets,
   isOnLocalNetwork,
+  probePort,
 } from "../../modules/mac-discovery";
 import * as bridge from "./bridge";
 import { LinkError, type RemoteStatus } from "./bridge";
 import {
+  hotspotCandidates,
   isBackingOff,
   isHomeNetwork,
   keepSyncedFields,
@@ -290,10 +293,15 @@ async function reachMac(
     if (error.code !== "unreachable" && error.code !== "mac_mismatch") {
       throw error;
     }
-    // The Mac may have a new address: look for it on the network.
-    const found = (await discoverMacs(4000)).find(
-      (candidate) => candidate.id === mac.mac_id,
-    );
+    // The Mac may have a new address: look for it on the network, and on this
+    // phone's hotspot if it's on (Bonjour doesn't always reach devices there).
+    const [discovered, onHotspot] = await Promise.all([
+      discoverMacs(4000),
+      findOnHotspot(mac.port),
+    ]);
+    const found =
+      discovered.find((candidate) => candidate.id === mac.mac_id) ??
+      (onHotspot.length > 0 ? { hosts: onHotspot, port: mac.port } : null);
     if (!found) {
       return {
         outcome: error.code === "mac_mismatch" ? "other_mac" : "mac_unreachable",
@@ -311,6 +319,17 @@ async function reachMac(
       return { outcome: "mac_unreachable" };
     }
   }
+}
+
+/**
+ * Devices on this phone's hotspot that accept connections on Mirna's port.
+ * The connection that follows checks the Mac's certificate, so another
+ * device answering here is never mistaken for the paired Mac.
+ */
+async function findOnHotspot(port: number): Promise<string[]> {
+  const candidates = hotspotCandidates(hotspotSubnets());
+  if (candidates.length === 0) return [];
+  return probePort(candidates, port);
 }
 
 type PullResult = { updated: number; failed: number; error: string | null };

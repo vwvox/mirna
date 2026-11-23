@@ -65,8 +65,10 @@ import {
 } from "@/settings/theme-provider";
 
 import {
+  currentNetworkKey,
   isIgnoringBatteryOptimizations,
   openAppSettings,
+  PHONE_HOTSPOT_NETWORK,
   requestIgnoreBatteryOptimizations,
 } from "../../../modules/mac-discovery";
 
@@ -125,7 +127,10 @@ function PairStart() {
         <Step number={2}>
           Click <Text style={styles.strong}>Pair a phone</Text>. A code appears.
         </Step>
-        <Step number={3}>Scan it here. Both need to be on the same Wi-Fi.</Step>
+        <Step number={3}>
+          Scan it here. Both need to be on the same Wi-Fi, or the Mac on this
+          phone’s hotspot.
+        </Step>
       </View>
       <View style={styles.privacy}>
         <MutedIcon name="shield-outline" />
@@ -237,7 +242,7 @@ export function pairingErrorText(error: unknown) {
       case "pairing_rejected":
         return "That code has expired or was already used. Show a new one on your Mac and scan again.";
       case "unreachable":
-        return "Couldn't reach the Mac. Make sure both are on the same Wi-Fi and Mirna is open on the Mac.";
+        return "Couldn't reach the Mac. Make sure Mirna is open on it, and that it's on the same Wi-Fi or on this phone's hotspot.";
       case "mac_mismatch":
         return "A different computer answered. Show a new code on your Mac and scan again.";
       case "invalid_offer":
@@ -369,7 +374,9 @@ function MacCard({ mac, reach }: { mac: PairedMac; reach: MacReachability }) {
   const Colors = useColors();
   const status =
     reach === "ok"
-      ? "Connected · same Wi-Fi"
+      ? currentNetworkKey() === PHONE_HOTSPOT_NETWORK
+        ? "Connected · on your hotspot"
+        : "Connected · same Wi-Fi"
       : reach === "no_wifi"
         ? "Not on Wi-Fi · recordings wait here"
         : "Checking…";
@@ -555,7 +562,7 @@ function CantReach({ mac }: { mac: PairedMac }) {
         <CheckItem
           icon="wifi-outline"
           title="Same Wi-Fi?"
-          detail="The Mac and this phone must be on the same network. Guest networks often block this."
+          detail="The Mac and this phone must be on the same network, or the Mac on this phone’s hotspot. Guest networks often block this."
         />
         <CheckItem
           icon="laptop-outline"
@@ -917,14 +924,14 @@ function outcomeText(outcome: SendOutcome) {
     case "done":
       return "Up to date with your Mac.";
     case "not_on_wifi":
-      return "Connect to Wi-Fi to sync.";
+      return "Connect to Wi-Fi to sync, or turn on your hotspot and join it from the Mac.";
     case "unpaired_by_mac":
       return "Your Mac no longer knows this phone. Pair again.";
     case "other_mac":
     case "mac_unreachable":
     case "backing_off":
     case "away":
-      return "Couldn't reach the Mac. Is Mirna open on it, and on the same Wi-Fi?";
+      return "Couldn't reach the Mac. Is Mirna open on it, and is it on the same Wi-Fi or your hotspot?";
     case "not_paired":
       return "Not paired.";
     case "recording":

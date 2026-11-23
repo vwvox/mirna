@@ -21,6 +21,11 @@ import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.net.Inet4Address
+import java.net.InetSocketAddress
+import java.net.NetworkInterface
+import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
+import java.nio.channels.SocketChannel
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -34,11 +39,29 @@ class MacDiscoveryModule : Module() {
     Name("MirnaMacDiscovery")
 
     Function("isOnLocalNetwork") {
-      localNetwork(context) != null
+      localNetwork(context) != null || hotspotSubnets(context).isNotEmpty()
     }
 
     Function("currentNetworkKey") {
       currentNetworkKey(context)
+    }
+
+    // --- This phone's own hotspot ----------------------------------------
+
+    /** Subnets this phone serves as a hotspot (Wi-Fi, USB or Bluetooth). */
+    Function("hotspotSubnets") {
+      hotspotSubnets(context).map {
+        mapOf(
+          "interface" to it.name,
+          "address" to it.address.hostAddress,
+          "prefix_length" to it.prefixLength,
+        )
+      }
+    }
+
+    /** Which of these addresses accept a connection on the port, all tried at once. */
+    AsyncFunction("probe") { hosts: List<String>, port: Int, timeoutMs: Int ->
+      probe(hosts, port, timeoutMs.toLong().coerceIn(200, 5_000))
     }
 
     AsyncFunction("discover") { timeoutMs: Int, promise: Promise ->
@@ -133,7 +156,8 @@ private fun localNetwork(context: Context): Network? {
  * permission that reading the Wi-Fi name needs.
  */
 private fun currentNetworkKey(context: Context): String? {
-  val network = localNetwork(context) ?: return null
+  val network = localNetwork(context)
+    ?: return if (hotspotSubnets(context).isNotEmpty()) PHONE_HOTSPOT else null
   val link: LinkProperties = connectivity(context).getLinkProperties(network) ?: return null
   val gateway = link.routes
     .firstOrNull { it.isDefaultRoute && it.gateway is Inet4Address }
@@ -152,6 +176,108 @@ private fun subnetOf(address: Inet4Address, prefixLength: Int): String {
     (bytes[index].toInt() and mask).toByte()
   }
   return (Inet4Address.getByAddress(masked).hostAddress ?: "") + "/" + prefixLength
+}
+
+/** The network key while the phone is the hotspot: the same one every time. */
+private const val PHONE_HOTSPOT = "phone-hotspot"
+
+private data class Subnet(val name: String, val address: Inet4Address, val prefixLength: Int)
+
+// Interfaces that are never a hotspot: mobile data, VPNs, tunnels, Wi-Fi Direct.
+private val NOT_A_HOTSPOT = listOf(
+  "lo", "rmnet", "ccmni", "v4-", "clat", "tun", "ppp", "ipsec", "dummy",
+  "ip6", "sit", "gre", "ifb", "p2p", "radio", "seth",
+)
+
+/**
+ * Subnets the phone serves to other devices: its Wi-Fi hotspot, or USB or
+ * Bluetooth tethering. Android doesn't list these as networks the phone is
+ * on, so they're the interfaces with a private IPv4 address that aren't one
+ * of its networks.
+ */
+private fun hotspotSubnets(context: Context): List<Subnet> {
+  val connectivity = connectivity(context)
+  val own = try {
+    @Suppress("DEPRECATION")
+    connectivity.allNetworks
+      .mapNotNull { connectivity.getLinkProperties(it)?.interfaceName }
+      .toSet()
+  } catch (_: Exception) {
+    emptySet()
+  }
+  val interfaces = try {
+    NetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
+  } catch (_: Exception) {
+    emptyList()
+  }
+  return interfaces.flatMap { candidate ->
+    val name = candidate.name ?: return@flatMap emptyList()
+    val usable = try {
+      candidate.isUp && !candidate.isLoopback && !candidate.isPointToPoint
+    } catch (_: Exception) {
+      false
+    }
+    if (!usable || name in own || NOT_A_HOTSPOT.any { name.startsWith(it) }) {
+      return@flatMap emptyList()
+    }
+    candidate.interfaceAddresses.mapNotNull { entry ->
+      val address = entry.address as? Inet4Address ?: return@mapNotNull null
+      if (!address.isSiteLocalAddress) return@mapNotNull null
+      Subnet(name, address, entry.networkPrefixLength.toInt())
+    }
+  }
+}
+
+/**
+ * Tries a TCP connection to every host at once and returns those that
+ * accepted. Nothing is sent: the connections close straight away.
+ */
+private fun probe(hosts: List<String>, port: Int, timeoutMs: Long): List<String> {
+  val open = mutableListOf<String>()
+  val channels = mutableListOf<SocketChannel>()
+  val selector = Selector.open()
+  try {
+    var waiting = 0
+    for (host in hosts.distinct().take(1024)) {
+      try {
+        val channel = SocketChannel.open()
+        channels.add(channel)
+        channel.configureBlocking(false)
+        if (channel.connect(InetSocketAddress(host, port))) {
+          open.add(host)
+        } else {
+          channel.register(selector, SelectionKey.OP_CONNECT, host)
+          waiting += 1
+        }
+      } catch (_: Exception) {}
+    }
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (waiting > 0) {
+      val left = deadline - System.currentTimeMillis()
+      if (left <= 0) break
+      if (selector.select(left) == 0) continue
+      val ready = selector.selectedKeys().iterator()
+      while (ready.hasNext()) {
+        val key = ready.next()
+        ready.remove()
+        waiting -= 1
+        try {
+          if ((key.channel() as SocketChannel).finishConnect()) open.add(key.attachment() as String)
+        } catch (_: Exception) {}
+        key.cancel()
+      }
+    }
+  } finally {
+    for (channel in channels) {
+      try {
+        channel.close()
+      } catch (_: Exception) {}
+    }
+    try {
+      selector.close()
+    } catch (_: Exception) {}
+  }
+  return open
 }
 
 /** One Bonjour browse: collects every Mirna Mac that resolves before the timeout. */
