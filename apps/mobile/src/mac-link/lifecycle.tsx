@@ -2,27 +2,32 @@ import { AppState } from "react-native";
 
 import { useMountEffect } from "@/lib/use-mount-effect";
 
-import { registerMacLinkBackgroundTask } from "./background";
+import { syncBackgroundJob } from "./background";
 import { loadPairedMac } from "./pairing";
-import { hasPendingRecordings, sendRecordingsToMac } from "./sender";
+import { needsBackgroundSync, sendRecordingsToMac } from "./sender";
 
-// While the app is open: send when it starts or comes back to the front, and
-// keep checking every 30 seconds while anything is still on its way, so
-// "Transcribing on your Mac" turns into the note's summary without a tap.
+// While the app is open: sync when it starts or comes back to the front
+// (sending what's waiting and fetching notes the Mac changed), then check
+// every 30 seconds while a recording is still on its way, so "Transcribing on
+// your Mac" turns into the note's summary without a tap.
 export function MacLinkLifecycle() {
   useMountEffect(() => {
     let active = AppState.currentState === "active";
+    const opened = async () => {
+      if (!active || !(await loadPairedMac())) return;
+      await sendRecordingsToMac("open");
+    };
     const tick = async () => {
-      if (!active) return;
-      if (!(await loadPairedMac())) return;
-      if (await hasPendingRecordings()) await sendRecordingsToMac();
+      if (!active || !(await loadPairedMac())) return;
+      if (await needsBackgroundSync()) await sendRecordingsToMac("interval");
     };
 
-    void registerMacLinkBackgroundTask();
-    void tick();
+    void syncBackgroundJob();
+    void opened();
     const subscription = AppState.addEventListener("change", (state) => {
+      const wasActive = active;
       active = state === "active";
-      if (active) void tick();
+      if (active && !wasActive) void opened();
     });
     const timer = setInterval(() => void tick(), 30_000);
     return () => {

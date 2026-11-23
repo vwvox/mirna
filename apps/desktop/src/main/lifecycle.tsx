@@ -24,6 +24,7 @@ import { SharedAttachmentCacheLifecycle } from "~/shared-notes/attachment-cache-
 import { SharedNotePreviewAuthLifecycle } from "~/shared-notes/preview";
 import { DurableSharedNoteCacheSync } from "~/shared-notes/sync";
 import { PhoneInboxWorker } from "~/phone-link/inbox-worker";
+import { PhoneNotesPublisher } from "~/phone-link/notes-publisher";
 import { useConfigValue } from "~/shared/config";
 import { useDesktopTabLifecycle } from "~/shared/desktop-tab-lifecycle";
 import { useLatestRef } from "~/shared/hooks/useLatestRef";
@@ -72,6 +73,7 @@ export function ClassicMainServices() {
       <BatchTranscriptionRecovery />
       <RecordingImportWorker />
       <PhoneInboxWorker />
+      <PhoneNotesPublisher />
       <ScheduledMeetingAutoStart />
       <MainListenerControlBridge />
       <BrowserMeetingStartBridge />

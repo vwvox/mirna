@@ -1,11 +1,14 @@
 import { File, FileMode, Paths } from "expo-file-system";
 
+import { isCapturingSession } from "@/audio/capture-lifecycle";
 import { recoverableWav, WAV_HEADER_BYTES, wavHeader } from "@/audio/pcm-wav";
+import { recoveryNotice, wavDurationMs } from "@/audio/recovery-notice";
 import { catalogSessionAudio } from "@/data/audio-catalog";
 import { sendRecordingsToMac } from "@/mac-link/sender";
 import { execute } from "@/db";
 import { captureAnalytics } from "@/lib/analytics";
 import { captureOperationalError } from "@/lib/error-reporting";
+import { showToast } from "@/lib/toast";
 import { clearStaleMeetingRecordingActivities } from "@/live-activity/meeting-recording-activity";
 
 const RECOVERY_CANDIDATES_SQL = `
@@ -39,6 +42,7 @@ void clearStaleMeetingRecordingActivities().catch((error) => {
   });
 });
 
+/** Repairs the header of a WAV cut off mid-recording; returns its length. */
 function repairInterruptedWav(file: File): number | null {
   if (!file.exists || file.size <= WAV_HEADER_BYTES) return null;
 
@@ -55,7 +59,7 @@ function repairInterruptedWav(file: File): number | null {
     handle.writeBytes(
       wavHeader(format.dataBytes, format.sampleRate, format.channels),
     );
-    return file.size;
+    return wavDurationMs(format.dataBytes, format.sampleRate, format.channels);
   } finally {
     handle.close();
   }
@@ -69,18 +73,22 @@ export async function recoverInterruptedRecordings(
     accountUserId,
   ]);
   const recoveredSessionIds: string[] = [];
+  const recoveredDurationsMs: number[] = [];
 
   for (const session of sessions) {
+    // A recording that started before this ran is still being written.
+    if (isCapturingSession(session.id)) continue;
     const file = new File(Paths.document, "sessions", session.id, "audio.wav");
     try {
-      const sizeBytes = repairInterruptedWav(file);
-      if (sizeBytes === null) continue;
+      const durationMs = repairInterruptedWav(file);
+      if (durationMs === null) continue;
       await catalogSessionAudio(session.id, {
         source: "recording",
         filename: "audio.wav",
         contentType: "audio/wav",
       });
       recoveredSessionIds.push(session.id);
+      recoveredDurationsMs.push(durationMs);
     } catch (error) {
       captureOperationalError(error, {
         operation: "recording_recovery",
@@ -96,6 +104,8 @@ export async function recoverInterruptedRecordings(
     });
     // Recovered recordings go to the Mac like any other.
     void sendRecordingsToMac();
+    const notice = recoveryNotice(recoveredDurationsMs);
+    if (notice) showToast({ id: "recording-recovered", ...notice });
   }
   return recoveredSessionIds.length;
 }

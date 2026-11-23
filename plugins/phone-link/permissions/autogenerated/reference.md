@@ -11,6 +11,8 @@ Default permissions for the plugin
 - `allow-remove-phone`
 - `allow-list-inbox`
 - `allow-update-recording`
+- `allow-list-linked-notes`
+- `allow-publish-notes`
 
 ## Permission Table
 
@@ -102,6 +104,32 @@ Denies the list_inbox command without any pre-configured scope.
 <tr>
 <td>
 
+`phone-link:allow-list-linked-notes`
+
+</td>
+<td>
+
+Enables the list_linked_notes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`phone-link:deny-list-linked-notes`
+
+</td>
+<td>
+
+Denies the list_linked_notes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `phone-link:allow-list-phones`
 
 </td>
@@ -121,6 +149,32 @@ Enables the list_phones command without any pre-configured scope.
 <td>
 
 Denies the list_phones command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`phone-link:allow-publish-notes`
+
+</td>
+<td>
+
+Enables the publish_notes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`phone-link:deny-publish-notes`
+
+</td>
+<td>
+
+Denies the publish_notes command without any pre-configured scope.
 
 </td>
 </tr>

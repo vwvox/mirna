@@ -2,11 +2,86 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  backoffAfterFailure,
   describeMacLink,
+  hashText,
+  isBackingOff,
+  isHomeNetwork,
+  keepSyncedFields,
+  macOnlyRecordings,
+  needsMacContact,
   parseMacLink,
   proseMirrorToMarkdown,
+  rememberNetwork,
+  strongerTrigger,
   wavDurationMs,
 } from "./model.ts";
+
+test("only recordings that still need the Mac keep the phone checking", () => {
+  assert.equal(needsMacContact({ state: "waiting" }, "auto"), true);
+  assert.equal(needsMacContact({ state: "waiting" }, "manual"), false);
+  assert.equal(needsMacContact({ state: "sending" }, "manual"), false);
+  assert.equal(needsMacContact({ state: "transcribing" }, "manual"), true);
+  assert.equal(needsMacContact({ state: "done" }, "auto"), false);
+  assert.equal(needsMacContact({ state: "failed" }, "auto"), false);
+});
+
+test("a tap beats an automatic check", () => {
+  assert.equal(strongerTrigger("background", "user"), "user");
+  assert.equal(strongerTrigger("open", "interval"), "open");
+});
+
+test("waits longer after each failure on the same Wi-Fi", () => {
+  const now = 1_000_000;
+  const first = backoffAfterFailure(null, "home", now);
+  assert.equal(first.next_at_ms, now + 15 * 60_000);
+  const second = backoffAfterFailure(first, "home", now);
+  assert.equal(second.next_at_ms, now + 30 * 60_000);
+  const third = backoffAfterFailure(second, "home", now);
+  const fourth = backoffAfterFailure(third, "home", now);
+  assert.equal(fourth.next_at_ms, now + 60 * 60_000);
+  assert.equal(isBackingOff(fourth, "home", now + 1), true);
+  // Joining another Wi-Fi tries again straight away.
+  assert.equal(isBackingOff(fourth, "cafe", now + 1), false);
+  assert.equal(backoffAfterFailure(fourth, "cafe", now).failures, 1);
+});
+
+test("remembers where the Mac answered", () => {
+  assert.deepEqual(rememberNetwork(["a", "b"], "b"), ["b", "a"]);
+  assert.equal(rememberNetwork(["1", "2", "3"], "4", 3).length, 3);
+  assert.equal(isHomeNetwork([], "anywhere"), true);
+  assert.equal(isHomeNetwork(["home"], "cafe"), false);
+  assert.equal(isHomeNetwork(["home"], null), false);
+});
+
+test("tells the phone's own recording from ones added on the Mac", () => {
+  const phoneStart = 1_795_000_000_000;
+  const transcripts = [
+    { id: "later", started_at_ms: phoneStart + 3_600_000, ended_at_ms: phoneStart + 3_720_000 },
+    { id: "phone", started_at_ms: phoneStart + 2_000, ended_at_ms: phoneStart + 600_000 },
+  ].map((t) => ({ ...t, memo: "", words_json: "[]", speaker_hints_json: "[]" }));
+  assert.deepEqual(macOnlyRecordings(transcripts, phoneStart), [
+    { id: "later", duration_ms: 120_000 },
+  ]);
+  // Notes made before the Mac dated phone recordings: the earliest is the phone's.
+  assert.deepEqual(
+    macOnlyRecordings(transcripts, null).map((r) => r.id),
+    ["later"],
+  );
+  assert.deepEqual(macOnlyRecordings([], phoneStart), []);
+});
+
+test("keeps what came back from the Mac through progress updates", () => {
+  const kept = keepSyncedFields({
+    state: "done",
+    sent_bytes: 10,
+    synced: { title: "A" },
+    mac_recordings: [],
+  });
+  assert.deepEqual(kept, { synced: { title: "A" }, mac_recordings: [] });
+  assert.notEqual(hashText("summary one"), hashText("summary two"));
+  assert.equal(hashText("same"), hashText("same"));
+});
 
 test("reads the stored status, defaulting to waiting", () => {
   assert.deepEqual(parseMacLink(null), { state: "waiting" });

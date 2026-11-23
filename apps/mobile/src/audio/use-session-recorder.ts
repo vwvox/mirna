@@ -11,10 +11,14 @@ import { AppState, PermissionsAndroid, Platform } from "react-native";
 import {
   beginMobileCapture,
   endMobileCapture,
+  setSessionRecording,
 } from "@/audio/capture-lifecycle";
+import { levelFromAmplitude, pushLevel } from "@/audio/level-meter";
 import { pcmAmplitude } from "@/audio/pcm-wav";
 import {
+  isCapturePhase,
   isRecordingStartCancelled,
+  phaseAfterStreamStatus,
   type RecorderPhase,
 } from "@/audio/recorder-status";
 import { SessionWavWriter } from "@/audio/session-wav-writer";
@@ -31,6 +35,7 @@ import { generateSummaryAfterTranscription } from "@/data/summarize";
 import { sendRecordingsToMac } from "@/mac-link/sender";
 import { captureAnalytics } from "@/lib/analytics";
 import { captureOperationalError } from "@/lib/error-reporting";
+import { showToast } from "@/lib/toast";
 import { useMountEffect } from "@/lib/use-mount-effect";
 import {
   endMeetingRecordingActivity,
@@ -39,6 +44,9 @@ import {
 
 const STREAM_SAMPLE_RATE = 16_000;
 const STREAM_CHANNELS = 1;
+// Android drops notification updates that come too fast, so title edits are
+// sent once typing settles.
+const NOTIFICATION_TITLE_DELAY_MS = 400;
 
 export type { RecorderPhase } from "@/audio/recorder-status";
 
@@ -59,16 +67,26 @@ export function useSessionRecorder(
   phase: RecorderPhase;
   failure: RecorderFailure | null;
   amplitude: number;
+  /** Recent levels (0 to 1), newest last, for the level strip. */
+  levels: number[];
+  /** Recorded time, without paused time. */
   durationMs: number;
   liveStatus: LiveTranscriptionStatus;
   liveTranscript: string;
+  /** Pause and resume are available (Android). */
+  canPause: boolean;
   start: () => Promise<void>;
   stop: () => Promise<StopResult>;
+  pause: () => void;
+  resume: () => Promise<void>;
   retry: () => Promise<StopResult>;
+  /** The note title for the recording notification. */
+  setNotificationTitle: (title: string) => void;
 } {
   const [phase, setPhaseState] = useState<RecorderPhase>("idle");
   const [failure, setFailure] = useState<RecorderFailure | null>(null);
   const [amplitude, setAmplitude] = useState(0);
+  const [levels, setLevels] = useState<number[]>([]);
   const [durationMs, setDurationMs] = useState(0);
   const [liveStatus, setLiveStatus] =
     useState<LiveTranscriptionStatus>("connecting");
@@ -83,6 +101,12 @@ export function useSessionRecorder(
   const completionTrackedRef = useRef(false);
   const reportedFailureRef = useRef<string | null>(null);
   const durationRef = useRef(0);
+  const levelsRef = useRef<number[]>([]);
+  const resumeOperationRef = useRef<Promise<void> | null>(null);
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const notificationTitleRef = useRef<string | null>(null);
   const captureRegisteredRef = useRef(false);
   const stopRef = useRef<() => Promise<StopResult>>(async () => "noop");
 
@@ -98,10 +122,14 @@ export function useSessionRecorder(
     endMobileCapture(sessionId);
   }, [sessionId]);
 
-  const setPhase = useCallback((next: RecorderPhase) => {
-    phaseRef.current = next;
-    if (activeRef.current) setPhaseState(next);
-  }, []);
+  const setPhase = useCallback(
+    (next: RecorderPhase) => {
+      phaseRef.current = next;
+      setSessionRecording(sessionId, isCapturePhase(next));
+      if (activeRef.current) setPhaseState(next);
+    },
+    [sessionId],
+  );
 
   const reportFailure = useCallback(
     (reason: RecorderFailure, error: unknown, operation: string) => {
@@ -125,9 +153,9 @@ export function useSessionRecorder(
 
   const handleBuffer = useCallback(
     (buffer: AudioStreamBuffer) => {
-      if (phaseRef.current !== "starting" && phaseRef.current !== "recording") {
-        return;
-      }
+      // Buffers can still arrive just after a pause; they were captured
+      // before it. Native sends none while paused.
+      if (!isCapturePhase(phaseRef.current)) return;
       const writer = writerRef.current;
       if (!writer) return;
       try {
@@ -161,7 +189,13 @@ export function useSessionRecorder(
       liveRef.current?.sendAudio(buffer.data);
       durationRef.current = Math.round(writer.durationMs);
       if (activeRef.current) {
-        setAmplitude(pcmAmplitude(buffer.data));
+        const bufferAmplitude = pcmAmplitude(buffer.data);
+        levelsRef.current = pushLevel(
+          levelsRef.current,
+          levelFromAmplitude(bufferAmplitude),
+        );
+        setAmplitude(bufferAmplitude);
+        setLevels(levelsRef.current);
         setDurationMs(durationRef.current);
       }
     },
@@ -183,8 +217,10 @@ export function useSessionRecorder(
       activeRef.current && generation === startGenerationRef.current;
     completionTrackedRef.current = false;
     durationRef.current = 0;
+    levelsRef.current = [];
     setDurationMs(0);
     setAmplitude(0);
+    setLevels([]);
     setLiveStatus("connecting");
     setLiveTranscript("");
     setFailure(null);
@@ -332,37 +368,40 @@ export function useSessionRecorder(
   });
 
   useMountEffect(() => {
-    const subscription = stream.addListener(
-      "audioStreamStatus",
-      ({ isStreaming }) => {
-        if (
-          !isStreaming &&
-          (phaseRef.current === "starting" || phaseRef.current === "recording")
-        ) {
-          void stopRef.current();
-        }
-      },
-    );
+    // Also covers Pause, Resume and Stop & save in the notification, which
+    // run while the app is in the background.
+    const subscription = stream.addListener("audioStreamStatus", (status) => {
+      const next = phaseAfterStreamStatus(phaseRef.current, status);
+      if (next === "stop") void stopRef.current();
+      else if (next) setPhase(next);
+    });
     return () => subscription.remove();
   });
 
   useMountEffect(() => {
     let previousState = AppState.currentState;
     const subscription = AppState.addEventListener("change", (nextState) => {
-      const returnedFromSettings =
-        previousState !== "active" &&
-        nextState === "active" &&
-        phaseRef.current === "unavailable";
+      const returned = previousState !== "active" && nextState === "active";
       previousState = nextState;
-      if (returnedFromSettings) void start();
+      if (!returned) return;
+      if (phaseRef.current === "unavailable") {
+        void start();
+      } else if (isCapturePhase(phaseRef.current)) {
+        // Live Updates may just have been allowed in Settings. Android
+        // applies that when the notification is posted again.
+        try {
+          streamRef.current.setNotificationTitle?.(notificationTitleRef.current);
+        } catch {}
+      }
     });
     return () => subscription.remove();
   });
 
   const performStop = async (): Promise<StopResult> => {
     await startRef.current?.catch(() => {});
+    await resumeOperationRef.current?.catch(() => {});
     if (
-      !["recording", "save_error", "error", "interrupted"].includes(
+      !["recording", "paused", "save_error", "error", "interrupted"].includes(
         phaseRef.current,
       )
     ) {
@@ -448,6 +487,67 @@ export function useSessionRecorder(
     return operation;
   };
 
+  const canPause = typeof stream.pause === "function";
+
+  // The mic goes off but the recording, its notification and the wake lock
+  // stay. Recorded time stops with it, since it is counted from the audio.
+  const pause = () => {
+    if (phaseRef.current !== "recording") return;
+    try {
+      if (streamRef.current.pause?.()) setPhase("paused");
+    } catch (error) {
+      captureOperationalError(error, { operation: "recording_pause" });
+    }
+  };
+
+  const performResume = async () => {
+    const current = streamRef.current;
+    if (!current.resume) return;
+    try {
+      await current.resume();
+      // A stop or a notification resume may have got there first.
+      if (phaseRef.current === "paused" && current.isPaused === false) {
+        setPhase("recording");
+      }
+    } catch (error) {
+      captureOperationalError(error, { operation: "recording_resume" });
+      showToast({
+        id: "recording-resume-failed",
+        title: "Couldn’t turn the mic back on",
+        description: "Another app may be using it. Try again.",
+      });
+    }
+  };
+
+  const resume = (): Promise<void> => {
+    const currentOperation = resumeOperationRef.current;
+    if (currentOperation) return currentOperation;
+    if (phaseRef.current !== "paused") return Promise.resolve();
+    const operation = performResume();
+    resumeOperationRef.current = operation;
+    const clearOperation = () => {
+      if (resumeOperationRef.current === operation) {
+        resumeOperationRef.current = null;
+      }
+    };
+    void operation.then(clearOperation, clearOperation);
+    return operation;
+  };
+
+  const setNotificationTitle = useCallback((title: string) => {
+    notificationTitleRef.current = title;
+    clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(() => {
+      try {
+        streamRef.current.setNotificationTitle?.(title);
+      } catch (error) {
+        captureOperationalError(error, {
+          operation: "recording_notification_title",
+        });
+      }
+    }, NOTIFICATION_TITLE_DELAY_MS);
+  }, []);
+
   const retry = async (): Promise<StopResult> => {
     if (
       writerRef.current &&
@@ -465,18 +565,29 @@ export function useSessionRecorder(
   useMountEffect(() => () => {
     activeRef.current = false;
     startGenerationRef.current += 1;
-    void stopRef.current().then(unregisterCapture, unregisterCapture);
+    clearTimeout(titleTimerRef.current);
+    const release = () => {
+      unregisterCapture();
+      // A start cut short by leaving the screen never reaches a later phase.
+      setSessionRecording(sessionId, false);
+    };
+    void stopRef.current().then(release, release);
   });
 
   return {
     phase,
     failure,
     amplitude,
+    levels,
     durationMs,
     liveStatus,
     liveTranscript,
+    canPause,
     start,
     stop,
+    pause,
+    resume,
     retry,
+    setNotificationTitle,
   };
 }

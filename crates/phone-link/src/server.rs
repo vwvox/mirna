@@ -10,10 +10,14 @@
 //! inbox/<id>/audio.<ext>   once complete and verified
 //! inbox/<id>/meta.json     what the phone said about the recording
 //! inbox/<id>/status.json   where the Mac is with it
+//! notes.json               text of the notes those recordings became, for
+//!                          the phones to download (never the audio)
 //! ```
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -25,14 +29,16 @@ use axum::{Json, Router};
 use bytes::Bytes;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 use crate::protocol::{
-    ChunkResponse, CompleteRequest, ErrorBody, MacInfo, PairRequest, PairResponse, RecordingMeta,
-    RecordingState, RecordingStatus, StatusesRequest, is_valid_recording_id,
+    ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
+    NoteSnapshot, PairRequest, PairResponse, RecordingMeta, RecordingState, RecordingStatus,
+    StatusesRequest, is_valid_recording_id,
 };
 use crate::{
     AUDIO_EXTENSIONS, Error, Identity, MAX_CHUNK_BYTES, MAX_RECORDING_BYTES, PROTOCOL_VERSION,
@@ -41,6 +47,10 @@ use crate::{
 
 const TLS_ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
 const PAIRING_CODE_ALPHABET: &[u8] = b"ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+/// How long a phone's request for note changes waits for the Mac app to
+/// publish fresh copies first.
+const NOTES_REFRESH_WAIT: Duration = Duration::from_millis(2500);
+const NOTE_CHANGES_PAGE: usize = 25;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PairedPhone {
@@ -55,6 +65,9 @@ pub struct PairedPhone {
 pub enum ServerEvent {
     PhonePaired { name: String, fingerprint: String },
     RecordingReceived { id: String },
+    /// A phone asked what changed: the Mac app should call `publish_notes`,
+    /// including notes recorded on the Mac when `include_mac_notes` is set.
+    NotesRequested { include_mac_notes: bool },
 }
 
 /// A complete recording waiting for, or in, processing on the Mac.
@@ -110,6 +123,20 @@ struct ActiveOffer {
     expires_at: Instant,
 }
 
+/// notes.json: every published note with the change number it last got.
+#[derive(Default, Serialize, Deserialize)]
+struct NotesFile {
+    seq: u64,
+    notes: BTreeMap<String, StoredNote>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct StoredNote {
+    seq: u64,
+    hash: String,
+    note: NoteSnapshot,
+}
+
 struct Inner {
     dir: PathBuf,
     fingerprint: String,
@@ -120,6 +147,9 @@ struct Inner {
     events: RwLock<Option<EventSink>>,
     // One writer at a time keeps appends, renames and status files simple.
     write_lock: tokio::sync::Mutex<()>,
+    notes: Mutex<NotesFile>,
+    notes_published: tokio::sync::Notify,
+    notes_refresh_wait_ms: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -144,6 +174,10 @@ impl PhoneLinkServer {
             .ok()
             .flatten()
             .unwrap_or_default();
+        let notes = read_json::<NotesFile>(&dir.join("notes.json"))
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         Ok(Self {
             inner: Arc::new(Inner {
                 dir,
@@ -154,8 +188,88 @@ impl PhoneLinkServer {
                 offer: Mutex::new(None),
                 events: RwLock::new(None),
                 write_lock: tokio::sync::Mutex::new(()),
+                notes: Mutex::new(notes),
+                notes_published: tokio::sync::Notify::new(),
+                notes_refresh_wait_ms: AtomicU64::new(NOTES_REFRESH_WAIT.as_millis() as u64),
             }),
         })
+    }
+
+    /// How long a phone's request for note changes waits for `publish_notes`.
+    pub fn set_notes_refresh_wait(&self, wait: Duration) {
+        self.inner
+            .notes_refresh_wait_ms
+            .store(wait.as_millis() as u64, Ordering::Relaxed);
+    }
+
+    /// Recordings that have become notes on this Mac, as (recording id, note id).
+    pub fn linked_notes(&self) -> Result<Vec<(String, String)>, Error> {
+        let mut linked = Vec::new();
+        for entry in std::fs::read_dir(self.inner.dir.join("inbox"))? {
+            let Some(id) = entry?.file_name().to_str().map(str::to_string) else {
+                continue;
+            };
+            if !is_valid_recording_id(&id) {
+                continue;
+            }
+            let status = self.inner.read_status(&id);
+            if let (RecordingState::Done, Some(session_id)) = (status.state, status.session_id) {
+                linked.push((id, session_id));
+            }
+        }
+        linked.sort();
+        Ok(linked)
+    }
+
+    /// Stores the current text of notes, so the phones can download what
+    /// changed: notes from phone recordings (shown only to the phone that sent
+    /// them) and notes recorded on the Mac (shown to phones that ask for them).
+    /// Unchanged notes, and notes for recordings no phone sent, are skipped.
+    /// Returns how many changed.
+    pub fn publish_notes(&self, notes: Vec<NoteSnapshot>) -> Result<usize, Error> {
+        let mut changed = 0;
+        {
+            let mut file = self
+                .inner
+                .notes
+                .lock()
+                .map_err(|_| Error::Io("notes lock poisoned".into()))?;
+            for note in notes {
+                let key = match &note.recording_id {
+                    Some(recording_id) => {
+                        if !is_valid_recording_id(recording_id)
+                            || self.inner.owner(recording_id).is_none()
+                        {
+                            continue;
+                        }
+                        recording_id.clone()
+                    }
+                    None => {
+                        if note.session_id.is_empty() || note.session_id.len() > 200 {
+                            continue;
+                        }
+                        format!("mac:{}", note.session_id)
+                    }
+                };
+                let hash = hex::encode(Sha256::digest(serde_json::to_vec(&note)?));
+                if file
+                    .notes
+                    .get(&key)
+                    .is_some_and(|stored| stored.hash == hash)
+                {
+                    continue;
+                }
+                file.seq += 1;
+                let seq = file.seq;
+                file.notes.insert(key, StoredNote { seq, hash, note });
+                changed += 1;
+            }
+            if changed > 0 {
+                write_json(&self.inner.dir.join("notes.json"), &*file)?;
+            }
+        }
+        self.inner.notes_published.notify_waiters();
+        Ok(changed)
     }
 
     pub fn fingerprint(&self) -> String {
@@ -405,6 +519,8 @@ impl PhoneLinkServer {
                 put(upload_chunk).layer(DefaultBodyLimit::max(MAX_CHUNK_BYTES)),
             )
             .route("/v1/recordings/{id}/complete", post(complete))
+            .route("/v1/recordings/{id}/retry", post(retry))
+            .route("/v1/notes/changes", post(note_changes))
             .layer(DefaultBodyLimit::max(256 * 1024))
             .with_state(self.inner.clone())
     }
@@ -415,6 +531,56 @@ impl Inner {
         let sink = self.events.read().ok().and_then(|sink| sink.clone());
         if let Some(sink) = sink {
             sink(event);
+        }
+    }
+
+    fn has_event_sink(&self) -> bool {
+        self.events.read().is_ok_and(|sink| sink.is_some())
+    }
+
+    /// Changes after `since` to notes from `fingerprint`'s recordings (and to
+    /// notes recorded on the Mac, if asked), oldest change first, a page at a
+    /// time.
+    fn note_changes_for(
+        &self,
+        fingerprint: &str,
+        since: u64,
+        include_mac_notes: bool,
+    ) -> NoteChangesResponse {
+        let Ok(file) = self.notes.lock() else {
+            return NoteChangesResponse {
+                notes: Vec::new(),
+                cursor: since,
+                more: false,
+            };
+        };
+        // A cursor from before notes.json was reset: start over.
+        let since = if since > file.seq { 0 } else { since };
+        let mut mine: Vec<&StoredNote> = file
+            .notes
+            .values()
+            .filter(|stored| {
+                stored.seq > since
+                    && match &stored.note.recording_id {
+                        Some(recording_id) => {
+                            self.owner(recording_id).as_deref() == Some(fingerprint)
+                        }
+                        None => include_mac_notes,
+                    }
+            })
+            .collect();
+        mine.sort_by_key(|stored| stored.seq);
+        let more = mine.len() > NOTE_CHANGES_PAGE;
+        mine.truncate(NOTE_CHANGES_PAGE);
+        let cursor = if more {
+            mine.last().map_or(since, |stored| stored.seq)
+        } else {
+            file.seq
+        };
+        NoteChangesResponse {
+            notes: mine.into_iter().map(|stored| stored.note.clone()).collect(),
+            cursor,
+            more,
         }
     }
 
@@ -646,6 +812,71 @@ async fn statuses(
         .map(|id| inner.status_for(id, &peer.fingerprint))
         .collect();
     Json(statuses).into_response()
+}
+
+async fn note_changes(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    Json(request): Json<NoteChangesRequest>,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    // Ask the Mac app for fresh copies, and give it a moment to publish them.
+    let event = ServerEvent::NotesRequested {
+        include_mac_notes: request.include_mac_notes,
+    };
+    let wait = Duration::from_millis(inner.notes_refresh_wait_ms.load(Ordering::Relaxed));
+    if inner.has_event_sink() && !wait.is_zero() {
+        let published = inner.notes_published.notified();
+        tokio::pin!(published);
+        published.as_mut().enable();
+        inner.emit(event);
+        let _ = tokio::time::timeout(wait, published).await;
+    } else {
+        inner.emit(event);
+    }
+    Json(inner.note_changes_for(&peer.fingerprint, request.since, request.include_mac_notes))
+        .into_response()
+}
+
+/// A recording the Mac couldn't turn into a note goes back in the queue.
+async fn retry(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    UrlPath(id): UrlPath<String>,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    if !is_valid_recording_id(&id) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid_id");
+    }
+    let guard = inner.write_lock.lock().await;
+    if !inner.owned_by(&id, &peer.fingerprint) {
+        return json_error(StatusCode::FORBIDDEN, "not_yours");
+    }
+    let mut status = inner.read_status(&id);
+    if status.state != RecordingState::Failed {
+        return json_error(StatusCode::CONFLICT, "not_failed");
+    }
+    let has_audio = inner
+        .read_meta(&id)
+        .is_some_and(|stored| inner.audio_path(&id, &stored.meta.ext).exists());
+    if !has_audio {
+        return json_error(StatusCode::CONFLICT, "no_audio");
+    }
+    status.state = RecordingState::Queued;
+    status.stage = None;
+    status.error = None;
+    status.updated_at_ms = now_ms();
+    if let Err(error) = inner.write_status(&id, &status) {
+        tracing::error!(%error, "could not requeue recording");
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "save_failed");
+    }
+    drop(guard);
+    inner.emit(ServerEvent::RecordingReceived { id });
+    Json(status).into_response()
 }
 
 #[derive(Deserialize)]

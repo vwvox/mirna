@@ -5,7 +5,9 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use phone_link::client::{Client, MacTarget};
-use phone_link::protocol::{CompleteRequest, RecordingMeta, RecordingState};
+use phone_link::protocol::{
+    CompleteRequest, NoteSnapshot, NoteTranscript, RecordingMeta, RecordingState,
+};
 use phone_link::server::{PhoneLinkServer, ServerEvent, StatusUpdate};
 use phone_link::{Error, Identity};
 use sha2::{Digest, Sha256};
@@ -235,6 +237,104 @@ async fn pairs_uploads_and_reports_progress() {
         !inbox[0].audio_path.exists(),
         "inbox copy removed after import"
     );
+
+    // The note's text flows back to the phone that sent the recording.
+    mac.server.set_notes_refresh_wait(Duration::ZERO);
+    assert_eq!(
+        mac.server.linked_notes().unwrap(),
+        vec![(id.to_string(), "session-1".to_string())]
+    );
+    let note = NoteSnapshot {
+        recording_id: Some(id.into()),
+        created_at: None,
+        session_id: "session-1".into(),
+        title: "Standup with Ana".into(),
+        summary_md: Some("# Standup\n- Budget approved".into()),
+        transcripts: vec![NoteTranscript {
+            id: "transcript-1".into(),
+            started_at_ms: 1_795_000_000_000,
+            ended_at_ms: Some(1_795_000_007_800),
+            memo: String::new(),
+            words_json: "[]".into(),
+            speaker_hints_json: "[]".into(),
+        }],
+    };
+    assert_eq!(mac.server.publish_notes(vec![note.clone()]).unwrap(), 1);
+    // The same text again changes nothing.
+    assert_eq!(mac.server.publish_notes(vec![note.clone()]).unwrap(), 0);
+    // A note for a recording no phone sent is ignored.
+    let stranger = NoteSnapshot {
+        recording_id: Some("0b5a4c1e-0000-4000-8000-00000000ffff".into()),
+        ..note.clone()
+    };
+    assert_eq!(mac.server.publish_notes(vec![stranger]).unwrap(), 0);
+
+    let changes = client.note_changes(0, false).await.unwrap();
+    assert_eq!(changes.notes, vec![note.clone()]);
+    assert!(!changes.more);
+    assert!(
+        mac.events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(event, ServerEvent::NotesRequested { .. }))
+    );
+    assert!(
+        client
+            .note_changes(changes.cursor, false)
+            .await
+            .unwrap()
+            .notes
+            .is_empty()
+    );
+    // Another phone never sees it.
+    assert!(
+        other_client
+            .note_changes(0, false)
+            .await
+            .unwrap()
+            .notes
+            .is_empty()
+    );
+
+    // Notes recorded on the Mac go only to phones that ask for them.
+    let mac_note = NoteSnapshot {
+        recording_id: None,
+        session_id: "mac-session".into(),
+        title: "Zoom with the team".into(),
+        created_at: Some("2026-11-22T15:00:00Z".into()),
+        summary_md: Some("- Shipping next week".into()),
+        transcripts: Vec::new(),
+    };
+    assert_eq!(mac.server.publish_notes(vec![mac_note.clone()]).unwrap(), 1);
+    assert!(
+        client
+            .note_changes(changes.cursor, false)
+            .await
+            .unwrap()
+            .notes
+            .is_empty()
+    );
+    let with_mac = other_client.note_changes(0, true).await.unwrap();
+    assert_eq!(with_mac.notes, vec![mac_note]);
+
+    // Only a recording the Mac failed on can be retried.
+    assert!(matches!(
+        client.retry(id).await,
+        Err(Error::Http { status: 409, .. })
+    ));
+
+    // A recording added to the note on the Mac changes it again.
+    let mut updated = note.clone();
+    updated.transcripts.push(NoteTranscript {
+        id: "transcript-2".into(),
+        started_at_ms: 1_795_000_900_000,
+        ended_at_ms: Some(1_795_001_000_000),
+        ..note.transcripts[0].clone()
+    });
+    assert_eq!(mac.server.publish_notes(vec![updated.clone()]).unwrap(), 1);
+    let next = client.note_changes(changes.cursor, false).await.unwrap();
+    assert_eq!(next.notes, vec![updated]);
 }
 
 #[tokio::test]

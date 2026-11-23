@@ -12,6 +12,7 @@ import {
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
 import { liveQueryClient } from "~/db";
+import { publishLinkedNotes } from "~/phone-link/notes-publisher";
 import { getEnhancerService } from "~/services/enhancer";
 import { catalogLocalSessionAudio } from "~/session/attachments";
 import { enqueueSessionAudioOperation } from "~/session/audio-operations";
@@ -219,7 +220,12 @@ async function processRecording(
     );
 
     await setStage("transcribing");
-    await runBatch(importedPath, { promotion: { scope: "whole_session" } });
+    await runBatch(importedPath, {
+      promotion: { scope: "whole_session" },
+      // Dated when the phone recorded it, so the phone can tell its own
+      // recording from ones added to the note later on this Mac.
+      captureInterval: captureIntervalOf(item),
+    });
 
     await setStage("summarizing");
     const enhancer = getEnhancerService();
@@ -239,6 +245,7 @@ async function processRecording(
       title,
       summary_md: summary,
     });
+    void publishLinkedNotes();
   } catch (error) {
     if (!isStoppedTranscriptionError(error)) {
       console.error(`[phone-link] ${stage} failed`, error);
@@ -253,6 +260,15 @@ async function processRecording(
       session_id: sessionId,
     });
   }
+}
+
+function captureIntervalOf(item: InboxEntry) {
+  const startedAtMs = item.started_at ? Date.parse(item.started_at) : NaN;
+  const durationMs = item.duration_ms ?? NaN;
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(durationMs)) {
+    return undefined;
+  }
+  return { startedAtMs, stoppedAtMs: startedAtMs + durationMs };
 }
 
 // The title is written just after the summary, so give it a moment.

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anlg_phone_link::protocol::RecordingState;
+use anlg_phone_link::protocol::{NoteSnapshot, NoteTranscript, RecordingState};
 use anlg_phone_link::server::{PhoneLinkServer, StatusUpdate};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -71,6 +71,60 @@ pub enum RecordingUpdate {
         session_id: Option<String>,
     },
     Requeue,
+}
+
+/// A phone recording that became a note on this Mac.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct LinkedNote {
+    pub recording_id: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedTranscript {
+    pub id: String,
+    pub started_at_ms: f64,
+    pub ended_at_ms: Option<f64>,
+    pub memo: String,
+    pub words_json: String,
+    pub speaker_hints_json: String,
+}
+
+/// The current text of a note for the phones: one that began as a phone
+/// recording (`recording_id` set) or one recorded on this Mac. Never audio.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedNote {
+    pub recording_id: Option<String>,
+    pub session_id: String,
+    pub title: String,
+    pub summary_md: Option<String>,
+    pub transcripts: Vec<PublishedTranscript>,
+    /// When the note was made, for notes recorded on this Mac.
+    pub created_at: Option<String>,
+}
+
+impl From<PublishedNote> for NoteSnapshot {
+    fn from(note: PublishedNote) -> Self {
+        NoteSnapshot {
+            recording_id: note.recording_id,
+            session_id: note.session_id,
+            title: note.title,
+            summary_md: note.summary_md,
+            created_at: note.created_at,
+            transcripts: note
+                .transcripts
+                .into_iter()
+                .map(|transcript| NoteTranscript {
+                    id: transcript.id,
+                    started_at_ms: transcript.started_at_ms as i64,
+                    ended_at_ms: transcript.ended_at_ms.map(|ms| ms as i64),
+                    memo: transcript.memo,
+                    words_json: transcript.words_json,
+                    speaker_hints_json: transcript.speaker_hints_json,
+                })
+                .collect(),
+        }
+    }
 }
 
 fn state<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Arc<PhoneLinkState> {
@@ -286,5 +340,39 @@ pub(crate) async fn update_recording<R: tauri::Runtime>(
         .update_status(&id, update)
         .await
         .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn list_linked_notes<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<LinkedNote>, String> {
+    let state = state(&app);
+    Ok(server(&state)?
+        .linked_notes()
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .map(|(recording_id, session_id)| LinkedNote {
+            recording_id,
+            session_id,
+        })
+        .collect())
+}
+
+/// Hands the phones the current text of their notes. Returns how many changed.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn publish_notes<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    notes: Vec<PublishedNote>,
+) -> Result<u32, String> {
+    let state = state(&app);
+    let server = server(&state)?.clone();
+    let notes: Vec<NoteSnapshot> = notes.into_iter().map(NoteSnapshot::from).collect();
+    tauri::async_runtime::spawn_blocking(move || server.publish_notes(notes))
+        .await
+        .map_err(|error| error.to_string())?
+        .map(|changed| changed as u32)
         .map_err(|error| error.to_string())
 }

@@ -1,9 +1,9 @@
 // Where each recording is on its way to the Mac. Stored as `mac_link` inside
 // the audio attachment's metadata_json, so no mobile-only columns are needed.
-import { executeTransaction, useLiveQuery } from "@/db";
+import { execute, executeTransaction, useLiveQuery } from "@/db";
 import { nowIso } from "@/lib/ids";
 
-import { type MacLinkStatus, parseMacLink } from "./model";
+import { keepSyncedFields, type MacLinkStatus, parseMacLink } from "./model";
 
 export {
   describeMacLink,
@@ -16,17 +16,34 @@ export function attachmentIdFor(sessionId: string) {
   return `session-audio:${sessionId}`;
 }
 
+export async function loadMacLinkStatus(
+  sessionId: string,
+): Promise<MacLinkStatus> {
+  const [row] = await execute<{ mac_link: string | null }>(
+    `SELECT json_extract(metadata_json, '$.mac_link') AS mac_link
+      FROM session_attachments WHERE id = ? AND deleted_at IS NULL`,
+    [attachmentIdFor(sessionId)],
+  );
+  return parseMacLink(row?.mac_link);
+}
+
+/** Sets the recording's progress, keeping what already came back from the Mac. */
 export async function setMacLinkStatus(
   sessionId: string,
   status: MacLinkStatus,
 ) {
+  const previous = await loadMacLinkStatus(sessionId);
   await executeTransaction([
     {
       sql: `UPDATE session_attachments
         SET metadata_json = json_set(COALESCE(metadata_json, '{}'), '$.mac_link', json(?))
         WHERE id = ? AND deleted_at IS NULL`,
       params: [
-        JSON.stringify({ ...status, updated_at: nowIso() }),
+        JSON.stringify({
+          ...keepSyncedFields(previous),
+          ...status,
+          updated_at: nowIso(),
+        }),
         attachmentIdFor(sessionId),
       ],
     },

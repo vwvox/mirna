@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { Alert } from "react-native";
 
 import { useAuth } from "@/auth/context";
+import { useRecordingPlayer } from "@/components/audio-chip";
 import { useSessionAudio } from "@/data/audio-catalog";
 import { importRecordingIntoSession } from "@/data/import-voice-memo";
 import {
@@ -119,11 +120,14 @@ export function useNoteAudio(sessionId: string, hasTranscript: boolean) {
         audio.data.localRelativePath,
       )
     : null;
+  const availableLocally =
+    audio.data?.availableLocally === true && file?.exists === true;
+  const player = useRecordingPlayer(availableLocally && file ? file.uri : null);
   return {
     ...audio,
     file,
-    availableLocally:
-      audio.data?.availableLocally === true && file?.exists === true,
+    availableLocally,
+    player,
     restore: {
       cloudAvailable: Boolean(
         audio.data?.cloudObjectKey &&

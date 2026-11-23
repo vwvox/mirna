@@ -14,8 +14,8 @@ use tokio_rustls::client::TlsStream;
 use crate::Error;
 use crate::identity::{Identity, is_fingerprint};
 use crate::protocol::{
-    ChunkResponse, CompleteRequest, ErrorBody, MacInfo, PairRequest, PairResponse, RecordingStatus,
-    StatusesRequest,
+    ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
+    PairRequest, PairResponse, RecordingStatus, StatusesRequest,
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -86,6 +86,32 @@ impl Client {
         let body = serde_json::to_vec(&StatusesRequest { ids: ids.to_vec() })?;
         self.call(Method::POST, "/v1/statuses", Some(body.into()))
             .await
+    }
+
+    /// Notes from this phone's recordings whose text changed on the Mac since
+    /// `since` (the cursor from the last call, or 0), and, if asked, notes
+    /// recorded on the Mac.
+    pub async fn note_changes(
+        &self,
+        since: u64,
+        include_mac_notes: bool,
+    ) -> Result<NoteChangesResponse, Error> {
+        let body = serde_json::to_vec(&NoteChangesRequest {
+            since,
+            include_mac_notes,
+        })?;
+        self.call(Method::POST, "/v1/notes/changes", Some(body.into()))
+            .await
+    }
+
+    /// Asks the Mac to try a recording it couldn't turn into a note again.
+    pub async fn retry(&self, recording_id: &str) -> Result<RecordingStatus, Error> {
+        self.call(
+            Method::POST,
+            &format!("/v1/recordings/{recording_id}/retry"),
+            Some(Bytes::from_static(b"{}")),
+        )
+        .await
     }
 
     /// Sends bytes that start at `offset` of the recording. Returns how many

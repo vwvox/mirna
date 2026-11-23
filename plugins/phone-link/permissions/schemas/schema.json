@@ -331,6 +331,18 @@
           "markdownDescription": "Denies the list_inbox command without any pre-configured scope."
         },
         {
+          "description": "Enables the list_linked_notes command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-list-linked-notes",
+          "markdownDescription": "Enables the list_linked_notes command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the list_linked_notes command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-list-linked-notes",
+          "markdownDescription": "Denies the list_linked_notes command without any pre-configured scope."
+        },
+        {
           "description": "Enables the list_phones command without any pre-configured scope.",
           "type": "string",
           "const": "allow-list-phones",
@@ -341,6 +353,18 @@
           "type": "string",
           "const": "deny-list-phones",
           "markdownDescription": "Denies the list_phones command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the publish_notes command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-publish-notes",
+          "markdownDescription": "Enables the publish_notes command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the publish_notes command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-publish-notes",
+          "markdownDescription": "Denies the publish_notes command without any pre-configured scope."
         },
         {
           "description": "Enables the remove_phone command without any pre-configured scope.",
@@ -379,10 +403,10 @@
           "markdownDescription": "Denies the update_recording command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`",
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`"
         }
       ]
     }

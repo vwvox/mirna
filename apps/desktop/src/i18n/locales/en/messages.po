@@ -3269,8 +3269,8 @@ msgid "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 msgstr "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
 
 #: src/settings/phone/index.tsx
-msgid "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
-msgstr "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
+#~ msgid "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
+#~ msgstr "It works once and expires in {minutes}:{seconds}. Your phone must be on the same Wi-Fi as this Mac."
 
 #: src/crm/enrich-contact.tsx
 msgid "job title"
@@ -3494,10 +3494,9 @@ msgstr "List action items so far."
 msgid "List action items."
 msgstr "List action items."
 
-#. placeholder {0}: status.data.addresses.join(", ") || "this Mac"
 #: src/settings/phone/index.tsx
-msgid "Listening for your phone at {0}."
-msgstr "Listening for your phone at {0}."
+#~ msgid "Listening for your phone at {0}."
+#~ msgstr "Listening for your phone at {0}."
 
 #: src/settings/dictation.tsx
 msgid "Listening…"
@@ -3972,8 +3971,12 @@ msgid "Mirna needs microphone and system audio to transcribe your meetings, plus
 msgstr "Mirna needs microphone and system audio to transcribe your meetings, plus Accessibility to read meeting controls, visible chat."
 
 #: src/settings/phone/index.tsx
-msgid "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
-msgstr "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+#~ msgid "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+#~ msgstr "Mirna needs to be open on this Mac to receive recordings. Nothing goes through a server."
+
+#: src/settings/phone/index.tsx
+msgid "Mirna only listens on your network while a phone is paired or this code is showing."
+msgstr "Mirna only listens on your network while a phone is paired or this code is showing."
 
 #. placeholder {0}: statuses[0].displayName
 #: src/settings/developers/skills.tsx
@@ -4310,8 +4313,8 @@ msgid "No people in this organization"
 msgstr "No people in this organization"
 
 #: src/settings/phone/index.tsx
-msgid "No phone is paired yet."
-msgstr "No phone is paired yet."
+#~ msgid "No phone is paired yet."
+#~ msgstr "No phone is paired yet."
 
 #: src/settings/ai/llm/configure.tsx
 #: src/settings/ai/llm/select.tsx
@@ -4380,6 +4383,10 @@ msgstr "No upcoming bots."
 msgid "None"
 msgstr "None"
 
+#: src/settings/phone/index.tsx
+msgid "None yet. The phone shows up here once it has scanned the code."
+msgstr "None yet. The phone shows up here once it has scanned the code."
+
 #: src/settings/stats/insights.tsx
 msgid "Not available"
 msgstr "Not available"
@@ -4402,8 +4409,8 @@ msgid "Not invited"
 msgstr "Not invited"
 
 #: src/settings/phone/index.tsx
-msgid "Not listening: no phone is paired."
-msgstr "Not listening: no phone is paired."
+#~ msgid "Not listening: no phone is paired."
+#~ msgstr "Not listening: no phone is paired."
 
 #: src/billing/trial-payment-reminder-dialog.tsx
 msgid "Not now"
@@ -4488,6 +4495,10 @@ msgstr "Older files that differ from your current data were kept as recovery cop
 #: src/sidebar/note-filter-menu.tsx
 msgid "Oldest"
 msgstr "Oldest"
+
+#: src/settings/phone/index.tsx
+msgid "On the phone, open <0>Settings › Mac</0> and tap <1>Scan pairing code</1>. Both need to be on the same Wi-Fi."
+msgstr "On the phone, open <0>Settings › Mac</0> and tap <1>Scan pairing code</1>. Both need to be on the same Wi-Fi."
 
 #: src/sidebar/footer.tsx
 msgid "On this Mac"
@@ -4594,8 +4605,8 @@ msgid "Open Mirna on an existing synced device signed in to the same account. Th
 msgstr "Open Mirna on an existing synced device signed in to the same account. This device will connect automatically."
 
 #: src/settings/phone/index.tsx
-msgid "Open Mirna on your phone and scan this code"
-msgstr "Open Mirna on your phone and scan this code"
+#~ msgid "Open Mirna on your phone and scan this code"
+#~ msgstr "Open Mirna on your phone and scan this code"
 
 #: src/task/resource-view.tsx
 msgid "Open on GitHub"
@@ -5105,8 +5116,8 @@ msgid "Record more"
 msgstr "Record more"
 
 #: src/settings/phone/index.tsx
-msgid "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
-msgstr "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
+#~ msgid "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
+#~ msgstr "Record on your Android phone when you're away from this Mac. When both are on the same Wi-Fi, the phone sends its recordings here, encrypted from end to end. Mirna transcribes and summarizes them on this Mac, like any other recording."
 
 #: src/settings/general/permissions.tsx
 msgid "Record other participants in meetings."
@@ -5565,6 +5576,10 @@ msgstr "Saved locally"
 msgid "Saving..."
 msgstr "Saving..."
 
+#: src/settings/phone/index.tsx
+msgid "Scan with Mirna on your phone"
+msgstr "Scan with Mirna on your phone"
+
 #: src/settings/team/index.tsx
 msgid "SCIM bearer token"
 msgstr "SCIM bearer token"
@@ -5929,6 +5944,10 @@ msgstr "Sharing domain"
 #: src/session-sharing/management-panel.tsx
 msgid "Sharing paused to protect your edits"
 msgstr "Sharing paused to protect your edits"
+
+#: src/settings/phone/index.tsx
+msgid "Show a pairing code here, then scan it with Mirna on your phone."
+msgstr "Show a pairing code here, then scan it with Mirna on your phone."
 
 #: src/sidebar/timeline/item.tsx
 msgid "Show All Recurring Events"
@@ -6700,6 +6719,10 @@ msgstr "Thinking..."
 #: src/resource-sharing/library.tsx
 msgid "This adds a copy you can edit without changing the shared item."
 msgstr "This adds a copy you can edit without changing the shared item."
+
+#: src/settings/phone/index.tsx
+msgid "This code works for {countdown} and only once."
+msgstr "This code works for {countdown} and only once."
 
 #: src/session/components/version-history-dialog.tsx
 #: src/settings/sync/index.tsx
@@ -7525,6 +7548,10 @@ msgstr "Your notes remain available locally. Try again in a moment."
 #: src/auth/connect-local-library-dialog.tsx
 msgid "Your personal notes and recordings stay on this device. Sync will connect them to this account and bring in its existing notes. Copies already in your previous account remain there. Team and shared notes stay with their workspace. Reconnect integrations for this account. After connecting, this library requires an app version that supports account switching."
 msgstr "Your personal notes and recordings stay on this device. Sync will connect them to this account and bring in its existing notes. Copies already in your previous account remain there. Team and shared notes stay with their workspace. Reconnect integrations for this account. After connecting, this library requires an app version that supports account switching."
+
+#: src/settings/phone/index.tsx
+msgid "Your phone records and sends the audio here over your Wi-Fi. This Mac writes the transcript and summary, then sends them back."
+msgstr "Your phone records and sends the audio here over your Wi-Fi. This Mac writes the transcript and summary, then sends them back."
 
 #: src/settings/general/billing.tsx
 #: src/sidebar/settings-nav-groups.ts

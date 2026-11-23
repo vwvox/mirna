@@ -5,11 +5,15 @@ import {
   phoneLinkComplete,
   phoneLinkInfo,
   phoneLinkNewIdentity,
+  phoneLinkNoteChanges,
   phoneLinkPair,
   phoneLinkParseOffer,
+  phoneLinkRetry,
   phoneLinkSend,
   phoneLinkStatuses,
 } from "@anlg/mobile-bridge";
+
+import type { RemoteNote } from "./model";
 
 export type PhoneIdentity = {
   cert_pem: string;
@@ -175,6 +179,34 @@ export function send(
         offset: input.offset,
         chunks: input.chunks,
       }),
+    ),
+  );
+}
+
+/** Asks the Mac to try a recording it couldn't transcribe again. */
+export function retry(
+  connection: Connection,
+  recordingId: string,
+): Promise<{ status: RemoteStatus; working_host: string | null }> {
+  return call(() =>
+    phoneLinkRetry(JSON.stringify({ ...connection, recording_id: recordingId })),
+  );
+}
+
+/** Text of this phone's notes that changed on the Mac since `since`. */
+export function noteChanges(
+  connection: Connection,
+  since: number,
+  includeMacNotes: boolean,
+): Promise<{
+  notes: RemoteNote[];
+  cursor: number;
+  more: boolean;
+  working_host: string | null;
+}> {
+  return call(() =>
+    phoneLinkNoteChanges(
+      JSON.stringify({ ...connection, since, include_mac_notes: includeMacNotes }),
     ),
   );
 }

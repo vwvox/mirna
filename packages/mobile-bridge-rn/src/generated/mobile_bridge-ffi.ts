@@ -211,6 +211,9 @@ interface NativeModuleInterface {
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_new_identity(
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_note_changes(
+    requestJson: Uint8Array,
+  ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_pair(
     requestJson: Uint8Array,
   ): bigint;
@@ -218,6 +221,9 @@ interface NativeModuleInterface {
     uri: Uint8Array,
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_retry(
+    requestJson: Uint8Array,
+  ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_send(
     requestJson: Uint8Array,
   ): bigint;
@@ -446,8 +452,10 @@ interface NativeModuleInterface {
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_complete(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_info(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_new_identity(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_note_changes(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_pair(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_parse_offer(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_retry(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_send(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_statuses(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_render_stored_transcript(): number;

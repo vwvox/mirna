@@ -6,6 +6,8 @@ const COMMANDS: &[&str] = &[
     "remove_phone",
     "list_inbox",
     "update_recording",
+    "list_linked_notes",
+    "publish_notes",
 ];
 
 fn main() {

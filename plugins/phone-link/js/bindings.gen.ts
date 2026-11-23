@@ -61,6 +61,25 @@ async updateRecording(id: string, update: RecordingUpdate) : Promise<Result<null
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async listLinkedNotes() : Promise<Result<LinkedNote[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|list_linked_notes") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Hands the phones the current text of their notes. Returns how many changed.
+ */
+async publishNotes(notes: PublishedNote[]) : Promise<Result<number, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|publish_notes", { notes }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -84,6 +103,10 @@ export type InboxEntry = { id: string; audio_path: string; title: string | null;
  * `queued` or `processing`.
  */
 state: string; stage: string | null; session_id: string | null }
+/**
+ * A phone recording that became a note on this Mac.
+ */
+export type LinkedNote = { recording_id: string; session_id: string }
 export type PairedPhoneInfo = { fingerprint: string; name: string; paired_at_ms: number; last_seen_ms: number | null }
 export type PairingInfo = { 
 /**
@@ -94,12 +117,27 @@ uri: string;
  * The QR code as an SVG document.
  */
 qr_svg: string; expires_in_secs: number; mac_name: string; addresses: string[]; port: number }
-export type PhoneLinkEvent = { type: "phonePaired"; name: string } | { type: "recordingReceived"; id: string }
+export type PhoneLinkEvent = { type: "phonePaired"; name: string } | { type: "recordingReceived"; id: string } | 
+/**
+ * A phone asked what changed: publish fresh copies of its notes, and of
+ * notes recorded on this Mac when `include_mac_notes` is set.
+ */
+{ type: "notesRequested"; include_mac_notes: boolean }
 export type PhoneLinkStatus = { 
 /**
  * Whether the Mac is listening for its phones right now.
  */
 listening: boolean; port: number | null; mac_name: string; addresses: string[]; error: string | null }
+/**
+ * The current text of a note for the phones: one that began as a phone
+ * recording (`recording_id` set) or one recorded on this Mac. Never audio.
+ */
+export type PublishedNote = { recording_id: string | null; session_id: string; title: string; summary_md: string | null; transcripts: PublishedTranscript[]; 
+/**
+ * When the note was made, for notes recorded on this Mac.
+ */
+created_at: string | null }
+export type PublishedTranscript = { id: string; started_at_ms: number; ended_at_ms: number | null; memo: string; words_json: string; speaker_hints_json: string }
 export type RecordingUpdate = { type: "processing"; stage: string; session_id: string | null } | { type: "done"; session_id: string; title: string | null; summary_md: string | null } | { type: "failed"; error: string; session_id: string | null } | { type: "requeue" }
 
 /** tauri-specta globals **/

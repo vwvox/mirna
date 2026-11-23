@@ -1,53 +1,48 @@
-import { Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Pressable, Text } from "react-native";
 
-import {
-  CornerCurve,
-  LISTENING_CONTROL_HEIGHT,
-  LISTENING_CONTROL_RADIUS,
-  Spacing,
-  Typography,
-} from "@/constants/theme";
-import { createStyleHook } from "@/settings/theme-provider";
+import { CornerCurve, FontFamily, Spacing } from "@/constants/theme";
+import { createStyleHook, useColors } from "@/settings/theme-provider";
+
+const BUTTON_HEIGHT = 56;
 
 export function StartListeningButton({ onPress }: { onPress: () => void }) {
   const styles = useStyles();
+  const Colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel="Start recording"
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
     >
-      <View style={styles.dot} />
-      <Text style={styles.label}>Start listening</Text>
+      <Ionicons name="mic-outline" size={22} color={Colors.primaryForeground} />
+      <Text style={styles.label}>Start recording</Text>
     </Pressable>
   );
 }
 
 const useStyles = createStyleHook((Colors) => ({
   button: {
-    height: LISTENING_CONTROL_HEIGHT,
+    height: BUTTON_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.sm,
+    gap: 10,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.xs,
-    borderRadius: LISTENING_CONTROL_RADIUS,
+    borderRadius: BUTTON_HEIGHT / 2,
     borderCurve: CornerCurve.squircle,
     backgroundColor: Colors.primary,
   },
   buttonPressed: {
-    opacity: 0.6,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderCurve: CornerCurve.squircle,
-    backgroundColor: Colors.accent,
+    opacity: 0.7,
   },
   label: {
-    ...Typography.section,
+    fontFamily: FontFamily.text,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "600",
     color: Colors.primaryForeground,
   },
 }));

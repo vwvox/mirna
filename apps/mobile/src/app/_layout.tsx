@@ -32,6 +32,7 @@ import "@/mac-link/background";
 import { MacLinkLifecycle } from "@/mac-link/lifecycle";
 import { QuickActionLifecycle } from "@/quick-actions/quick-action-lifecycle";
 import { AppLock } from "@/settings/app-lock";
+import { usePrivacyPreferences } from "@/settings/privacy-store";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 import { ThemeProvider, useAppColorScheme } from "@/settings/theme-provider";
 import { MobileSyncLifecycle } from "@/sync/mobile-sync-lifecycle";
@@ -110,15 +111,20 @@ function Gate() {
   );
   const signIn = useMutation({ mutationFn: auth.signIn });
   const cloudSyncEnabled = useCloudSyncOptIn(auth.session?.user.id ?? null);
+  const loading =
+    !captureActive &&
+    (auth.status === "loading" ||
+      (auth.status === "signed_in" && !auth.billingReady));
+  // The loading view stays until its mist has settled back to full colour.
+  const [loadingDone, setLoadingDone] = useState(!loading);
 
   if (auth.bypass) return <Screens accountUserId={null} />;
 
-  if (
-    !captureActive &&
-    (auth.status === "loading" ||
-      (auth.status === "signed_in" && !auth.billingReady))
-  ) {
-    return <BrandLoadingView />;
+  if (loading && loadingDone) setLoadingDone(false);
+  if (!loadingDone) {
+    return (
+      <BrandLoadingView ready={!loading} onDone={() => setLoadingDone(true)} />
+    );
   }
 
   if (!captureActive && auth.status === "signed_out") {
@@ -210,14 +216,17 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 function RootLayout() {
   const styles = useStyles();
-  const [startupAnimationComplete, setStartupAnimationComplete] =
-    useState(false);
+  // Privacy preferences start loading with the bundle (initializeErrorReporting).
+  // Waiting for them keeps the app lock's "not ready" cover from flashing over
+  // the splash.
+  const privacy = usePrivacyPreferences();
+  const [startupDone, setStartupDone] = useState(false);
 
-  if (!startupAnimationComplete) {
+  if (!startupDone) {
     return (
       <BrandLoadingView
-        animated={!startupAnimationComplete}
-        onAnimationComplete={() => setStartupAnimationComplete(true)}
+        ready={privacy.ready}
+        onDone={() => setStartupDone(true)}
       />
     );
   }

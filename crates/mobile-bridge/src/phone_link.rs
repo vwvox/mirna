@@ -254,6 +254,66 @@ async fn read_chunk(path: PathBuf, offset: u64, max: usize) -> Result<Bytes, Pho
 }
 
 #[derive(Deserialize)]
+struct NoteChangesCall {
+    #[serde(flatten)]
+    connection: Connection,
+    #[serde(default)]
+    since: u64,
+    #[serde(default)]
+    include_mac_notes: bool,
+}
+
+#[derive(Serialize)]
+struct NoteChangesReply {
+    notes: Vec<anlg_phone_link::protocol::NoteSnapshot>,
+    cursor: u64,
+    more: bool,
+    working_host: Option<String>,
+}
+
+/// The text of this phone's notes that changed on the Mac since `since`
+/// (titles, summaries and transcripts; never audio).
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_note_changes(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: NoteChangesCall = from_json(&request_json)?;
+    let client = request.connection.client()?;
+    let changes = client
+        .note_changes(request.since, request.include_mac_notes)
+        .await?;
+    to_json(&NoteChangesReply {
+        notes: changes.notes,
+        cursor: changes.cursor,
+        more: changes.more,
+        working_host: client.working_host(),
+    })
+}
+
+#[derive(Deserialize)]
+struct RetryCall {
+    #[serde(flatten)]
+    connection: Connection,
+    recording_id: String,
+}
+
+#[derive(Serialize)]
+struct RetryReply {
+    status: anlg_phone_link::protocol::RecordingStatus,
+    working_host: Option<String>,
+}
+
+/// Asks the Mac to try a recording it couldn't turn into a note again.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_retry(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: RetryCall = from_json(&request_json)?;
+    let client = request.connection.client()?;
+    let status = client.retry(&request.recording_id).await?;
+    to_json(&RetryReply {
+        status,
+        working_host: client.working_host(),
+    })
+}
+
+#[derive(Deserialize)]
 struct CompleteCall {
     #[serde(flatten)]
     connection: Connection,

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ScrollView, Text, View } from "react-native";
 
 import { MarkdownView } from "@/components/markdown-view";
+import { RecordingSyncCard } from "@/components/recording-sync-card";
 import { RemoteAudioCard } from "@/components/remote-audio-card";
 import { Button } from "@/components/ui/button";
 import { Spacing, Typography } from "@/constants/theme";
@@ -15,10 +16,13 @@ import {
 } from "@/data/summarize";
 import { transcribeSession, useTranscriptionState } from "@/data/transcribe";
 import { usePairedMac } from "@/mac-link/pairing";
-import { describeMacLink, useMacLinkStatus } from "@/mac-link/status";
+import { useMacLinkStatus } from "@/mac-link/status";
 import { createStyleHook } from "@/settings/theme-provider";
 import { useProviderAccess } from "@/settings/use-provider-access";
 
+import { isOnItsWay } from "./mac-progress";
+import { MacProvenance } from "./mac-provenance";
+import { savedRecording } from "./recording-details";
 import type { useNoteAudio } from "./use-note-audio";
 
 export function NoteSummary({
@@ -61,6 +65,15 @@ export function NoteSummary({
   const summarySkipped = summaryError instanceof SummarySkippedError;
   const needsTranscription =
     Boolean(audio.data) && audio.data?.transcriptStatus !== "complete";
+  // The Mac's progress, or what went wrong there, stands in for the summary.
+  const showMacCard =
+    !active &&
+    !summaryPending &&
+    transcription !== "running" &&
+    Boolean(macLink) &&
+    (mac
+      ? macLink?.state === "failed" || (!summary && isOnItsWay(macLink))
+      : needsTranscription && !canTranscribe && !summary);
 
   if (!visible) return null;
   return (
@@ -68,6 +81,23 @@ export function NoteSummary({
       style={styles.summaryScroll}
       contentContainerStyle={styles.summary}
     >
+      {!active && macLink?.state === "done" && (
+        <MacProvenance
+          status={macLink}
+          macName={mac?.mac_name || "your Mac"}
+          hasSummary={Boolean(summary)}
+        />
+      )}
+      {showMacCard && (
+        <RecordingSyncCard
+          sessionId={sessionId}
+          offerPairing
+          saved={savedRecording(audio)}
+          onPlay={
+            audio.player.available ? () => void audio.player.play() : undefined
+          }
+        />
+      )}
       {summary && (
         <View>
           {summary.title !== "Summary" && (
@@ -76,7 +106,7 @@ export function NoteSummary({
           <MarkdownView markdown={summary.text} />
         </View>
       )}
-      {!summary && (
+      {!summary && !showMacCard && (
         <Text style={styles.summaryText}>
           {active
             ? "Your summary will be generated after the meeting."
@@ -84,15 +114,11 @@ export function NoteSummary({
               ? "Generating summary…"
               : transcription === "running"
                 ? "Finishing transcription. Your summary will follow automatically."
-                : needsTranscription && mac && macLink && !canTranscribe
-                  ? macLink.state === "failed"
-                    ? describeMacLink(macLink, mac.mac_name)
-                    : `${describeMacLink(macLink, mac.mac_name)}. The summary will appear here when the Mac has made it.`
                 : needsTranscription
                   ? canTranscribe
                     ? "Your recording is saved. Finish transcription to get your summary."
-                    : "Your recording is saved on this phone. Pair with your Mac in Settings › Mac and it will be transcribed there."
-                  : "Your meeting summary will appear here. Your memos are in the Memos tab."}
+                    : "Your recording is saved on this phone. Your Mac will transcribe it."
+                  : "Your summary will appear here. Your own notes are in the Notes tab."}
         </Text>
       )}
       {!active && needsTranscription && transcription !== "running" && (
@@ -142,7 +168,8 @@ export function NoteSummary({
 
 const useStyles = createStyleHook((Colors) => ({
   summary: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: 20,
+    paddingTop: Spacing.xs,
     paddingBottom: Spacing.lg,
     gap: Spacing.md,
   },

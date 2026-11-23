@@ -1,30 +1,62 @@
 // Sends recordings to the paired Mac and brings back what it made of them.
 //
-// Runs after a recording stops, when the app opens, every so often while it's
-// open, and from the Android background job. Only on Wi-Fi or Ethernet: the
-// Mac is on the local network, so mobile data could never reach it anyway.
+// Each run has a reason (see SendTrigger), which decides how much it does:
+// - Sync now and pull to refresh do everything straight away.
+// - Opening the app, or stopping a recording, sends what's waiting (when
+//   sending is automatic) and fetches notes the Mac changed.
+// - The 30-second check while the app is open, and Android's background job,
+//   only follow recordings still on their way. They wait longer each time the
+//   Mac doesn't answer, and the background job never looks for the Mac on a
+//   Wi-Fi where it has never answered.
+// Only on Wi-Fi or Ethernet: the Mac is on the local network, so mobile data
+// could never reach it anyway.
 import { File, Paths } from "expo-file-system";
 
 import { defaultSummaryDocumentId } from "@anlg/utils/session";
 
+import { isRecordingNow } from "@/audio/capture-lifecycle";
 import { execute, executeTransaction } from "@/db";
 import { nowIso } from "@/lib/ids";
 
-import { discoverMacs, isOnLocalNetwork } from "../../modules/mac-discovery";
+import {
+  currentNetworkKey,
+  discoverMacs,
+  isOnLocalNetwork,
+} from "../../modules/mac-discovery";
 import * as bridge from "./bridge";
 import { LinkError, type RemoteStatus } from "./bridge";
 import {
+  isBackingOff,
+  isHomeNetwork,
+  keepSyncedFields,
   type MacLinkStatus,
+  needsMacContact,
   parseMacLink,
   proseMirrorToMarkdown,
+  type SendTrigger,
+  strongerTrigger,
   wavDurationMs,
 } from "./model";
+import { applyRemoteNote } from "./notes";
 import {
   loadIdentity,
   loadPairedMac,
+  type PairedMac,
   rememberWorkingHost,
   targetFor,
 } from "./pairing";
+import {
+  clearBackoff,
+  loadBackoff,
+  loadIncludeMacNotes,
+  loadKnownNetworks,
+  loadNotesCursor,
+  loadSendMode,
+  noteMacUnreachable,
+  recordLastSync,
+  rememberMacNetwork,
+  saveNotesCursor,
+} from "./schedule";
 import { attachmentIdFor, setMacLinkStatus } from "./status";
 
 type PendingRow = {
@@ -73,87 +105,118 @@ export type SendOutcome =
   | "mac_unreachable"
   | "unpaired_by_mac"
   | "other_mac"
+  /** Waiting a while after the Mac didn't answer on this Wi-Fi. */
+  | "backing_off"
+  /** On a Wi-Fi where the Mac has never answered; not looking for it. */
+  | "away"
+  /** A recording is going; automatic syncs wait until it stops. */
+  | "recording"
   | "done";
 
-let running: Promise<SendOutcome> | null = null;
-let again = false;
+type Run = { trigger: SendTrigger; promise: Promise<SendOutcome> };
+let current: Run | null = null;
+let queued: Run | null = null;
+const finishedListeners = new Set<() => void>();
 
-/** Sends what's waiting. Calls made while one is running share its result. */
-export function sendRecordingsToMac(): Promise<SendOutcome> {
-  if (running) {
-    again = true;
-    return running;
+/** Called after every run, for example to schedule or cancel the background job. */
+export function onSendFinished(listener: () => void) {
+  finishedListeners.add(listener);
+  return () => finishedListeners.delete(listener);
+}
+
+/**
+ * Syncs with the Mac. A call made while a run is going waits for one more
+ * run afterwards, as thorough as the strongest reason asked for.
+ */
+export function sendRecordingsToMac(
+  trigger: SendTrigger = "open",
+): Promise<SendOutcome> {
+  if (!current) return start(trigger);
+  if (queued) {
+    queued.trigger = strongerTrigger(queued.trigger, trigger);
+    return queued.promise;
   }
-  running = run()
+  const next: Run = { trigger, promise: Promise.resolve("done") };
+  next.promise = current.promise.then(() => {
+    queued = null;
+    return start(next.trigger);
+  });
+  queued = next;
+  return next.promise;
+}
+
+function start(trigger: SendTrigger): Promise<SendOutcome> {
+  const promise = run(trigger)
     .catch((error: unknown) => {
-      console.warn("[mac-link] send failed", error);
+      console.warn("[mac-link] sync failed", error);
       return "mac_unreachable" as const;
     })
     .finally(() => {
-      running = null;
-      if (again) {
-        again = false;
-        void sendRecordingsToMac();
-      }
+      current = null;
+      for (const listener of finishedListeners) listener();
     });
-  return running;
+  current = { trigger, promise };
+  return promise;
 }
 
-/** Whether any recording still needs the Mac (to send it or to hear back). */
-export async function hasPendingRecordings(): Promise<boolean> {
+/** Whether any recording still needs the Mac, so the background job should run. */
+export async function needsBackgroundSync(): Promise<boolean> {
+  if (!(await loadPairedMac())) return false;
+  const mode = await loadSendMode();
   const rows = await execute<PendingRow>(PENDING_SQL, []);
-  return rows.length > 0;
+  return rows.some((row) => needsMacContact(parseMacLink(row.mac_link), mode));
 }
 
-async function run(): Promise<SendOutcome> {
+async function run(trigger: SendTrigger): Promise<SendOutcome> {
   const mac = await loadPairedMac();
   if (!mac) return "not_paired";
   const identity = await loadIdentity();
   if (!identity) return "not_paired";
 
-  const pending = await execute<PendingRow>(PENDING_SQL, []);
-  if (pending.length === 0) return "nothing_to_send";
+  const userAsked = trigger === "user";
+  // Keep a recording undisturbed; the save at the end triggers a sync anyway.
+  if (!userAsked && isRecordingNow()) return "recording";
+  const fresh = userAsked || trigger === "open";
+  const mode = userAsked ? "auto" : await loadSendMode();
+  const rows = await execute<PendingRow>(PENDING_SQL, []);
+  const pending = rows.filter((row) => {
+    const local = parseMacLink(row.mac_link);
+    // Sync now also retries ones the Mac couldn't transcribe.
+    return userAsked ? true : needsMacContact(local, mode);
+  });
+  if (pending.length === 0 && !fresh) return "nothing_to_send";
   if (!isOnLocalNetwork()) return "not_on_wifi";
 
-  let connection = { identity, mac: targetFor(mac, null) };
-  const ids = pending.map((row) => row.session_id);
-
-  let remote: RemoteStatus[];
-  try {
-    remote = (await bridge.statuses(connection, ids)).statuses;
-  } catch (error) {
-    if (!(error instanceof LinkError)) throw error;
-    if (error.code === "not_paired") return "unpaired_by_mac";
-    if (error.code !== "unreachable" && error.code !== "mac_mismatch") {
-      throw error;
-    }
-    // The Mac may have a new address: look for it on the network.
-    const found = (await discoverMacs(4000)).find(
-      (candidate) => candidate.id === mac.mac_id,
-    );
-    if (!found) {
-      return error.code === "mac_mismatch" ? "other_mac" : "mac_unreachable";
-    }
-    connection = { identity, mac: targetFor(mac, found) };
-    try {
-      const reply = await bridge.statuses(connection, ids);
-      remote = reply.statuses;
-      await rememberWorkingHost(reply.working_host, found.port);
-    } catch (retryError) {
-      if (retryError instanceof LinkError && retryError.code === "not_paired") {
-        return "unpaired_by_mac";
-      }
-      return "mac_unreachable";
-    }
+  const network = currentNetworkKey();
+  const home = isHomeNetwork(await loadKnownNetworks(), network);
+  if (fresh) {
+    await clearBackoff();
+  } else if (isBackingOff(await loadBackoff(), network, Date.now())) {
+    return "backing_off";
   }
+  // Away from home, only a tap, or something waiting to go, makes the phone
+  // look for the Mac; the background job never does.
+  if (!home && (trigger === "background" || (!userAsked && pending.length === 0))) {
+    return "away";
+  }
+
+  const reached = await reachMac(mac, identity, pending);
+  if (reached.outcome) {
+    if (reached.outcome === "mac_unreachable" && !userAsked) {
+      await noteMacUnreachable(network);
+    }
+    return reached.outcome;
+  }
+  const { connection, remote } = reached;
+  await rememberMacNetwork(network);
+  await clearBackoff();
 
   const byId = new Map(remote.map((status) => [status.id, status]));
   for (const row of pending) {
     const status = byId.get(row.session_id);
     if (!status) continue;
-    const local = parseMacLink(row.mac_link);
     try {
-      await advance(connection, row, local, status);
+      await advance(connection, row, parseMacLink(row.mac_link), status, mode);
     } catch (error) {
       if (error instanceof LinkError && error.code === "unreachable") {
         // Lost the Wi-Fi mid-way; the next run resumes where the Mac is.
@@ -162,22 +225,141 @@ async function run(): Promise<SendOutcome> {
       console.warn("[mac-link] recording not sent", row.session_id, error);
     }
   }
+
+  let pulled: PullResult = { updated: 0, failed: 0, error: null };
+  if (fresh) {
+    try {
+      pulled = await pullNoteChanges(connection, mac);
+    } catch (error) {
+      // An older Mac app doesn't have note changes yet; that's fine.
+      console.warn("[mac-link] could not fetch note changes", error);
+    }
+  }
+  await recordLastSync({
+    at: nowIso(),
+    notes_updated: pulled.updated,
+    notes_failed: pulled.failed,
+    error: pulled.error,
+  });
   return "done";
 }
 
+/**
+ * Asks the Mac to try a recording it couldn't transcribe again (from the
+ * note's "Try again"), then syncs so the phone follows along.
+ */
+export async function retryRecordingOnMac(sessionId: string): Promise<SendOutcome> {
+  const mac = await loadPairedMac();
+  const identity = await loadIdentity();
+  if (!mac || !identity) return "not_paired";
+  if (!isOnLocalNetwork()) return "not_on_wifi";
+  try {
+    await bridge.retry({ identity, mac: targetFor(mac, null) }, sessionId);
+  } catch (error) {
+    if (error instanceof LinkError && error.code === "not_paired") {
+      return "unpaired_by_mac";
+    }
+    if (error instanceof LinkError && error.code === "unreachable") {
+      return "mac_unreachable";
+    }
+    throw error;
+  }
+  await setMacLinkStatus(sessionId, { state: "on_mac" });
+  return sendRecordingsToMac("user");
+}
+
 type Connection = Parameters<typeof bridge.statuses>[0];
+
+async function reachMac(
+  mac: PairedMac,
+  identity: Connection["identity"],
+  pending: PendingRow[],
+): Promise<
+  | { outcome: SendOutcome }
+  | { outcome?: undefined; connection: Connection; remote: RemoteStatus[] }
+> {
+  const ids = pending.map((row) => row.session_id);
+  let connection: Connection = { identity, mac: targetFor(mac, null) };
+  try {
+    const reply = await bridge.statuses(connection, ids);
+    await rememberWorkingHost(reply.working_host);
+    return { connection, remote: reply.statuses };
+  } catch (error) {
+    if (!(error instanceof LinkError)) throw error;
+    if (error.code === "not_paired") return { outcome: "unpaired_by_mac" };
+    if (error.code !== "unreachable" && error.code !== "mac_mismatch") {
+      throw error;
+    }
+    // The Mac may have a new address: look for it on the network.
+    const found = (await discoverMacs(4000)).find(
+      (candidate) => candidate.id === mac.mac_id,
+    );
+    if (!found) {
+      return {
+        outcome: error.code === "mac_mismatch" ? "other_mac" : "mac_unreachable",
+      };
+    }
+    connection = { identity, mac: targetFor(mac, found) };
+    try {
+      const reply = await bridge.statuses(connection, ids);
+      await rememberWorkingHost(reply.working_host, found.port);
+      return { connection, remote: reply.statuses };
+    } catch (retryError) {
+      if (retryError instanceof LinkError && retryError.code === "not_paired") {
+        return { outcome: "unpaired_by_mac" };
+      }
+      return { outcome: "mac_unreachable" };
+    }
+  }
+}
+
+type PullResult = { updated: number; failed: number; error: string | null };
+
+/**
+ * Takes in the notes that changed on the Mac. If one can't be taken in, the
+ * phone keeps its place so the whole batch is tried again next time (notes
+ * already taken in are skipped then, as their text hasn't changed).
+ */
+async function pullNoteChanges(
+  connection: Connection,
+  mac: PairedMac,
+): Promise<PullResult> {
+  const includeMacNotes = await loadIncludeMacNotes();
+  let cursor = await loadNotesCursor(mac.mac_id, includeMacNotes);
+  const result: PullResult = { updated: 0, failed: 0, error: null };
+  for (let page = 0; page < 20; page += 1) {
+    const reply = await bridge.noteChanges(connection, cursor, includeMacNotes);
+    for (const note of reply.notes) {
+      try {
+        if (await applyRemoteNote(note)) result.updated += 1;
+      } catch (error) {
+        result.failed += 1;
+        result.error = error instanceof Error ? error.message : String(error);
+        console.warn("[mac-link] note not updated", note.session_id, error);
+      }
+    }
+    if (result.failed > 0) break;
+    cursor = reply.cursor;
+    await saveNotesCursor(mac.mac_id, cursor, includeMacNotes);
+    if (!reply.more) break;
+  }
+  return result;
+}
 
 async function advance(
   connection: Connection,
   row: PendingRow,
   local: MacLinkStatus,
   status: RemoteStatus,
+  mode: "auto" | "manual",
 ) {
   switch (status.state) {
     case "missing":
     case "receiving": {
+      // Sending only when it's automatic, or when someone tapped Sync now.
+      if (mode !== "auto") return;
       const reached = await upload(connection, row, status.received_bytes);
-      await advance(connection, row, local, reached);
+      await advance(connection, row, local, reached, mode);
       return;
     }
     case "queued":
@@ -197,7 +379,7 @@ async function advance(
         mac_session_id: status.session_id,
       });
     case "done":
-      return applyDone(row.session_id, status);
+      return applyDone(row.session_id, local, status);
   }
 }
 
@@ -268,7 +450,11 @@ async function upload(
   return reply.status;
 }
 
-async function applyDone(sessionId: string, status: RemoteStatus) {
+async function applyDone(
+  sessionId: string,
+  local: MacLinkStatus,
+  status: RemoteStatus,
+) {
   const now = nowIso();
   const statements: Array<{ sql: string; params: unknown[] }> = [];
   const title = status.title?.trim();
@@ -306,6 +492,7 @@ async function applyDone(sessionId: string, status: RemoteStatus) {
       WHERE id = ? AND deleted_at IS NULL`,
     params: [
       JSON.stringify({
+        ...keepSyncedFields(local),
         state: "done",
         mac_session_id: status.session_id,
         updated_at: now,

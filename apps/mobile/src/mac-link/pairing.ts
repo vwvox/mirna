@@ -10,6 +10,8 @@ import { useSyncExternalStore } from "react";
 
 import * as bridge from "./bridge";
 import type { MacTarget, PhoneIdentity } from "./bridge";
+import { rememberMacNetwork, resetMacSchedule } from "./schedule";
+import { currentNetworkKey } from "../../modules/mac-discovery";
 
 const IDENTITY_KEY = "mirna.mac_link.identity";
 const MAC_KEY = "mirna.mac_link.mac";
@@ -97,11 +99,15 @@ export async function pairWithScannedCode(text: string): Promise<PairedMac> {
     last_host: reply.working_host,
     paired_at: new Date().toISOString(),
   };
+  await resetMacSchedule();
+  // Pairing happens next to the Mac: this Wi-Fi is one where it answers.
+  await rememberMacNetwork(currentNetworkKey());
   await savePairedMac(mac);
   return mac;
 }
 
 export async function unpairMac(): Promise<void> {
+  await resetMacSchedule();
   await savePairedMac(null);
 }
 

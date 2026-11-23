@@ -24,6 +24,10 @@ pub enum PhoneLinkEvent {
     PhonePaired { name: String },
     #[serde(rename = "recordingReceived")]
     RecordingReceived { id: String },
+    /// A phone asked what changed: publish fresh copies of its notes, and of
+    /// notes recorded on this Mac when `include_mac_notes` is set.
+    #[serde(rename = "notesRequested")]
+    NotesRequested { include_mac_notes: bool },
 }
 
 fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
@@ -37,6 +41,8 @@ fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             commands::remove_phone::<tauri::Wry>,
             commands::list_inbox::<tauri::Wry>,
             commands::update_recording::<tauri::Wry>,
+            commands::list_linked_notes::<tauri::Wry>,
+            commands::publish_notes::<tauri::Wry>,
         ])
         .events(tauri_specta::collect_events![PhoneLinkEvent])
         .error_handling(tauri_specta::ErrorHandlingMode::Result)
@@ -75,6 +81,9 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
                         }
                         ServerEvent::RecordingReceived { id } => {
                             PhoneLinkEvent::RecordingReceived { id }
+                        }
+                        ServerEvent::NotesRequested { include_mac_notes } => {
+                            PhoneLinkEvent::NotesRequested { include_mac_notes }
                         }
                     };
                     let _ = event.emit(&handle);

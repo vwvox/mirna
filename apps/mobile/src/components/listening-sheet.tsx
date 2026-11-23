@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,51 +11,31 @@ import type {
   RecorderFailure,
   RecorderPhase,
 } from "@/audio/use-session-recorder";
-import { DancingSticks } from "@/components/dancing-sticks";
-import { CornerCurve, Radius, Spacing, Typography } from "@/constants/theme";
+import { CornerCurve, FontFamily, Radius, Spacing } from "@/constants/theme";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+const SIDE_BUTTON_SIZE = 64;
+const STOP_BUTTON_SIZE = 78;
 
-function statusLabel(phase: RecorderPhase): string {
-  switch (phase) {
-    case "recording":
-      return "Listening ·";
-    case "saving":
-      return "Saving recording…";
-    case "unavailable":
-      return "Microphone access needed";
-    case "interrupted":
-      return "Recording interrupted";
-    case "save_error":
-      return "Recording needs to be saved";
-    case "error":
-      return "Recorder unavailable";
-    case "saved":
-      return "Recording saved";
-    default:
-      return "Getting ready…";
-  }
-}
-
+/**
+ * The recording screen's controls: Pause or Resume beside Stop, or one way
+ * out when the recorder needs attention.
+ */
 export function ListeningSheet({
   phase,
   failure,
-  amplitude,
-  durationMs,
+  canPause,
+  onPause,
+  onResume,
   onStop,
   onRetry,
   onOpenSettings,
 }: {
   phase: RecorderPhase;
   failure: RecorderFailure | null;
-  amplitude: number;
-  durationMs: number;
+  canPause: boolean;
+  onPause: () => void;
+  onResume: () => void;
   onStop: () => void;
   onRetry: () => void;
   onOpenSettings: () => void;
@@ -66,57 +47,77 @@ export function ListeningSheet({
     (failure === "permission_denied" ||
       failure === "notification_permission_denied");
   const recoverable = ["interrupted", "save_error", "error"].includes(phase);
-  const handlePanelPress = permissionDenied
-    ? onOpenSettings
-    : recoverable
-      ? onRetry
-      : onStop;
-  const label = statusLabel(phase);
-  const actionLabel = permissionDenied
-    ? "Settings"
-    : recoverable
-      ? "Retry"
-      : "Stop";
+
+  if (permissionDenied || recoverable) {
+    return (
+      <View style={styles.dock}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            permissionDenied ? "Open settings" : "Try again to save"
+          }
+          onPress={permissionDenied ? onOpenSettings : onRetry}
+          style={({ pressed }) => [styles.wideButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.wideButtonText}>
+            {permissionDenied ? "Open settings" : "Try again"}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const paused = phase === "paused";
+  const saving = phase === "saving";
+  const pauseDisabled = phase !== "recording" && phase !== "paused";
 
   return (
     <View style={styles.dock}>
-      <View style={styles.status}>
-        {phase === "recording" ? (
-          <DancingSticks
-            amplitude={amplitude}
-            color={Colors.accent}
-            height={20}
-            width={24}
-            stickWidth={2}
-            gap={2}
-          />
-        ) : phase === "saving" || phase === "starting" ? (
-          <ActivityIndicator color={Colors.muted} size="small" />
-        ) : null}
-        <Text style={styles.statusText}>
-          {label}
-          {phase === "recording" && (
-            <Text style={styles.time}> {formatDuration(durationMs)}</Text>
-          )}
-        </Text>
-      </View>
+      {canPause ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={paused ? "Resume recording" : "Pause recording"}
+          accessibilityState={{ disabled: pauseDisabled }}
+          disabled={pauseDisabled}
+          onPress={paused ? onResume : onPause}
+          style={({ pressed }) => [
+            styles.control,
+            pressed && styles.pressed,
+            pauseDisabled && styles.disabled,
+          ]}
+        >
+          <View style={styles.sideButton}>
+            {paused ? (
+              <View style={styles.resumeDot} />
+            ) : (
+              <Ionicons name="pause" size={24} color={Colors.ink} />
+            )}
+          </View>
+          <Text style={styles.label}>{paused ? "Resume" : "Pause"}</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.spacer} />
+      )}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={
-          permissionDenied
-            ? "Open recording settings"
-            : recoverable
-              ? "Recover recording"
-              : "Stop listening"
-        }
-        accessibilityState={{ disabled: phase === "saving" }}
-        onPress={handlePanelPress}
-        disabled={phase === "saving"}
+        accessibilityLabel="Stop and save"
+        accessibilityState={{ disabled: saving, busy: saving }}
+        disabled={saving}
+        onPress={onStop}
         style={({ pressed }) => [styles.control, pressed && styles.pressed]}
       >
-        {!permissionDenied && !recoverable && <View style={styles.stopIcon} />}
-        <Text style={styles.controlText}>{actionLabel}</Text>
+        <View style={styles.stopButton}>
+          {saving ? (
+            <ActivityIndicator color={Colors.destructiveForeground} />
+          ) : (
+            <View style={styles.stopIcon} />
+          )}
+        </View>
+        <Text style={[styles.label, styles.stopLabel]}>
+          {saving ? "Saving…" : "Stop"}
+        </Text>
       </Pressable>
+      <View style={styles.spacer} />
     </View>
   );
 }
@@ -124,46 +125,74 @@ export function ListeningSheet({
 const useStyles = createStyleHook((Colors) => ({
   dock: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-  },
-  status: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  statusText: {
-    flexShrink: 1,
-    ...Typography.caption,
-    color: Colors.muted,
-  },
-  time: {
-    ...Typography.time,
-    fontSize: Typography.caption.fontSize,
-    lineHeight: Typography.caption.lineHeight,
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 56,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.lg,
   },
   control: {
-    minHeight: 44,
-    flexDirection: "row",
+    minWidth: SIDE_BUTTON_SIZE,
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.4 },
+  sideButton: {
+    width: SIDE_BUTTON_SIZE,
+    height: SIDE_BUTTON_SIZE,
     alignItems: "center",
     justifyContent: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    borderRadius: SIDE_BUTTON_SIZE / 2,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: Colors.border,
+    backgroundColor: Colors.mutedSurface,
+  },
+  resumeDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: Colors.accent,
+  },
+  stopButton: {
+    width: STOP_BUTTON_SIZE,
+    height: STOP_BUTTON_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: STOP_BUTTON_SIZE / 2,
+    backgroundColor: Colors.accent,
+  },
+  stopIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 5,
+    borderCurve: CornerCurve.squircle,
+    backgroundColor: Colors.destructiveForeground,
+  },
+  label: {
+    fontFamily: FontFamily.text,
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: "500",
+    color: Colors.ink,
+  },
+  stopLabel: { fontWeight: "600" },
+  spacer: { width: SIDE_BUTTON_SIZE },
+  wideButton: {
+    flex: 1,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: Radius.pill,
     borderCurve: CornerCurve.squircle,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primary,
   },
-  pressed: { backgroundColor: Colors.accentSurface },
-  controlText: { ...Typography.bodyStrong, color: Colors.ink },
-  stopIcon: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: Colors.accent,
+  wideButtonText: {
+    fontFamily: FontFamily.text,
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: Colors.primaryForeground,
   },
 }));

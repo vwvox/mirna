@@ -8,4 +8,6 @@ permissions = [
   "allow-remove-phone",
   "allow-list-inbox",
   "allow-update-recording",
+  "allow-list-linked-notes",
+  "allow-publish-notes",
 ]

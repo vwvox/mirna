@@ -77,3 +77,19 @@ test("failed audio writes do not advance the recording duration", () => {
   assert.equal(writer.durationMs, 100);
   assert.equal(files.get("/test/sessions/failed-write/audio.wav").size, 3244);
 });
+
+test("a pause leaves no gap: the WAV holds only the captured audio, back to back", () => {
+  const writer = new SessionWavWriter("paused");
+  const before = new Uint8Array(3200).fill(1);
+  const after = new Uint8Array(1600).fill(2);
+  writer.append(before.buffer, 16000, 1);
+  // Paused: the mic is off and native sends no buffers, so nothing is written.
+  writer.append(after.buffer, 16000, 1);
+  assert.equal(writer.durationMs, 150);
+
+  const file = writer.finalize();
+  const header = new DataView(file.bytes.buffer);
+  assert.equal(header.getUint32(40, true), 4800);
+  assert.deepEqual(file.bytes.slice(44, 44 + 3200), before);
+  assert.deepEqual(file.bytes.slice(44 + 3200), after);
+});

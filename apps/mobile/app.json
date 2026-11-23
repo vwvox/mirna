@@ -13,7 +13,9 @@
         "android.permission.INTERNET",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.POST_PROMOTED_NOTIFICATIONS",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ]
     },
     "web": {
@@ -106,12 +108,12 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#FBFAF6",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 96,
+          "image": "./assets/images/splash-wordmark.png",
+          "imageWidth": 164,
           "resizeMode": "contain",
           "dark": {
             "backgroundColor": "#1A1F1C",
-            "image": "./assets/images/splash-icon.png"
+            "image": "./assets/images/splash-wordmark-dark.png"
           }
         }
       ],

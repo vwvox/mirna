@@ -114,6 +114,67 @@ pub struct ErrorBody {
     pub received_bytes: Option<u64>,
 }
 
+/// One recording's transcript, in the stored format both apps share.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteTranscript {
+    pub id: String,
+    /// When that recording started (Unix ms). The phone uses it to tell its
+    /// own recording from ones added later on the Mac.
+    pub started_at_ms: i64,
+    #[serde(default)]
+    pub ended_at_ms: Option<i64>,
+    #[serde(default)]
+    pub memo: String,
+    pub words_json: String,
+    #[serde(default = "empty_json_array")]
+    pub speaker_hints_json: String,
+}
+
+fn empty_json_array() -> String {
+    "[]".into()
+}
+
+/// The text of a note as it is now on the Mac: one that began as a phone
+/// recording, or (when the phone asks for them) one recorded on the Mac.
+/// Audio never goes to the phone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteSnapshot {
+    /// The phone's id for the recording it sent, or none for a note that was
+    /// recorded on the Mac.
+    #[serde(default)]
+    pub recording_id: Option<String>,
+    /// The Mac's id for the note.
+    pub session_id: String,
+    pub title: String,
+    #[serde(default)]
+    pub summary_md: Option<String>,
+    #[serde(default)]
+    pub transcripts: Vec<NoteTranscript>,
+    /// When the note was made (RFC 3339), for notes recorded on the Mac.
+    #[serde(default)]
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteChangesRequest {
+    /// The `cursor` from the last answer, or 0 the first time.
+    #[serde(default)]
+    pub since: u64,
+    /// Also send notes recorded on the Mac (text only).
+    #[serde(default)]
+    pub include_mac_notes: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoteChangesResponse {
+    pub notes: Vec<NoteSnapshot>,
+    /// Send back as `since` next time.
+    pub cursor: u64,
+    /// More changes are waiting: ask again with the new cursor.
+    #[serde(default)]
+    pub more: bool,
+}
+
 /// Recording ids are the phone's session UUIDs. Anything else is refused so an
 /// id can never escape the inbox folder.
 pub fn is_valid_recording_id(id: &str) -> bool {
