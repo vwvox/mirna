@@ -91,6 +91,24 @@ pub(super) fn in_person_fixture() -> tempfile::NamedTempFile {
     write_stereo_wav(&left, &right)
 }
 
+/// Only `english_1`'s first speaker on the mic channel and silence on system
+/// audio: the shape of a solo memo recorded from one laptop.
+pub(super) fn solo_mic_fixture() -> tempfile::NamedTempFile {
+    let mono = english_1_mono();
+    let rate = TARGET_SAMPLE_RATE as usize;
+    let mut left = vec![0.0f32; mono.len()];
+    for turn in english_1_turns()
+        .into_iter()
+        .filter(|turn| turn.speaker == "speaker0")
+    {
+        let start = (turn.start as usize * rate / 1000).min(mono.len());
+        let end = (turn.end as usize * rate / 1000).min(mono.len());
+        left[start..end].copy_from_slice(&mono[start..end]);
+    }
+    let right = vec![0.0f32; left.len()];
+    write_stereo_wav(&left, &right)
+}
+
 fn write_stereo_wav(left: &[f32], right: &[f32]) -> tempfile::NamedTempFile {
     let file = tempfile::Builder::new().suffix(".wav").tempfile().unwrap();
     let mut writer = hound::WavWriter::create(

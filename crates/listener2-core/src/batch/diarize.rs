@@ -3,13 +3,15 @@
 //! diarize server-side, so this only runs when a channel came back unlabeled.
 
 use std::cell::Cell;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anlg_pyannote_local::{
-    AudioSource, DiarizationConfig, DiarizeRequest, Diarizer, SpeakerBounds, assign_words,
+    AudioSource, Diarization, DiarizationConfig, DiarizeRequest, Diarizer, SpeakerBounds,
+    assign_words,
 };
 use owhisper_interface::batch;
 use owhisper_interface::batch_stream::BatchStreamEvent;
@@ -30,6 +32,12 @@ pub(super) const REMOTE_SILENCE_MAX_SECONDS: f64 = 3.0;
 /// Word channel for a microphone shared by several people in the room. The
 /// renderer names its speakers instead of folding them into "You".
 pub(super) const SHARED_MIC_CHANNEL: i32 = 2;
+/// When nobody listed who was in the room, voices beyond the main one must
+/// hold this share of the mic's speech to count as other people. A single
+/// voice spliced from the english_1 fixture grew phantom second voices of
+/// 2–4 %; real second people held 12 % (english_1) and 29 % (a two-person test
+/// recorded in a room).
+pub(super) const MIN_UNLISTED_GUEST_SHARE: f64 = 0.08;
 /// Progressive sessions are torn down after 60 s without a streamed event, so
 /// the diarizer emits a progress heartbeat at least this often.
 pub(super) const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -114,12 +122,13 @@ pub(super) fn channel_audio(
     }
 }
 
-/// Whether a stereo capture was an in-person meeting: the session expected
-/// several participants, yet the system-audio channel stayed silent, so they
-/// were all in the room sharing the microphone. Headphones are not a factor;
-/// they keep the far end out of the mic, not the people beside it. Unknown
-/// participant counts stay closed: a solo memo and a two-person meeting sound
-/// the same to the recorder.
+/// Whether a stereo capture was made in the room: the system-audio channel
+/// stayed silent, so every voice came through the microphone. Notes rarely
+/// list who was in the room, so an unknown participant count stays open and
+/// diarization decides between a solo memo and a meeting; the mic only moves
+/// off "You" when it finds several voices. A count of one closes it: that
+/// person can only be the user. Headphones are not a factor; they keep the
+/// far end out of the mic, not the people beside it.
 pub(super) fn in_person_capture(
     listen_params: &owhisper_interface::ListenParams,
     response: &batch::Response,
@@ -128,9 +137,9 @@ pub(super) fn in_person_capture(
     if channels.len() != 2 {
         return false;
     }
-    let several_participants = listen_params.num_speakers.is_some_and(|count| count >= 2)
-        || listen_params.min_speakers.is_some_and(|count| count >= 2);
-    several_participants && channel_speech_seconds(&channels[1]) <= REMOTE_SILENCE_MAX_SECONDS
+    let solo = listen_params.num_speakers.is_some_and(|count| count <= 1)
+        || listen_params.max_speakers.is_some_and(|count| count <= 1);
+    !solo && channel_speech_seconds(&channels[1]) <= REMOTE_SILENCE_MAX_SECONDS
 }
 
 fn channel_speech_seconds(channel: &batch::Channel) -> f64 {
@@ -513,7 +522,10 @@ fn diarize_channels(
             let done = (plan_index as f64 + f64::from(fraction)) / plan_count;
             heartbeat.beat(DIARIZATION_PROGRESS_START + progress_span * done);
         };
-        let diarization = diarizer
+        let shared_mic = in_person && channel.index == 0 && transcript_channels == 2;
+        let unlisted_room =
+            shared_mic && bounds.num_speakers.is_none() && bounds.min_speakers.is_none();
+        let mut diarization = diarizer
             .diarize(
                 &mut audio,
                 &DiarizeRequest {
@@ -526,6 +538,9 @@ fn diarize_channels(
             .map_err(|e| e.to_string())?;
         if diarization.segments.is_empty() {
             continue;
+        }
+        if unlisted_room {
+            fold_slight_voices(&mut diarization);
         }
 
         labels.push(ChannelLabels {
@@ -541,10 +556,42 @@ fn diarize_channels(
                 .iter()
                 .filter(|speaker| speaker.identity.is_some())
                 .count(),
-            shared_mic: in_person && channel.index == 0 && transcript_channels == 2,
+            shared_mic,
         });
     }
     Ok(labels)
+}
+
+/// Merges every voice into the main one when the others together hold less
+/// than [`MIN_UNLISTED_GUEST_SHARE`] of the speech and none matched a known
+/// voiceprint: on an open count, clustering splits one person's voice more
+/// often than it finds someone who barely spoke.
+pub(super) fn fold_slight_voices(diarization: &mut Diarization) {
+    let mut seconds: BTreeMap<usize, f64> = BTreeMap::new();
+    for segment in &diarization.segments {
+        *seconds.entry(segment.speaker).or_default() += (segment.end - segment.start).max(0.0);
+    }
+    let total: f64 = seconds.values().sum();
+    let Some((&main, &main_seconds)) = seconds.iter().max_by(|a, b| a.1.total_cmp(b.1)) else {
+        return;
+    };
+    if seconds.len() < 2 || total <= 0.0 {
+        return;
+    }
+    let guest_identified = diarization
+        .speakers
+        .iter()
+        .any(|speaker| speaker.index != main && speaker.identity.is_some());
+    if guest_identified || (total - main_seconds) / total >= MIN_UNLISTED_GUEST_SHARE {
+        return;
+    }
+    for segment in &mut diarization.segments {
+        segment.speaker = 0;
+    }
+    diarization.speakers.retain(|speaker| speaker.index == main);
+    for speaker in &mut diarization.speakers {
+        speaker.index = 0;
+    }
 }
 
 struct WavAudioSource {
@@ -830,7 +877,7 @@ mod tests {
     }
 
     #[test]
-    fn in_person_needs_several_participants_and_a_silent_remote_channel() {
+    fn in_person_needs_a_silent_remote_channel_and_room_for_a_second_voice() {
         let silent = two_channel_response(vec![]);
         assert!(in_person_capture(
             &listen_params(Some(2), None, None),
@@ -840,13 +887,15 @@ mod tests {
             &listen_params(None, Some(2), None),
             &silent
         ));
-        // A solo memo and a two-person meeting sound the same to the recorder.
+        // Nobody listed who was in the room: diarization decides.
+        assert!(in_person_capture(&listen_params(None, None, None), &silent));
+        // Only the user was there.
         assert!(!in_person_capture(
-            &listen_params(None, None, None),
+            &listen_params(Some(1), None, None),
             &silent
         ));
         assert!(!in_person_capture(
-            &listen_params(Some(1), None, None),
+            &listen_params(None, None, Some(1)),
             &silent
         ));
 
@@ -887,6 +936,71 @@ mod tests {
         ));
     }
 
+    /// Voices given as `(speaker index, seconds of speech)`, laid end to end.
+    fn diarization_of(voices: &[(usize, f64)]) -> Diarization {
+        let mut start = 0.0;
+        let segments = voices
+            .iter()
+            .map(|&(speaker, seconds)| {
+                let segment = anlg_pyannote_local::SpeakerSegment {
+                    start,
+                    end: start + seconds,
+                    speaker,
+                };
+                start += seconds;
+                segment
+            })
+            .collect();
+        let mut indices: Vec<usize> = voices.iter().map(|&(speaker, _)| speaker).collect();
+        indices.sort_unstable();
+        indices.dedup();
+        Diarization {
+            segments,
+            speakers: indices
+                .into_iter()
+                .map(|index| anlg_pyannote_local::DiarizedSpeaker {
+                    index,
+                    centroid: vec![],
+                    identity: None,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn slight_extra_voices_fold_into_the_main_one() {
+        // A phantom split of one person: 3 s out of 100 s.
+        let mut diarization = diarization_of(&[(1, 60.0), (0, 3.0), (1, 37.0)]);
+        fold_slight_voices(&mut diarization);
+        assert!(diarization.segments.iter().all(|s| s.speaker == 0));
+        assert_eq!(diarization.speaker_count(), 1);
+        assert_eq!(diarization.segments.len(), 3, "timing is kept");
+    }
+
+    #[test]
+    fn real_second_voices_are_kept() {
+        // A guest with 12 % of the speech, like english_1's second speaker.
+        let mut diarization = diarization_of(&[(0, 88.0), (1, 12.0)]);
+        let before = diarization.clone();
+        fold_slight_voices(&mut diarization);
+        assert_eq!(diarization, before);
+
+        // A brief voice that matched a known voiceprint is someone real.
+        let mut diarization = diarization_of(&[(0, 97.0), (1, 3.0)]);
+        diarization.speakers[1].identity = Some(anlg_pyannote_local::SpeakerIdentity {
+            id: "shane".to_string(),
+            score: 0.9,
+        });
+        let before = diarization.clone();
+        fold_slight_voices(&mut diarization);
+        assert_eq!(diarization, before);
+
+        let mut single = diarization_of(&[(0, 50.0)]);
+        let before = single.clone();
+        fold_slight_voices(&mut single);
+        assert_eq!(single, before);
+    }
+
     #[test]
     fn only_unlabeled_channels_need_diarization() {
         assert!(channel_needs_diarization(&channel(vec![
@@ -900,7 +1014,9 @@ mod tests {
         assert!(!channel_needs_diarization(&channel(vec![])));
     }
 
-    use super::super::test_fixtures::{NeverCancelled, in_person_fixture, params, stereo_fixture};
+    use super::super::test_fixtures::{
+        NeverCancelled, in_person_fixture, params, solo_mic_fixture, stereo_fixture,
+    };
 
     #[test]
     fn local_providers_are_detected() {
@@ -1147,6 +1263,77 @@ mod tests {
             .collect::<std::collections::HashSet<_>>();
         assert_eq!(speakers.len(), 2, "expected both people, got {speakers:?}");
         assert_eq!(output.response.metadata["diarization"]["shared_mic"], true);
+    }
+
+    fn stereo_listen_params() -> owhisper_interface::ListenParams {
+        owhisper_interface::ListenParams {
+            channels: 2,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn in_person_meeting_without_a_participant_list_still_separates_the_room() {
+        // Notes made on the spot list only the user, so no count reaches the
+        // diarizer; both people must still come out of the mic.
+        let file = in_person_fixture();
+        let params = params(
+            BatchProvider::WhisperLocal,
+            "http://localhost:1234",
+            file.path().to_str().unwrap(),
+        );
+        let mut output = in_person_output(300, 153.0);
+
+        apply_local_diarization(
+            Arc::new(NeverCancelled),
+            &params,
+            &stereo_listen_params(),
+            &mut output,
+        )
+        .await;
+
+        let words = &output.response.results.channels[0].alternatives[0].words;
+        assert!(
+            words.iter().all(|word| word.channel == SHARED_MIC_CHANNEL),
+            "mic words should move to the shared channel"
+        );
+        let speakers = words
+            .iter()
+            .filter_map(|word| word.speaker)
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(speakers.len(), 2, "expected both people, got {speakers:?}");
+        assert_eq!(output.response.metadata["diarization"]["shared_mic"], true);
+    }
+
+    #[tokio::test]
+    async fn solo_memo_without_a_participant_list_stays_the_user() {
+        let file = solo_mic_fixture();
+        let params = params(
+            BatchProvider::WhisperLocal,
+            "http://localhost:1234",
+            file.path().to_str().unwrap(),
+        );
+        let mut output = in_person_output(300, 153.0);
+
+        apply_local_diarization(
+            Arc::new(NeverCancelled),
+            &params,
+            &stereo_listen_params(),
+            &mut output,
+        )
+        .await;
+
+        let words = &output.response.results.channels[0].alternatives[0].words;
+        assert!(
+            words.iter().all(|word| word.channel == 0),
+            "a lone voice must stay on the direct mic"
+        );
+        let speakers = words
+            .iter()
+            .filter_map(|word| word.speaker)
+            .collect::<std::collections::HashSet<_>>();
+        assert!(speakers.len() <= 1, "expected one voice, got {speakers:?}");
+        assert_ne!(output.response.metadata["diarization"]["shared_mic"], true);
     }
 
     #[tokio::test]

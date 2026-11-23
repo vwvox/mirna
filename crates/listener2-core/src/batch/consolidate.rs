@@ -1097,6 +1097,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn in_person_mic_without_a_participant_list_is_shared() {
+        // Nobody listed who was in the room; the provider heard two voices on
+        // the mic while system audio stayed silent, so they leave "You".
+        let params = params(
+            BatchProvider::Deepgram,
+            "https://api.deepgram.com/v1",
+            "/nonexistent/recording.wav",
+        );
+        let listen_params = owhisper_interface::ListenParams {
+            channels: 2,
+            ..Default::default()
+        };
+        let mut output = output(vec![in_person_mic_channel(1), channel(vec![])]);
+
+        consolidate_hosted_speakers(
+            Arc::new(NeverCancelled),
+            &params,
+            &listen_params,
+            &mut output,
+        )
+        .await;
+
+        assert!(
+            output.response.results.channels[0].alternatives[0]
+                .words
+                .iter()
+                .all(|word| word.channel == SHARED_MIC_CHANNEL)
+        );
+    }
+
+    #[tokio::test]
     async fn call_mic_labels_are_left_alone_even_when_over_split() {
         // Far-end speech on the remote channel makes this a call; whatever the
         // provider did to the mic channel, it stays the local user's.
