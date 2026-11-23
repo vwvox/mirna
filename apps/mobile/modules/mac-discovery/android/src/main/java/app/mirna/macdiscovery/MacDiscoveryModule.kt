@@ -186,21 +186,28 @@ private data class Subnet(val name: String, val address: Inet4Address, val prefi
 // Interfaces that are never a hotspot: mobile data, VPNs, tunnels, Wi-Fi Direct.
 private val NOT_A_HOTSPOT = listOf(
   "lo", "rmnet", "ccmni", "v4-", "clat", "tun", "ppp", "ipsec", "dummy",
-  "ip6", "sit", "gre", "ifb", "p2p", "radio", "seth",
+  "ip6", "sit", "gre", "ifb", "p2p", "aware", "radio", "seth",
 )
 
 /**
  * Subnets the phone serves to other devices: its Wi-Fi hotspot, or USB or
- * Bluetooth tethering. Android doesn't list these as networks the phone is
- * on, so they're the interfaces with a private IPv4 address that aren't one
- * of its networks.
+ * Bluetooth tethering. They're the interfaces with a private IPv4 address
+ * that aren't how the phone itself gets online (mobile data, Wi-Fi it has
+ * joined, a VPN). Newer Android lists a hotspot as a "local network" of its
+ * own, without internet, so those count as hotspots too.
  */
 private fun hotspotSubnets(context: Context): List<Subnet> {
   val connectivity = connectivity(context)
-  val own = try {
+  val outward = try {
     @Suppress("DEPRECATION")
     connectivity.allNetworks
-      .mapNotNull { connectivity.getLinkProperties(it)?.interfaceName }
+      .mapNotNull { network ->
+        val capabilities = connectivity.getNetworkCapabilities(network) ?: return@mapNotNull null
+        val online = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
+          capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+          capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        if (online) connectivity.getLinkProperties(network)?.interfaceName else null
+      }
       .toSet()
   } catch (_: Exception) {
     emptySet()
@@ -217,7 +224,7 @@ private fun hotspotSubnets(context: Context): List<Subnet> {
     } catch (_: Exception) {
       false
     }
-    if (!usable || name in own || NOT_A_HOTSPOT.any { name.startsWith(it) }) {
+    if (!usable || name in outward || NOT_A_HOTSPOT.any { name.startsWith(it) }) {
       return@flatMap emptyList()
     }
     candidate.interfaceAddresses.mapNotNull { entry ->

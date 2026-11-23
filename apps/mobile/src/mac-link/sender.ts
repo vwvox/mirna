@@ -188,7 +188,10 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
     return userAsked ? true : needsMacContact(local, mode);
   });
   if (pending.length === 0 && !fresh) return "nothing_to_send";
-  if (!isOnLocalNetwork()) return "not_on_wifi";
+  // Android doesn't always say when the phone is a hotspot, so a tap tries
+  // anyway; only automatic syncs stop here.
+  const local = isOnLocalNetwork();
+  if (!local && !userAsked) return "not_on_wifi";
 
   const network = currentNetworkKey();
   const home = isHomeNetwork(await loadKnownNetworks(), network);
@@ -203,12 +206,14 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
     return "away";
   }
 
-  const reached = await reachMac(mac, identity, pending);
+  const reached = await reachMac(mac, identity, pending, local);
   if (reached.outcome) {
     if (reached.outcome === "mac_unreachable" && !userAsked) {
       await noteMacUnreachable(network);
     }
-    return reached.outcome;
+    return !local && reached.outcome === "mac_unreachable"
+      ? "not_on_wifi"
+      : reached.outcome;
   }
   const { connection, remote } = reached;
   await rememberMacNetwork(network);
@@ -255,7 +260,7 @@ export async function retryRecordingOnMac(sessionId: string): Promise<SendOutcom
   const mac = await loadPairedMac();
   const identity = await loadIdentity();
   if (!mac || !identity) return "not_paired";
-  if (!isOnLocalNetwork()) return "not_on_wifi";
+  // Tried even when the phone doesn't look like it's on Wi-Fi (see run()).
   try {
     await bridge.retry({ identity, mac: targetFor(mac, null) }, sessionId);
   } catch (error) {
@@ -263,7 +268,7 @@ export async function retryRecordingOnMac(sessionId: string): Promise<SendOutcom
       return "unpaired_by_mac";
     }
     if (error instanceof LinkError && error.code === "unreachable") {
-      return "mac_unreachable";
+      return isOnLocalNetwork() ? "mac_unreachable" : "not_on_wifi";
     }
     throw error;
   }
@@ -277,6 +282,8 @@ async function reachMac(
   mac: PairedMac,
   identity: Connection["identity"],
   pending: PendingRow[],
+  /** On Wi-Fi or a hotspot; Bonjour can't find anything otherwise. */
+  local: boolean,
 ): Promise<
   | { outcome: SendOutcome }
   | { outcome?: undefined; connection: Connection; remote: RemoteStatus[] }
@@ -296,7 +303,7 @@ async function reachMac(
     // The Mac may have a new address: look for it on the network, and on this
     // phone's hotspot if it's on (Bonjour doesn't always reach devices there).
     const [discovered, onHotspot] = await Promise.all([
-      discoverMacs(4000),
+      local ? discoverMacs(4000) : Promise.resolve([]),
       findOnHotspot(mac.port),
     ]);
     const found =
