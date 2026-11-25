@@ -7,6 +7,8 @@ import {
   isCapturePhase,
   isRecordingStartCancelled,
   phaseAfterStreamStatus,
+  retryWithDelays,
+  stopSourceFromStream,
 } from "./recorder-status.ts";
 
 test("recognizes a native stop during recording startup as cancellation", () => {
@@ -98,4 +100,59 @@ test("elapsed time has a spoken form", () => {
   assert.equal(describeElapsed(1_000), "1 second");
   assert.equal(describeElapsed(12 * 60_000 + 4_000), "12 minutes 4 seconds");
   assert.equal(describeElapsed(3_600_000 + 60_000), "1 hour 1 minute");
+});
+
+test("retries a failing step after each delay, then gives up with its error", async () => {
+  const waits = [];
+  const failures = [];
+  let calls = 0;
+  await assert.rejects(
+    retryWithDelays(
+      async () => {
+        calls += 1;
+        throw new Error(`attempt ${calls}`);
+      },
+      [1_000, 3_000],
+      async (ms) => {
+        waits.push(ms);
+      },
+      (error, index, willRetry) => failures.push([error.message, index, willRetry]),
+    ),
+    /attempt 3/,
+  );
+  assert.equal(calls, 3);
+  assert.deepEqual(waits, [1_000, 3_000]);
+  assert.deepEqual(failures, [
+    ["attempt 1", 0, true],
+    ["attempt 2", 1, true],
+    ["attempt 3", 2, false],
+  ]);
+});
+
+test("stops retrying as soon as the step succeeds", async () => {
+  const waits = [];
+  let calls = 0;
+  const result = await retryWithDelays(
+    async (index) => {
+      calls += 1;
+      if (index === 0) throw new Error("busy");
+      return "saved";
+    },
+    [1_000, 3_000],
+    async (ms) => {
+      waits.push(ms);
+    },
+  );
+  assert.equal(result, "saved");
+  assert.equal(calls, 2);
+  assert.deepEqual(waits, [1_000]);
+});
+
+test("names where a stop the stream made on its own came from", () => {
+  assert.equal(stopSourceFromStream("notification"), "notification");
+  assert.equal(stopSourceFromStream("alert"), "alert");
+  assert.equal(stopSourceFromStream("paused_timeout"), "automatic");
+  assert.equal(stopSourceFromStream("mic_error"), "mic_lost");
+  assert.equal(stopSourceFromStream(undefined), "stream_ended");
+  assert.equal(stopSourceFromStream("app"), "stream_ended");
 });

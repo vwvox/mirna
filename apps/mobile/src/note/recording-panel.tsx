@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { useLiveUpdatesPrompt } from "@/audio/live-updates";
+import { RECORDING_ALERTS } from "@/audio/long-recording";
 import {
   describeElapsed,
   formatElapsed,
@@ -29,10 +30,11 @@ import {
   Spacing,
   Typography,
 } from "@/constants/theme";
-import type { SessionDetail } from "@/data/session";
+import { useSessionDetail, type SessionDetail } from "@/data/session";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useMountEffect } from "@/lib/use-mount-effect";
 import type { NoteDraft } from "@/note/note-draft";
+import { useNoteDraft } from "@/note/use-note-draft";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
 type Recorder = ReturnType<typeof useSessionRecorder>;
@@ -101,7 +103,7 @@ export function RecordingPanel({
   const Colors = useColors();
   const keyboardVisible = useKeyboardVisible();
   const liveUpdates = useLiveUpdatesPrompt();
-  const { phase, failure, durationMs } = recorder;
+  const { phase, failure, durationMs, notice, part } = recorder;
   const recording = phase === "recording";
   const paused = phase === "paused";
   const status = statusText(phase, failure);
@@ -155,6 +157,42 @@ export function RecordingPanel({
           </Text>
           <LevelStrip levels={recorder.levels} paused={!recording} />
         </View>
+
+        {(notice || part > 1) && (
+          <View style={styles.notices}>
+            {notice && (
+              <View accessibilityLiveRegion="polite" style={styles.prompt}>
+                <View style={styles.noticeCopy}>
+                  <Text style={styles.noticeTitle}>
+                    {RECORDING_ALERTS[notice].title}
+                  </Text>
+                  <Text style={styles.noticeText}>
+                    {RECORDING_ALERTS[notice].text}
+                  </Text>
+                </View>
+                {notice !== "paused" && (
+                  <View style={styles.promptActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={recorder.keepGoing}
+                      style={({ pressed }) => [
+                        styles.turnOn,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.turnOnText}>Keep going</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            )}
+            {part > 1 && (
+              <Text style={styles.partLine}>
+                Part {part} · earlier parts are in their own notes
+              </Text>
+            )}
+          </View>
+        )}
 
         {note && (
           <View style={styles.form}>
@@ -277,6 +315,52 @@ export function RecordingPanel({
         />
       )}
     </View>
+  );
+}
+
+/**
+ * The recording panel for a later part of a long recording: a note of its
+ * own, with its own title and notes.
+ */
+export function PartRecordingPanel({
+  sessionId,
+  recorder,
+  onMount,
+  onBack,
+  onStop,
+  onRetry,
+  onOpenSettings,
+}: {
+  sessionId: string;
+  recorder: Recorder;
+  /** The part before has just ended; a chance to save its edits. */
+  onMount: () => void;
+  onBack: () => void;
+  onStop: () => void;
+  onRetry: () => void;
+  onOpenSettings: () => void;
+}) {
+  const { data, isLoading } = useSessionDetail(sessionId);
+  const draft = useNoteDraft(sessionId, data);
+  useMountEffect(() => {
+    onMount();
+  });
+
+  return (
+    <RecordingPanel
+      recorder={recorder}
+      note={isLoading ? null : data}
+      titleKey={`${sessionId}:${draft.restored?.titleToken ?? 0}`}
+      initialTitle={draft.restored?.title ?? data?.title ?? ""}
+      body={draft.bodyDraft?.text ?? data?.noteText ?? ""}
+      bodyFormat={draft.bodyDraft?.format ?? data?.bodyFormat ?? "markdown"}
+      onEdit={draft.edit}
+      onCommit={() => void draft.flush()}
+      onBack={() => void draft.flush().finally(onBack)}
+      onStop={() => void draft.flush().finally(onStop)}
+      onRetry={onRetry}
+      onOpenSettings={onOpenSettings}
+    />
   );
 }
 
@@ -441,6 +525,31 @@ const useStyles = createStyleHook((Colors) => ({
   },
   lockText: {
     flex: 1,
+    fontFamily: FontFamily.text,
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.muted,
+  },
+  notices: {
+    gap: Spacing.sm,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+  },
+  noticeCopy: { gap: 2 },
+  noticeTitle: {
+    fontFamily: FontFamily.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  noticeText: {
+    fontFamily: FontFamily.text,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.primary,
+  },
+  partLine: {
     fontFamily: FontFamily.text,
     fontSize: 13,
     lineHeight: 18,

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -35,16 +35,21 @@ import { confirmDestructive } from "@/lib/confirm";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useMountEffect } from "@/lib/use-mount-effect";
+import { usePairedMac } from "@/mac-link/pairing";
+import { useMacLinkStatus } from "@/mac-link/status";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
 import { BodyEditor } from "./body-editor";
+import { MacJobBanner } from "./mac-job-banner";
 import { NoteFiles } from "./note-files";
 import { NoteMeta } from "./note-meta";
 import { NoteRecordings } from "./note-recordings";
 import { NoteSummary } from "./note-summary";
 import { NoteTabs } from "./note-tabs";
 import { RecordingDetails } from "./recording-details";
-import { RecordingPanel } from "./recording-panel";
+import { PartRecordingPanel, RecordingPanel } from "./recording-panel";
+import { RetranscribeSheet } from "./retranscribe-sheet";
+import { TrimSheet } from "./trim-sheet";
 import { useNoteAudio } from "./use-note-audio";
 import { useNoteDraft } from "./use-note-draft";
 
@@ -74,16 +79,34 @@ export function NoteScreen({
   const [selection, setSelection] = useState<SessionViewSelection | null>(null);
   const [listening, setListening] = useState(autoListen);
   const [editorFocused, setEditorFocused] = useState(false);
-  const [sheet, setSheet] = useState<"actions" | "folders" | "versions" | null>(
-    null,
-  );
+  const [sheet, setSheet] = useState<
+    "actions" | "folders" | "versions" | "retranscribe" | "trim" | null
+  >(null);
+  const macLink = useMacLinkStatus(id);
+  const { mac } = usePairedMac();
+  // The Mac has this recording as a note (or tried to): it can do it again.
+  const macHasNote =
+    Boolean(mac) &&
+    Boolean(macLink?.mac_session_id) &&
+    (macLink?.state === "done" || macLink?.state === "failed");
+  const canTrim =
+    Boolean(audio.data?.filename.toLowerCase().endsWith(".wav")) &&
+    (audio.availableLocally || macHasNote);
   const closeSheet = (name: typeof sheet) =>
     setSheet((current) => (current === name ? null : current));
   const keyboardVisible = useKeyboardVisible();
   const recorder = useSessionRecorder(id, listening);
   const hasRecordingHistory =
     Boolean(audio.data) || transcriptState.data === true;
-  const active = listening && recorder.phase !== "saved";
+  // After 3 hours a recording carries on in a new note; once saved, it ends
+  // on that note.
+  const lastPartId =
+    recorder.phase === "saved" && recorder.sessionId !== id
+      ? recorder.sessionId
+      : null;
+  const active =
+    (listening && recorder.phase !== "saved") || lastPartId !== null;
+  const leavingRef = useRef(false);
   const { tabs, current, selectedIndex } = sessionView({
     sessionId: id,
     active,
@@ -110,16 +133,23 @@ export function NoteScreen({
     captureAnalytics("note_opened", { entry_point: "mobile_note" });
   });
 
+  useEffect(() => {
+    if (lastPartId && !leavingRef.current) {
+      router.replace(`/note/${lastPartId}`);
+    }
+  }, [lastPartId, router]);
+
   const handleBack = async () => {
+    leavingRef.current = true;
     await flush();
-    await recorder.stop();
+    await recorder.stop("back");
     if (router.canGoBack()) router.back();
     else router.replace("/");
   };
 
   const handleStop = async () => {
     await flush();
-    const result = await recorder.stop();
+    const result = await recorder.stop("app_button");
     if (result !== "failed") setListening(false);
   };
 
@@ -170,7 +200,7 @@ export function NoteScreen({
       "Delete",
     );
     if (!confirmed) return;
-    await recorder.stop();
+    await recorder.stop("delete");
     try {
       await remove(() => deleteSession(id));
       if (router.canGoBack()) router.back();
@@ -239,6 +269,23 @@ export function NoteScreen({
   };
 
   // While recording, the note is the recording screen: timer, title, notes.
+  if (active && recorder.sessionId !== id) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <PartRecordingPanel
+          key={recorder.sessionId}
+          sessionId={recorder.sessionId}
+          recorder={recorder}
+          onMount={() => void flush()}
+          onBack={() => void handleBack()}
+          onStop={() => void handleStop()}
+          onRetry={() => void handleRetryRecording()}
+          onOpenSettings={() => void handleOpenSettings()}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (active) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -307,6 +354,7 @@ export function NoteScreen({
         {!isLoading && data && (
           <NoteMeta sessionId={id} createdAt={data.createdAt} audio={audio} />
         )}
+        <MacJobBanner sessionId={id} />
       </View>
 
       {!isLoading && data && (
@@ -423,7 +471,26 @@ export function NoteScreen({
         onImportRecording={audio.importRecording}
         onToggleListening={handleListeningAction}
         onVersionHistory={() => setSheet("versions")}
+        onRetranscribe={macHasNote ? () => setSheet("retranscribe") : undefined}
+        onTrim={canTrim ? () => setSheet("trim") : undefined}
         visible={sheet === "actions"}
+      />
+
+      <RetranscribeSheet
+        sessionId={id}
+        macName={mac?.mac_name ?? ""}
+        hasSummary={Boolean(data?.summary)}
+        visible={sheet === "retranscribe"}
+        onClose={() => closeSheet("retranscribe")}
+      />
+
+      <TrimSheet
+        sessionId={id}
+        audio={audio}
+        macName={mac?.mac_name ?? ""}
+        hasSummary={Boolean(data?.summary)}
+        visible={sheet === "trim"}
+        onClose={() => closeSheet("trim")}
       />
 
       <FolderPickerSheet

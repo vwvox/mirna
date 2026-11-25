@@ -57,6 +57,16 @@ export class SessionWavWriter {
     return (this.dataBytes * 1_000) / (this.sampleRate * this.channels * 2);
   }
 
+  /** The file's size once its header is written. */
+  get sizeBytes(): number {
+    return WAV_HEADER_BYTES + this.dataBytes;
+  }
+
+  /** True once finalize() has written the header and closed the file. */
+  get isFinalized(): boolean {
+    return this.finalized;
+  }
+
   finalize(): File {
     if (this.finalized) return this.file;
     if (!this.handle) throw new Error("Recording file is unavailable");
@@ -89,4 +99,29 @@ export class SessionWavWriter {
     this.handle.writeBytes(header);
     this.handle.offset = header.byteLength + this.dataBytes;
   }
+}
+
+/**
+ * Carries a recording on in the next part's file, in one synchronous step,
+ * so every buffer lands in exactly one part: the ones before this call in
+ * `current`, the ones after it in the returned writer. The next file is
+ * opened first; if that fails, nothing changes and recording carries on in
+ * `current`. A failure to finalize `current` is returned, not thrown: its
+ * header was checkpointed, so recovery can still repair it.
+ */
+export function continueInNextPart(
+  current: SessionWavWriter,
+  nextSessionId: string,
+): { next: SessionWavWriter; finalizeError: unknown } {
+  const next = new SessionWavWriter(nextSessionId);
+  let finalizeError: unknown = null;
+  try {
+    current.finalize();
+  } catch (error) {
+    finalizeError = error;
+    try {
+      current.close();
+    } catch {}
+  }
+  return { next, finalizeError };
 }

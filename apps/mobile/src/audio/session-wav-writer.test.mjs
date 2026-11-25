@@ -43,7 +43,9 @@ registerHooks({
     };
   },
 });
-const { SessionWavWriter } = await import("./session-wav-writer.ts");
+const { SessionWavWriter, continueInNextPart } = await import(
+  "./session-wav-writer.ts"
+);
 
 test("elapsed recording time comes from captured PCM and matches the finalized WAV", () => {
   for (const [sampleRate, channels] of [
@@ -92,4 +94,78 @@ test("a pause leaves no gap: the WAV holds only the captured audio, back to back
   assert.equal(header.getUint32(40, true), 4800);
   assert.deepEqual(file.bytes.slice(44, 44 + 3200), before);
   assert.deepEqual(file.bytes.slice(44 + 3200), after);
+});
+
+test("a part switch puts every buffer in exactly one part, in order", async () => {
+  const buffer = (value) => new Uint8Array(3200).fill(value).buffer;
+  let writer = new SessionWavWriter("part-1");
+  let sent = 0;
+  const send = () => {
+    sent += 1;
+    writer.append(buffer(sent), 16000, 1);
+  };
+  for (let i = 0; i < 5; i++) send();
+
+  // The new note is created asynchronously; buffers keep arriving meanwhile
+  // and still go to part 1.
+  const noteCreated = Promise.resolve().then(() => {
+    for (let i = 0; i < 3; i++) send();
+  });
+  await noteCreated;
+  const previous = writer;
+  const { next, finalizeError } = continueInNextPart(writer, "part-2");
+  writer = next;
+  for (let i = 0; i < 4; i++) send();
+  writer.finalize();
+
+  assert.equal(finalizeError, null);
+  assert.equal(previous.isFinalized, true);
+  const first = files.get("/test/sessions/part-1/audio.wav").bytes;
+  const second = files.get("/test/sessions/part-2/audio.wav").bytes;
+  assert.equal(new DataView(first.buffer).getUint32(40, true), 8 * 3200);
+  assert.equal(new DataView(second.buffer).getUint32(40, true), 4 * 3200);
+  const values = [...first.slice(44), ...second.slice(44)].filter(
+    (_, index) => index % 3200 === 0,
+  );
+  assert.deepEqual(values, Array.from({ length: 12 }, (_, i) => i + 1));
+  assert.equal(previous.durationMs + writer.durationMs, 12 * 100);
+});
+
+test("a part switch that can't open the next file leaves recording where it was", () => {
+  const writer = new SessionWavWriter("stays");
+  writer.append(new ArrayBuffer(3200), 16000, 1);
+  const File = writer.file.constructor;
+  const open = File.prototype.open;
+  File.prototype.open = function () {
+    if (this.path.includes("unopenable")) throw Error("No space left");
+    return open.call(this);
+  };
+  try {
+    assert.throws(() => continueInNextPart(writer, "unopenable"), /No space left/);
+  } finally {
+    File.prototype.open = open;
+  }
+  assert.equal(writer.isFinalized, false);
+  writer.append(new ArrayBuffer(3200), 16000, 1);
+  assert.equal(writer.durationMs, 200);
+});
+
+test("a part switch hands back a failed finalize instead of throwing", () => {
+  const writer = new SessionWavWriter("bad-header");
+  writer.append(new ArrayBuffer(3200), 16000, 1);
+  writer.file.failWrite = true;
+  const { next, finalizeError } = continueInNextPart(writer, "after-bad-header");
+  assert.match(String(finalizeError), /Disk write failed/);
+  next.append(new ArrayBuffer(3200), 16000, 1);
+  assert.equal(next.durationMs, 100);
+});
+
+test("reports its size and whether it is finalized", () => {
+  const writer = new SessionWavWriter("size");
+  writer.append(new ArrayBuffer(3200), 16000, 1);
+  assert.equal(writer.sizeBytes, 3244);
+  assert.equal(writer.isFinalized, false);
+  writer.finalize();
+  assert.equal(writer.isFinalized, true);
+  assert.equal(writer.sizeBytes, files.get("/test/sessions/size/audio.wav").size);
 });
