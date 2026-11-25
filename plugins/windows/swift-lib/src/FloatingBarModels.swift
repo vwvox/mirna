@@ -82,4 +82,7 @@ struct FloatingBarStatePayload: Codable {
   var transcriptNotice: String? = nil
   // Optional so a payload without the key still decodes; Rust always sends it.
   var marksEnabled: Bool? = nil
+  var paused: Bool? = nil
+
+  var isPaused: Bool { paused ?? false }
 }

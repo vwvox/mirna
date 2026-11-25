@@ -1,6 +1,7 @@
 import { commands as listenerCommands } from "@anlg/plugin-transcription";
 
 import { updateLessonDocument, useLessonDocument } from "./documents";
+import { pauseClocks } from "./pause-clock";
 import { emptyLessonMarks, parseLessonMarks } from "./schema";
 import type {
   LessonMark,
@@ -10,6 +11,7 @@ import type {
 } from "./types";
 
 import { useLiveQuery } from "~/db";
+import { listenerStore } from "~/store/zustand/listener/instance";
 import { loadCaptureLifecycleMarker } from "~/stt/capture-lifecycle-storage";
 
 const EMPTY = emptyLessonMarks();
@@ -58,7 +60,22 @@ export async function currentLessonAudioMs(
       ? snapshotData.startedAtMs
       : (marker?.startedAt ?? null);
   if (!startedAt) return null;
-  return Math.max(0, (marker?.audioOffsetMs ?? 0) + (now - startedAt));
+  return Math.max(
+    0,
+    (marker?.audioOffsetMs ?? 0) +
+      (now - startedAt) -
+      pauseClocks.pausedMs(sessionId, now),
+  );
+}
+
+// Start following pauses as soon as lesson marks can be made in this window.
+if (typeof window !== "undefined") {
+  const follow = () => {
+    const { sessionId, paused } = listenerStore.getState().live;
+    pauseClocks.observe({ sessionId, paused });
+  };
+  follow();
+  listenerStore.subscribe(follow);
 }
 
 export async function addLessonMark(

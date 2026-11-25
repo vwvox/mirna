@@ -1,4 +1,5 @@
 mod commands;
+mod events;
 mod ext;
 mod macos_position;
 mod menu_items;
@@ -7,6 +8,7 @@ mod tray_icon;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+pub use events::*;
 pub use ext::*;
 pub use menu_items::{AnlgMenuItem, UpdateMenuState, handle_agenda_menu_event, quit_completely};
 
@@ -19,7 +21,8 @@ pub fn init(enable_updates: bool) -> tauri::plugin::TauriPlugin<tauri::Wry> {
 
     tauri::plugin::Builder::<tauri::Wry>::new(PLUGIN_NAME)
         .invoke_handler(specta_builder.invoke_handler())
-        .setup(|app, _api| {
+        .setup(move |app, _api| {
+            specta_builder.mount_events(app);
             if updates_enabled() {
                 setup_update_listeners(app);
             }
@@ -77,6 +80,7 @@ fn make_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::set_tray_schedule,
             commands::set_tray_recording_title,
         ])
+        .events(tauri_specta::collect_events![TrayRecordingAction])
         .error_handling(tauri_specta::ErrorHandlingMode::Result)
 }
 

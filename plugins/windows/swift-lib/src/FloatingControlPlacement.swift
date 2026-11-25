@@ -20,7 +20,9 @@ enum FloatingControlPlacement {
   {
     let width = min(size.width, workArea.width)
     let minHeight = min(
-      size.height, FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true).height,
+      size.height,
+      FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true, showsPause: false)
+        .height,
       workArea.height)
     let y: CGFloat
     let height: CGFloat

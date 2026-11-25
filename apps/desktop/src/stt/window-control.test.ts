@@ -68,6 +68,26 @@ describe("requestMainListenerControl", () => {
     expect(hoisted.stopCaptureForSession).toHaveBeenCalledWith("session-1");
   });
 
+  test("routes pause and resume to the main webview without stopping", async () => {
+    await requestMainListenerControl("pause", "session-1");
+    await requestMainListenerControl("resume", "session-1");
+    await vi.runAllTimersAsync();
+
+    expect(hoisted.emitTo).toHaveBeenNthCalledWith(
+      1,
+      "main",
+      "anlg:listener-control",
+      expect.objectContaining({ action: "pause", sessionId: "session-1" }),
+    );
+    expect(hoisted.emitTo).toHaveBeenNthCalledWith(
+      2,
+      "main",
+      "anlg:listener-control",
+      expect.objectContaining({ action: "resume", sessionId: "session-1" }),
+    );
+    expect(hoisted.stopCaptureForSession).not.toHaveBeenCalled();
+  });
+
   test("still routes start requests to the main webview", async () => {
     await requestMainListenerControl("start", "session-1");
 

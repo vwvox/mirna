@@ -26,14 +26,19 @@ use crate::{
 #[cfg(target_os = "macos")]
 use crate::menu_items::{AppInfo, AppNew, HelpReportBug, HelpSuggestFeature, TrayQuit};
 use crate::menu_items::{
-    MenuItemHandler, TrayCheckUpdate, TrayHide, TrayOpen, TrayQuitCompletely, TraySettings,
-    TrayShowEvents, TrayStart, TrayVersion, build_agenda_item,
+    MenuItemHandler, TrayCheckUpdate, TrayHide, TrayOpen, TrayPauseRecording, TrayQuitCompletely,
+    TraySettings, TrayShowEvents, TrayStart, TrayStopRecording, TrayVersion, build_agenda_item,
 };
 use tauri_plugin_store2::Store2PluginExt;
 
 const TRAY_ID: &str = "anlg-tray";
 
+pub(crate) fn recording_paused() -> bool {
+    IS_PAUSED.load(Ordering::SeqCst)
+}
+
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
+static IS_PAUSED: AtomicBool = AtomicBool::new(false);
 static IS_DEGRADED: AtomicBool = AtomicBool::new(false);
 static IS_UPDATE_AVAILABLE: AtomicBool = AtomicBool::new(false);
 static SHOW_EVENTS: AtomicBool = AtomicBool::new(true);
@@ -404,6 +409,13 @@ impl<'a, M: tauri::Manager<tauri::Wry>> Tray<'a, tauri::Wry, M> {
         menu.append(&PredefinedMenuItem::separator(app)?)?;
 
         menu.append(&TrayOpen::build(app)?)?;
+        if IS_RECORDING.load(Ordering::SeqCst) {
+            menu.append(&TrayPauseRecording::build_with_paused(
+                app,
+                IS_PAUSED.load(Ordering::SeqCst),
+            )?)?;
+            menu.append(&TrayStopRecording::build(app)?)?;
+        }
         menu.append(&TrayStart::build_with_disabled(
             app,
             START_DISABLED.load(Ordering::SeqCst),
@@ -517,16 +529,30 @@ impl<'a, M: tauri::Manager<tauri::Wry>> Tray<'a, tauri::Wry, M> {
     }
 
     pub fn set_recording(&self, recording: bool) -> Result<()> {
-        IS_RECORDING.store(recording, Ordering::SeqCst);
+        let changed = IS_RECORDING.swap(recording, Ordering::SeqCst) != recording;
         if !recording {
             *RECORDING_TITLE.lock().unwrap() = None;
+            IS_PAUSED.store(false, Ordering::SeqCst);
         }
 
         let app = self.manager.app_handle();
         Self::refresh_menu_bar_title(app)?;
         Self::refresh_icon(app)?;
         Self::restart_schedule_task(app);
+        if changed {
+            Self::rebuild_menu(app)?;
+        }
         Ok(())
+    }
+
+    /// A paused recording keeps its menu-bar icon, still, and offers Resume instead of Pause.
+    pub fn set_recording_paused(&self, paused: bool) -> Result<()> {
+        if IS_PAUSED.swap(paused, Ordering::SeqCst) == paused {
+            return Ok(());
+        }
+        let app = self.manager.app_handle();
+        Self::refresh_icon(app)?;
+        Self::rebuild_menu(app)
     }
 
     pub fn set_recording_title(&self, title: Option<String>) -> Result<()> {
@@ -558,7 +584,10 @@ impl<'a, M: tauri::Manager<tauri::Wry>> Tray<'a, tauri::Wry, M> {
                 handle.abort();
             }
 
-            if IS_RECORDING.load(Ordering::SeqCst) && !IS_DEGRADED.load(Ordering::SeqCst) {
+            if IS_RECORDING.load(Ordering::SeqCst)
+                && !IS_PAUSED.load(Ordering::SeqCst)
+                && !IS_DEGRADED.load(Ordering::SeqCst)
+            {
                 let app = app.clone();
                 *task = Some(tauri::async_runtime::spawn(async move {
                     let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
@@ -567,6 +596,7 @@ impl<'a, M: tauri::Manager<tauri::Wry>> Tray<'a, tauri::Wry, M> {
                         interval.tick().await;
                         let _ = on_main_thread(&app, move |app| {
                             if IS_RECORDING.load(Ordering::SeqCst)
+                                && !IS_PAUSED.load(Ordering::SeqCst)
                                 && !IS_DEGRADED.load(Ordering::SeqCst)
                                 && crate::macos_position::wanted_visible()
                                 && let Some(tray) = app.tray_by_id(TRAY_ID)
@@ -585,6 +615,14 @@ impl<'a, M: tauri::Manager<tauri::Wry>> Tray<'a, tauri::Wry, M> {
         let Some(tray) = app.tray_by_id(TRAY_ID) else {
             return Ok(());
         };
+
+        if IS_RECORDING.load(Ordering::SeqCst)
+            && IS_PAUSED.load(Ordering::SeqCst)
+            && !IS_DEGRADED.load(Ordering::SeqCst)
+        {
+            tray.set_icon(Some(Image::from_bytes(RECORDING_FRAMES[0])?))?;
+            return Ok(());
+        }
 
         let state = if IS_UPDATE_AVAILABLE.load(Ordering::SeqCst) {
             TrayIconState::UpdateAvailable

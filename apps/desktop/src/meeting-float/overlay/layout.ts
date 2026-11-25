@@ -23,13 +23,20 @@ export const FLOATING_BAR_COMPACT_MARKS_WIDTH =
     (FLOATING_BAR_COMPACT_ICON_SIZE + FLOATING_BAR_COMPACT_GAP) +
   FLOATING_BAR_COMPACT_MARKS_SEPARATOR;
 
-export function compactControlsWidth(showsExpand: boolean, showsMarks = false) {
+export function compactControlsWidth(
+  showsExpand: boolean,
+  showsPause: boolean,
+  showsMarks = false,
+) {
+  const main = showsExpand
+    ? FLOATING_BAR_COMPACT_STOP_WIDTH +
+      FLOATING_BAR_COMPACT_GAP +
+      FLOATING_BAR_COMPACT_ICON_SIZE
+    : FLOATING_BAR_COMPACT_SOLO_STOP_WIDTH;
   return (
     (showsMarks ? FLOATING_BAR_COMPACT_MARKS_WIDTH : 0) +
-    (showsExpand
-      ? FLOATING_BAR_COMPACT_STOP_WIDTH +
-        FLOATING_BAR_COMPACT_GAP +
-        FLOATING_BAR_COMPACT_ICON_SIZE
-      : FLOATING_BAR_COMPACT_SOLO_STOP_WIDTH)
+    (showsPause
+      ? main + FLOATING_BAR_COMPACT_GAP + FLOATING_BAR_COMPACT_ICON_SIZE
+      : main)
   );
 }

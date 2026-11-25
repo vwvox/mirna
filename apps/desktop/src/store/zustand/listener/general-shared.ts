@@ -43,6 +43,8 @@ export type GeneralState = {
     intervalId?: LiveIntervalId;
     sessionId: string | null;
     muted: boolean;
+    /** Audio is dropped, not recorded, until the user resumes. */
+    paused: boolean;
     captureHealth: {
       mic: boolean | null;
       speaker: boolean | null;
@@ -82,6 +84,7 @@ const initialLiveState: LiveState = {
   captureGenerationBySession: {},
   sessionId: null,
   muted: false,
+  paused: false,
   captureHealth: { mic: null, speaker: null, unavailable: false },
   lastError: null,
   lastErrorSessionId: null,
@@ -213,6 +216,7 @@ export const markLiveActive = (
   live.loadingPhase = "idle";
   live.seconds = 0;
   live.intervalId = intervalId;
+  live.paused = false;
   live.degraded = degraded;
   live.requestedLiveTranscription = requestedLiveTranscription;
   live.liveTranscriptionActive = liveTranscriptionActive;
@@ -273,6 +277,7 @@ export const markLiveInactive = (
   live.finalStallAudibleSeconds = 0;
   live.transcriptionStalled = false;
   live.muted = initialLiveState.muted;
+  live.paused = false;
   live.triggerAppIds = null;
 };
 
@@ -296,6 +301,7 @@ export const markLiveStartFailed = (
   live.seconds = 0;
   live.sessionId = null;
   live.muted = initialLiveState.muted;
+  live.paused = false;
   live.lastError = audioError ?? error;
   live.lastErrorSessionId = sessionId;
   live.lastErrorIsAudioRelated = audioError !== null;

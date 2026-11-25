@@ -25,6 +25,8 @@ pub struct CaptureSnapshot {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mic_muted: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub degraded: Option<listener::DegradedError>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capture_health: Option<listener::actors::CaptureHealth>,
@@ -188,6 +190,10 @@ pub enum CaptureDataEvent {
     },
     #[serde(rename = "mic_muted")]
     MicMuted { session_id: String, value: bool },
+    #[serde(rename = "capture_paused")]
+    CapturePaused { session_id: String, value: bool },
+    #[serde(rename = "speech_heard")]
+    SpeechHeard { session_id: String },
     #[serde(rename = "mic_isolated")]
     MicIsolated { session_id: String, value: bool },
     #[serde(rename = "mic_dropouts")]
@@ -349,6 +355,7 @@ impl From<listener::Snapshot> for CaptureSnapshot {
             live_segments: None,
             started_at_ms: None,
             mic_muted: None,
+            paused: None,
             degraded: None,
             capture_health: None,
         }
@@ -413,6 +420,12 @@ impl From<listener::SessionDataEvent> for CaptureDataEvent {
             },
             listener::SessionDataEvent::MicMuted { session_id, value } => {
                 Self::MicMuted { session_id, value }
+            }
+            listener::SessionDataEvent::CapturePaused { session_id, value } => {
+                Self::CapturePaused { session_id, value }
+            }
+            listener::SessionDataEvent::SpeechHeard { session_id } => {
+                Self::SpeechHeard { session_id }
             }
             listener::SessionDataEvent::MicIsolated { session_id, value } => {
                 Self::MicIsolated { session_id, value }

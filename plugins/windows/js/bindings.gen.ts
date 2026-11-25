@@ -209,6 +209,7 @@ floatingBarMark: FloatingBarMark,
 floatingBarOpenMain: FloatingBarOpenMain,
 floatingBarOverlayAmplitude: FloatingBarOverlayAmplitude,
 floatingBarOverlayState: FloatingBarOverlayState,
+floatingBarPause: FloatingBarPause,
 floatingBarSettingsChange: FloatingBarSettingsChange,
 floatingBarStop: FloatingBarStop,
 liveCaptionOverlayState: LiveCaptionOverlayState,
@@ -223,6 +224,7 @@ floatingBarMark: "plugin:windows:floating-bar-mark",
 floatingBarOpenMain: "plugin:windows:floating-bar-open-main",
 floatingBarOverlayAmplitude: "plugin:windows:floating-bar-overlay-amplitude",
 floatingBarOverlayState: "plugin:windows:floating-bar-overlay-state",
+floatingBarPause: "plugin:windows:floating-bar-pause",
 floatingBarSettingsChange: "plugin:windows:floating-bar-settings-change",
 floatingBarStop: "plugin:windows:floating-bar-stop",
 liveCaptionOverlayState: "plugin:windows:live-caption-overlay-state",
@@ -258,8 +260,9 @@ export type FloatingBarOpenMain = Record<string, never>
 export type FloatingBarOverlayAmplitude = { amplitude: number }
 export type FloatingBarOverlayLayout = { controlsCenterX: number; expandsUpward: boolean }
 export type FloatingBarOverlayState = { state: FloatingBarState }
+export type FloatingBarPause = { paused: boolean }
 export type FloatingBarSettingsChange = { floatingBarOpacity: number | null; liveCaptionOpacity: number | null; liveCaptionWidth: number | null; liveCaptionLineCount: number | null; liveCaptionPosition: LiveCaptionPosition | null; liveCaptionMinimized: boolean | null }
-export type FloatingBarState = { dictation?: FloatingDictationState | null; amplitude: number; title: string; status: FloatingBarStatus; colorScheme: FloatingBarColorScheme; opacity: number; liveCaptionOpacity: number; liveCaptionWidth: number; liveCaptionLineCount: number; liveCaptionPosition: LiveCaptionPosition; liveCaptionMinimized: boolean; liveCaptionToggleVisible: boolean; transcriptBubbles?: FloatingTranscriptBubble[] | null; transcriptNotice?: string | null; layout?: FloatingBarOverlayLayout | null; sessionId?: string | null; marksEnabled?: boolean }
+export type FloatingBarState = { dictation?: FloatingDictationState | null; amplitude: number; title: string; status: FloatingBarStatus; colorScheme: FloatingBarColorScheme; opacity: number; liveCaptionOpacity: number; liveCaptionWidth: number; liveCaptionLineCount: number; liveCaptionPosition: LiveCaptionPosition; liveCaptionMinimized: boolean; liveCaptionToggleVisible: boolean; transcriptBubbles?: FloatingTranscriptBubble[] | null; transcriptNotice?: string | null; layout?: FloatingBarOverlayLayout | null; sessionId?: string | null; marksEnabled?: boolean; paused?: boolean }
 export type FloatingBarStatus = "recording" | "reconnecting" | "error"
 export type FloatingBarStop = Record<string, never>
 export type FloatingDictationState = { sessionId: string; phase: string; microphone: string; text: string; partial: string; previewEnabled: boolean; previewUnavailable: boolean }

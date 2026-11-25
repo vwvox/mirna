@@ -22,15 +22,28 @@ final class FloatingBarMarksTests: XCTestCase {
 
   func testMarksWidenOnlyTheCompactBar() {
     XCTAssertEqual(
-      FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true, showsMarks: true),
+      FloatingBarLayout.containerSize(
+        isExpanded: false, showsExpand: true, showsPause: false, showsMarks: true),
       NSSize(width: 202, height: 67))
     XCTAssertEqual(
-      FloatingBarLayout.containerSize(isExpanded: false, showsExpand: false, showsMarks: true)
-        .width,
-      FloatingBarLayout.containerSize(isExpanded: false, showsExpand: false).width + 94)
+      FloatingBarLayout.containerSize(
+        isExpanded: false, showsExpand: false, showsPause: false, showsMarks: true
+      ).width,
+      FloatingBarLayout.containerSize(isExpanded: false, showsExpand: false, showsPause: false)
+        .width + 94)
     XCTAssertEqual(
-      FloatingBarLayout.containerSize(isExpanded: true, showsExpand: true, showsMarks: true),
-      FloatingBarLayout.containerSize(isExpanded: true, showsExpand: true))
+      FloatingBarLayout.containerSize(
+        isExpanded: true, showsExpand: true, showsPause: false, showsMarks: true),
+      FloatingBarLayout.containerSize(isExpanded: true, showsExpand: true, showsPause: false))
+  }
+
+  func testMarksAndPauseFitSideBySide() {
+    let both = FloatingBarLayout.compactControlsWidth(
+      showsExpand: true, showsPause: true, showsMarks: true)
+    XCTAssertEqual(
+      both,
+      FloatingBarLayout.compactControlsWidth(showsExpand: true, showsPause: true)
+        + FloatingBarLayout.compactMarksWidth)
   }
 
   func testMarkKindsMatchTheRustEvent() {

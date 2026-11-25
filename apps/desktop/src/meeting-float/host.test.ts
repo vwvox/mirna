@@ -82,6 +82,7 @@ describe("getFloatingRouteState", () => {
       title: "Live transcript",
       amplitude: 1,
       status: "recording",
+      paused: false,
       colorScheme: "dark",
       opacity: 0.78,
       liveCaptionOpacity: 0.3,
@@ -248,6 +249,18 @@ describe("getFloatingRouteState", () => {
         }),
       )?.status,
     ).toBe("recording");
+  });
+
+  it("reports a paused recording", () => {
+    expect(
+      getFloatingRouteState(
+        createListenerState({
+          status: "active",
+          sessionId: "session-1",
+          paused: true,
+        }),
+      ),
+    ).toMatchObject({ status: "recording", paused: true, amplitude: 0 });
   });
 
   it("hides the floating route while the session is finalizing", () => {
@@ -597,6 +610,19 @@ describe("floating route refresh", () => {
       live: { ...previous.live, transcriptionStalled: true },
     };
     expect(haveFloatingRouteInputsChanged(stalled, previous)).toBe(true);
+  });
+
+  it("refreshes when the recording is paused or resumed", () => {
+    const previous = createListenerState({
+      status: "active",
+      sessionId: "session-1",
+    });
+    const paused = {
+      ...previous,
+      live: { ...previous.live, paused: true },
+    };
+    expect(haveFloatingRouteInputsChanged(paused, previous)).toBe(true);
+    expect(haveFloatingRouteInputsChanged(previous, paused)).toBe(true);
   });
 
   it("refreshes when retry state changes without new audio", () => {

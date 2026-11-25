@@ -8,6 +8,7 @@ mod tray_hide;
 mod tray_open;
 mod tray_quit;
 mod tray_quit_completely;
+mod tray_recording;
 mod tray_settings;
 mod tray_show_events;
 mod tray_start;
@@ -23,6 +24,7 @@ pub use tray_hide::TrayHide;
 pub use tray_open::TrayOpen;
 pub use tray_quit::TrayQuit;
 pub use tray_quit_completely::{TrayQuitCompletely, quit_completely};
+pub use tray_recording::{TrayPauseRecording, TrayStopRecording};
 pub use tray_settings::TraySettings;
 pub use tray_show_events::TrayShowEvents;
 pub use tray_start::TrayStart;
@@ -77,6 +79,8 @@ macro_rules! menu_items {
 menu_items! {
     TrayOpen => TrayOpen,
     TrayStart => TrayStart,
+    TrayPauseRecording => TrayPauseRecording,
+    TrayStopRecording => TrayStopRecording,
     TraySettings => TraySettings,
     TrayShowEvents => TrayShowEvents,
     TrayCheckUpdate => TrayCheckUpdate,

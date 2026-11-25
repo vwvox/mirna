@@ -56,6 +56,7 @@ describe("FloatingBarOverlay", () => {
         <FloatingBarOverlay
           state={state({ status })}
           onStop={onStop}
+          onSetPaused={vi.fn()}
           onToggleExpanded={vi.fn()}
           onMark={vi.fn()}
         />,
@@ -74,6 +75,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={vi.fn()}
+        onSetPaused={vi.fn()}
         onToggleExpanded={onToggleExpanded}
         onMark={vi.fn()}
       />,
@@ -89,6 +91,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state({ liveCaptionMinimized: false })}
         onStop={vi.fn()}
+        onSetPaused={vi.fn()}
         onToggleExpanded={onToggleExpanded}
         onMark={vi.fn()}
       />,
@@ -110,6 +113,7 @@ describe("FloatingBarOverlay", () => {
         onStop={vi.fn()}
         onToggleExpanded={vi.fn()}
         onMark={vi.fn()}
+        onSetPaused={vi.fn()}
       />,
     );
     expect(screen.queryByRole("button", { name: /^Mark as/ })).toBeNull();
@@ -131,6 +135,7 @@ describe("FloatingBarOverlay", () => {
         onStop={vi.fn()}
         onToggleExpanded={vi.fn()}
         onMark={vi.fn()}
+        onSetPaused={vi.fn()}
       />,
     );
     expect(screen.queryByRole("button", { name: /^Mark as/ })).toBeNull();
@@ -144,6 +149,7 @@ describe("FloatingBarOverlay", () => {
         onStop={vi.fn()}
         onToggleExpanded={vi.fn()}
         onMark={onMark}
+        onSetPaused={vi.fn()}
       />,
     );
 
@@ -160,5 +166,89 @@ describe("FloatingBarOverlay", () => {
     }
     expect(onMark).toHaveBeenCalledTimes(3);
     screen.getByRole("button", { name: /stop listening/i });
+  });
+
+  it("pauses a meeting recording and shows a still indicator until resumed", () => {
+    const onSetPaused = vi.fn();
+    const onStop = vi.fn();
+
+    const view = render(
+      <FloatingBarOverlay
+        state={state()}
+        onStop={onStop}
+        onSetPaused={onSetPaused}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("waveform")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Pause recording" }));
+    expect(onSetPaused).toHaveBeenCalledWith(true);
+
+    view.rerender(
+      <FloatingBarOverlay
+        state={state({ paused: true, amplitude: 0 })}
+        onStop={onStop}
+        onSetPaused={onSetPaused}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("waveform")).toBeNull();
+    expect(screen.getByTestId("paused-indicator")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Resume recording" }));
+    expect(onSetPaused).toHaveBeenLastCalledWith(false);
+
+    const stop = screen.getByRole("button", {
+      name: "Recording paused; stop listening",
+    });
+    fireEvent.mouseEnter(stop);
+    expect(screen.getByText("Stop")).toBeTruthy();
+    fireEvent.click(stop);
+    expect(onStop).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the error state visible while paused", () => {
+    render(
+      <FloatingBarOverlay
+        state={state({ paused: true, status: "error" })}
+        onStop={vi.fn()}
+        onSetPaused={vi.fn()}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByTestId("paused-indicator")).toBeNull();
+    screen.getByRole("button", { name: /needs attention; stop listening/i });
+  });
+
+  it("does not offer pause during dictation", () => {
+    render(
+      <FloatingBarOverlay
+        state={state({
+          dictation: {
+            sessionId: "dictation-1",
+            phase: "recording",
+            microphone: "Mic",
+            text: "",
+            partial: "",
+            previewEnabled: true,
+            previewUnavailable: false,
+          },
+        })}
+        onStop={vi.fn()}
+        onSetPaused={vi.fn()}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /pause recording/i }),
+    ).toBeNull();
+    screen.getByRole("button", { name: "Finish dictation" });
   });
 });

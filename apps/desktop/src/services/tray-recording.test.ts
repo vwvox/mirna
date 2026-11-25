@@ -1,7 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
 import {
   createTrayRecordingTitlePublisher,
+  handleTrayRecordingAction,
   getTrayRecordingSessionId,
   getTrayRecordingTitle,
 } from "./tray-recording";
@@ -91,5 +92,34 @@ describe("resolveLiveSessionTitle", () => {
         storeTitle,
       ),
     ).toBe(expected);
+  });
+});
+
+describe("handleTrayRecordingAction", () => {
+  const listener = (status: "active" | "inactive" | "finalizing") => ({
+    live: { status } as never,
+    stop: vi.fn(),
+    setPaused: vi.fn(async () => true),
+  });
+
+  test("pauses, resumes and stops the active recording", async () => {
+    const active = listener("active");
+
+    await handleTrayRecordingAction("pause", active);
+    await handleTrayRecordingAction("resume", active);
+    await handleTrayRecordingAction("stop", active);
+
+    expect(active.setPaused.mock.calls).toEqual([[true], [false]]);
+    expect(active.stop).toHaveBeenCalledTimes(1);
+  });
+
+  test("does nothing once the recording has stopped", async () => {
+    const finalizing = listener("finalizing");
+
+    await handleTrayRecordingAction("pause", finalizing);
+    await handleTrayRecordingAction("stop", finalizing);
+
+    expect(finalizing.setPaused).not.toHaveBeenCalled();
+    expect(finalizing.stop).not.toHaveBeenCalled();
   });
 });

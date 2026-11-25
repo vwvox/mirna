@@ -119,6 +119,9 @@ final class FloatingBarManager {
     if model.status != state.status {
       model.status = state.status
     }
+    if model.paused != state.isPaused {
+      model.paused = state.isPaused
+    }
     applyAmplitude(state.amplitude)
     if model.colorScheme != state.colorScheme {
       model.colorScheme = state.colorScheme
@@ -223,7 +226,8 @@ final class FloatingBarManager {
     let grows =
       nextLayout.isExpanded
       && panel.frame.height
-        <= FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true).height
+        <= FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true, showsPause: false)
+        .height
     let expandsUpward =
       grows
       ? workArea.maxY - anchor.y > anchor.y - workArea.minY
@@ -250,6 +254,7 @@ final class FloatingBarManager {
     FloatingBarWindowLayout(
       isExpanded: isExpanded,
       showsExpand: model.liveCaptionToggleVisible,
+      showsPause: model.showsPause,
       showsMarks: model.marksEnabled
     )
   }
@@ -258,6 +263,7 @@ final class FloatingBarManager {
     FloatingBarLayout.containerSize(
       isExpanded: layout.isExpanded,
       showsExpand: layout.showsExpand,
+      showsPause: layout.showsPause,
       showsMarks: layout.showsMarks
     )
   }
@@ -294,6 +300,7 @@ final class FloatingBarManager {
 private struct FloatingBarWindowLayout {
   let isExpanded: Bool
   let showsExpand: Bool
+  let showsPause: Bool
   let showsMarks: Bool
 }
 

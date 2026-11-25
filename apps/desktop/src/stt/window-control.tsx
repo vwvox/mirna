@@ -15,7 +15,7 @@ const LISTENER_CONTROL_EVENT = "anlg:listener-control";
 // capture by then, stop it natively.
 const MAIN_STOP_FALLBACK_DELAY_MS = 1_500;
 
-type ListenerControlAction = "start" | "stop";
+type ListenerControlAction = "start" | "stop" | "pause" | "resume";
 
 type ListenerControlRequest = {
   action: ListenerControlAction;
@@ -138,8 +138,12 @@ function MainListenerControlRequestRunner({
         if (live.sessionId !== request.sessionId || !isStartingOrActive) {
           await startListeningRef.current();
         }
-      } else if (live.sessionId === request.sessionId) {
+      } else if (live.sessionId !== request.sessionId) {
+        // Another recording took over; this request is stale.
+      } else if (request.action === "stop") {
         stopRef.current();
+      } else {
+        await listenerStore.getState().setPaused(request.action === "pause");
       }
 
       if (!cancelled) {

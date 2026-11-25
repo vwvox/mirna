@@ -137,6 +137,7 @@ impl<'a, R: tauri::Runtime, M: tauri::Manager<R>> Listener<'a, R, M> {
         {
             let source: ActorRef<SourceMsg> = cell.into();
             snapshot.mic_muted = call_t!(source, SourceMsg::GetMicMute, 100).ok();
+            snapshot.paused = call_t!(source, SourceMsg::GetPaused, 100).ok();
             snapshot.capture_health = call_t!(source, SourceMsg::GetCaptureHealth, 100).ok();
         }
 
@@ -157,6 +158,41 @@ impl<'a, R: tauri::Runtime, M: tauri::Manager<R>> Listener<'a, R, M> {
         if let Some(actor) = active_source().await {
             let _ = actor.cast(SourceMsg::SetMicMute(muted));
         }
+    }
+
+    /// Pauses or resumes the session's recording. Paused audio is dropped before it is recorded
+    /// or transcribed. The meeting runtime follows, so speaker evidence and the browser extension
+    /// see the pause too; the native helper, where one records, pauses its own audio.
+    #[tracing::instrument(skip_all)]
+    pub async fn set_capture_paused(&self, session_id: String, paused: bool) -> crate::Result<()> {
+        let cell = registry::where_is(SourceActor::name(&session_id))
+            .ok_or_else(|| crate::Error::ActorNotFound("active source".into()))?;
+        let source: ActorRef<SourceMsg> = cell.into();
+        source
+            .cast(SourceMsg::SetPaused(paused))
+            .map_err(|_| crate::Error::ActorNotFound("active source".into()))?;
+
+        if let Some(meeting) = crate::meeting::state(self.manager)
+            && let Some(capture) = meeting.runtime.active_for_session(&session_id)
+        {
+            let result = if meeting.router.can_pause(&capture) {
+                let toggled = if paused {
+                    meeting.router.pause(&capture)
+                } else {
+                    meeting.router.resume(&capture)
+                };
+                toggled.await.map_err(|error| error.to_string())
+            } else {
+                meeting
+                    .runtime
+                    .set_paused(&capture, paused)
+                    .map_err(|error| error.to_string())
+            };
+            if let Err(error) = result {
+                tracing::warn!(%error, paused, "meeting_runtime_pause_failed");
+            }
+        }
+        Ok(())
     }
 
     pub async fn retry_audio_capture(
@@ -496,6 +532,7 @@ mod tests {
             live_segments: None,
             started_at_ms: None,
             mic_muted: None,
+            paused: None,
             degraded: None,
             capture_health: None,
         };

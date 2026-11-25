@@ -16,6 +16,7 @@ import {
 } from "@anlg/plugin-phone-link";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
+import { reloadSessionAudio } from "~/audio-player/reload";
 import { liveQueryClient } from "~/db";
 import { publishLinkedNotes } from "~/phone-link/notes-publisher";
 import { getEnhancerService } from "~/services/enhancer";
@@ -29,11 +30,14 @@ import {
   clearSummaryOutdated,
   markSummaryOutdated,
 } from "~/session/summary-outdated";
+import {
+  TrimRefusedError,
+  trimSessionRecording,
+} from "~/session/trim-recording";
 import { useAiProvidersState } from "~/settings/providers";
 import { useSettingsReady } from "~/settings/queries";
 import { DEFAULT_USER_ID } from "~/shared/utils";
 import { useListener } from "~/stt/contexts";
-import { trimTranscriptAfter } from "~/stt/queries";
 import { isStoppedTranscriptionError, useRunBatch } from "~/stt/useRunBatch";
 
 export const PHONE_INBOX_QUERY_KEY = ["phone-link", "inbox"] as const;
@@ -163,6 +167,9 @@ function RunPhoneRecording({
         .finally(() => {
           runningRecordings.delete(item.id);
           sessionsByRecording.delete(item.id);
+          if (item.job?.type === "trim") {
+            reloadSessionAudio(queryClient, sessionId);
+          }
           void queryClient.invalidateQueries({
             queryKey: PHONE_INBOX_QUERY_KEY,
           });
@@ -395,36 +402,22 @@ async function retranscribe(
 }
 
 async function trimNote(sessionId: string, keepMs: number) {
-  const transcripts = await liveQueryClient.execute<{ id: string }>(
-    `SELECT id FROM transcripts
-    WHERE session_id = ? AND deleted_at IS NULL
-    ORDER BY started_at_ms, created_at, id`,
-    [sessionId],
-  );
-  if (transcripts.length > 1) {
-    throw new JobProblem(
-      "This note has recordings added on the Mac, so it can't be trimmed from the phone yet.",
-    );
-  }
-  const trimmed = await enqueueSessionAudioOperation(sessionId, async () => {
-    const result = await fsSyncCommands.audioTrim(sessionId, keepMs);
-    if (result.status === "error") throw new Error(result.error);
-    if (result.data) {
-      try {
-        await catalogLocalSessionAudio(sessionId);
-      } catch (error) {
-        console.error("[phone-link] could not catalog the audio", error);
-      }
+  try {
+    const { audioTrimmed } = await trimSessionRecording(sessionId, keepMs, {
+      requestedBy: "phone",
+    });
+    if (!audioTrimmed) {
+      console.info(
+        "[phone-link] no audio on the Mac to trim; trimming text only",
+      );
     }
-    return result.data;
-  });
-  if (!trimmed) {
-    console.info(
-      "[phone-link] no audio on the Mac to trim; trimming text only",
-    );
-  }
-  for (const transcript of transcripts) {
-    await trimTranscriptAfter(transcript.id, keepMs);
+  } catch (error) {
+    if (error instanceof TrimRefusedError && error.reason === "several_parts") {
+      throw new JobProblem(
+        "This note has recordings added on the Mac, so it can't be trimmed from the phone yet.",
+      );
+    }
+    throw error;
   }
 }
 

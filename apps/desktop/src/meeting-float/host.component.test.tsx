@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
     | null
     | ((event: { payload: { sessionId: string; kind: string } }) => void),
   addLessonMark: vi.fn(async () => null),
+  meetingPause: null as
+    | null
+    | ((event: { payload: { paused: boolean } }) => void),
   settings: {
     current: {
       floating_bar_opacity: 0.78,
@@ -43,10 +46,12 @@ const mocks = vi.hoisted(() => ({
       degraded: null,
       lastError: null,
       liveTranscriptionActive: true,
+      paused: false,
     },
     liveSegments: [],
     liveCaptionText: "we should ship this",
     stop: vi.fn(),
+    setPaused: vi.fn(async () => true),
   },
   subscribeListener: vi.fn(() => vi.fn()),
 }));
@@ -71,6 +76,12 @@ vi.mock("@anlg/plugin-windows", () => ({
     floatingBarStop: {
       listen: vi.fn(async (callback) => {
         mocks.meetingStop = callback;
+        return vi.fn();
+      }),
+    },
+    floatingBarPause: {
+      listen: vi.fn(async (callback) => {
+        mocks.meetingPause = callback;
         return vi.fn();
       }),
     },
@@ -129,6 +140,7 @@ describe("FloatingMeetingWindowHost", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.meetingStop = null;
+    mocks.meetingPause = null;
     mocks.dictationAction = null;
     mocks.mark = null;
     mocks.listenerState.live.sessionId = "session-1";
@@ -294,5 +306,39 @@ describe("FloatingMeetingWindowHost", () => {
       ),
     );
     expect(mocks.floatingBarShow).toHaveBeenCalledOnce();
+  });
+
+  it("pauses and resumes the meeting from the floating bar", async () => {
+    render(<FloatingMeetingWindowHost />);
+    await waitFor(() => expect(mocks.meetingPause).not.toBeNull());
+
+    await act(async () => {
+      mocks.meetingPause!({ payload: { paused: true } });
+    });
+    expect(mocks.listenerState.setPaused).toHaveBeenLastCalledWith(true);
+
+    await act(async () => {
+      mocks.meetingPause!({ payload: { paused: false } });
+    });
+    expect(mocks.listenerState.setPaused).toHaveBeenLastCalledWith(false);
+    expect(mocks.listenerState.stop).not.toHaveBeenCalled();
+  });
+
+  it("ignores pause requests while dictating", async () => {
+    mocks.listenerState.live.status = "inactive";
+    useDictationStatus.setState({ phase: "recording", owner: "dictation-1" });
+    render(<FloatingMeetingWindowHost />);
+    await waitFor(() =>
+      expect(mocks.floatingBarUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          dictation: expect.objectContaining({ sessionId: "dictation-1" }),
+        }),
+      ),
+    );
+
+    await act(async () => {
+      mocks.meetingPause!({ payload: { paused: true } });
+    });
+    expect(mocks.listenerState.setPaused).not.toHaveBeenCalled();
   });
 });

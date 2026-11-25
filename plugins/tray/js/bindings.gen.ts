@@ -35,6 +35,11 @@ async setTrayRecordingTitle(title: string | null) : Promise<Result<null, string>
 /** user-defined events **/
 
 
+export const events = __makeEvents__<{
+trayRecordingAction: TrayRecordingAction
+}>({
+trayRecordingAction: "plugin:anlg-tray:tray-recording-action"
+})
 
 /** user-defined constants **/
 
@@ -42,6 +47,11 @@ async setTrayRecordingTitle(title: string | null) : Promise<Result<null, string>
 
 /** user-defined types **/
 
+/**
+ * Asked from the menu bar; the main window acts on the recording it owns.
+ */
+export type TrayRecordingAction = { action: TrayRecordingActionKind }
+export type TrayRecordingActionKind = "pause" | "resume" | "stop"
 export type TrayScheduleEvent = { id: string; title: string; meetingLink: string | null; startsAtMs: number; endsAtMs: number | null; dayStartMs: number; previousDayStartMs: number; timeLabel: string }
 
 /** tauri-specta globals **/

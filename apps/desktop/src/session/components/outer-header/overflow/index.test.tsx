@@ -33,6 +33,7 @@ const {
   toastErrorMock,
   sessionRecord,
   authenticateMock,
+  trimDialogMock,
 } = vi.hoisted(() => ({
   uploadAudioMock: vi.fn(),
   uploadTranscriptMock: vi.fn(),
@@ -55,6 +56,13 @@ const {
   toastErrorMock: vi.fn(),
   sessionRecord: { value: null as { locked?: boolean } | null },
   authenticateMock: vi.fn(),
+  trimDialogMock: vi.fn(
+    (_props: {
+      sessionId: string;
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+    }) => null,
+  ),
 }));
 
 vi.mock("@tauri-apps/plugin-os", () => ({
@@ -167,6 +175,10 @@ vi.mock("./transcribe-again", () => ({
   ),
 }));
 
+vi.mock("./trim-recording", () => ({
+  TrimRecordingDialog: trimDialogMock,
+}));
+
 vi.mock("./lock-note", () => ({
   LockNote: () => <button type="button">Lock Note</button>,
 }));
@@ -263,6 +275,7 @@ const ACTIONS = [
   "Start listening",
   "Resume listening",
   "Transcribe again",
+  "Trim recording…",
   "Show Audio in Finder",
   "Show Audio in Explorer",
   "Show Audio in Folder",
@@ -372,6 +385,7 @@ describe("OverflowButton", () => {
       [
         "Resume listening",
         "Transcribe again",
+        "Trim recording…",
         "Show Audio in Finder",
         "Open in New Window",
         "Delete note",
@@ -452,6 +466,38 @@ describe("OverflowButton", () => {
       provider: "soniqo",
       model: "soniqo-qwen3-small",
     });
+  });
+
+  it("opens the trim dialog for recorded audio", () => {
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      callback(0);
+      return 0;
+    });
+    arrange({ audio: true });
+    renderOverflow();
+
+    expect(trimDialogMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trim recording…" }));
+
+    expect(trimDialogMock.mock.lastCall?.[0]).toMatchObject({
+      sessionId: "session-1",
+      open: true,
+    });
+  });
+
+  it("requires authentication for a locked note before trimming", async () => {
+    arrange({ audio: true });
+    sessionRecord.value = { locked: true };
+    authenticateMock.mockResolvedValue(false);
+    renderOverflow();
+
+    fireEvent.click(screen.getByRole("button", { name: "Trim recording…" }));
+
+    await waitFor(() => {
+      expect(authenticateMock).toHaveBeenCalled();
+    });
+    expect(trimDialogMock).not.toHaveBeenCalled();
   });
 
   it.each(["macos", "linux"])(

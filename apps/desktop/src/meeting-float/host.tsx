@@ -300,6 +300,25 @@ function FloatingMeetingWindowSync({
         else unlisteners.push(unlisten);
       });
 
+    windowsEvents.floatingBarPause
+      .listen(({ payload }) => {
+        if (
+          !enabledRef.current ||
+          routeState?.dictation ||
+          listenerStore.getState().live.status !== "active"
+        )
+          return;
+        void listenerStore.getState().setPaused(payload.paused);
+      })
+      .then((unlisten) => {
+        if (cancelled) {
+          unlisten();
+          return;
+        }
+
+        unlisteners.push(unlisten);
+      });
+
     windowsEvents.floatingBarOpenMain
       .listen(async () => {
         await windowsCommands.windowShow({ type: "main" });
@@ -453,6 +472,7 @@ export function haveFloatingRouteInputsChanged(
   return (
     state.live.captureHealth !== previousState.live.captureHealth ||
     state.live.lastError !== previousState.live.lastError ||
+    state.live.paused !== previousState.live.paused ||
     state.live.status !== previousState.live.status ||
     state.live.sessionId !== previousState.live.sessionId ||
     state.live.loadingPhase !== previousState.live.loadingPhase ||

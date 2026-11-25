@@ -10,6 +10,7 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@anlg/ui/components/ui/popover";
+import { toast } from "@anlg/ui/components/ui/toast";
 import { cn, parseEventInstant, safeParseDate } from "@anlg/utils";
 
 import { FolderPicker } from "../folder-picker";
@@ -220,6 +221,8 @@ function HeaderMeetingAction({
 }) {
   const startListening = useStartListening(sessionId);
   const stop = useListener((state) => state.stop);
+  const paused = useListener((state) => state.live.paused);
+  const setPaused = useListener((state) => state.setPaused);
   const remote = getRemoteMeeting(event?.meeting_link);
   const meetingLink = event?.meeting_link || null;
   const isWelcomeDemo = event?.tracking_id === WELCOME_NOTE_TRACKING_ID;
@@ -296,6 +299,21 @@ function HeaderMeetingAction({
 
     stop();
   }, [sessionId, stop]);
+  const togglePause = useCallback(async () => {
+    if (!isMainWebviewWindow()) {
+      await requestMainListenerControl(paused ? "resume" : "pause", sessionId);
+      return;
+    }
+
+    if (!(await setPaused(!paused))) {
+      toast.error(
+        paused
+          ? t`Mirna couldn't resume the recording.`
+          : t`Mirna couldn't pause the recording.`,
+        { id: `pause-failed-${sessionId}` },
+      );
+    }
+  }, [paused, sessionId, setPaused, t]);
   const action = (() => {
     if (
       canJoinFromHeader &&
@@ -343,7 +361,10 @@ function HeaderMeetingAction({
   if (sessionMode === "active") {
     return (
       <div className="mr-1 ml-1">
-        <LiveRecordingPill onStop={stopListening} />
+        <LiveRecordingPill
+          onStop={stopListening}
+          onTogglePause={() => void togglePause()}
+        />
       </div>
     );
   }

@@ -91,6 +91,9 @@ export function FloatingBarOverlayScreen() {
             });
           }
         }}
+        onSetPaused={(paused) => {
+          void windowsEvents.floatingBarPause.emit({ paused });
+        }}
         onToggleExpanded={(expanded) => {
           if (state.dictation) {
             void windowsEvents.floatingBarDictationAction.emit({

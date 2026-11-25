@@ -223,6 +223,10 @@ msgstr ""
 msgid "{homework} homework items open"
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "{hours} h {paddedMinutes} min"
+msgstr ""
+
 #: src/lesson/components/study-sheet.tsx
 #~ msgid "{inChinese}% of the lesson was in Chinese"
 #~ msgstr ""
@@ -230,6 +234,10 @@ msgstr ""
 #. placeholder {0}: formatClock(clip.startMs)
 #: src/lesson/components/practice-dialog.tsx
 msgid "{lessonTitle} · teacher at <0>{0}</0>"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "{minutes} min"
 msgstr ""
 
 #. placeholder {0}: formatLanguageList(unsupportedLanguages)
@@ -263,6 +271,10 @@ msgstr ""
 
 #: src/settings/general/billing.tsx
 msgid "{remaining} days left"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "{seconds} s"
 msgstr ""
 
 #: src/lesson/components/practice-dialog.tsx
@@ -301,6 +313,10 @@ msgstr ""
 #. placeholder {0}: due.length - HERO_WORDS
 #: src/lesson/components/course-panel.tsx
 msgid "+{0} more"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "−{minutes} min"
 msgstr ""
 
 #. placeholder {0}: proPrice.monthly
@@ -1216,6 +1232,7 @@ msgstr ""
 #: src/lesson/components/new-lesson-dialog.tsx
 #: src/resource-sharing/library.tsx
 #: src/session-sharing/comments.tsx
+#: src/session/components/outer-header/overflow/trim-recording.tsx
 #: src/settings/ai/llm/subscriptions/connect.tsx
 #: src/settings/crm/index.tsx
 #: src/settings/dictionary/index.tsx
@@ -1532,6 +1549,10 @@ msgstr ""
 msgid "Choose the microphone that captures your voice."
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Choose where it ends"
+msgstr ""
+
 #: src/settings/general/week-start.tsx
 msgid "Choose which day begins your calendar week."
 msgstr ""
@@ -1602,6 +1623,7 @@ msgstr ""
 #: src/main/windows-title-bar.tsx
 #: src/main/windows-window-controls.tsx
 #: src/session/components/note-input/search/bar.tsx
+#: src/session/components/outer-header/overflow/trim-recording.tsx
 #: src/shared/open-note-dialog.tsx
 msgid "Close"
 msgstr ""
@@ -2284,8 +2306,16 @@ msgstr ""
 msgid "Couldn't open sign-in. Try again."
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Couldn't play the recording."
+msgstr ""
+
 #: src/lesson/components/practice-dialog.tsx
 msgid "Couldn't read the teacher's clip."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Couldn't read this recording."
 msgstr ""
 
 #: src/lesson/components/course-words.tsx
@@ -2313,6 +2343,10 @@ msgstr ""
 
 #: src/onboarding/account/after-login.tsx
 msgid "Couldn't switch accounts. Please try again."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Couldn't trim this recording."
 msgstr ""
 
 #: src/lesson/components/course-panel.tsx
@@ -2444,6 +2478,18 @@ msgstr ""
 
 #: src/main/windows-title-bar.tsx
 msgid "Cut"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Cut the last {cut}"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Cut the last {cut}."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Cut the last {minutes} minutes"
 msgstr ""
 
 #: src/settings/stats/index.tsx
@@ -2892,6 +2938,10 @@ msgstr ""
 msgid "Enabling it uploads a separate server-readable copy of your meeting titles, notes, summaries, participants, action items, and transcripts. Your normal cloud sync stays end-to-end encrypted. Turning it off deletes the server-readable copies."
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "End it there"
+msgstr ""
+
 #. placeholder {0}: i18n.date(billing.trialEnd, BILLING_DATE_FORMAT)
 #: src/settings/general/billing.tsx
 msgid "Ends {0}"
@@ -2903,6 +2953,10 @@ msgstr ""
 
 #: src/settings/general/billing.tsx
 msgid "ends {formattedTrialEnd}"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Ends at {end} · cuts {cut}"
 msgstr ""
 
 #: src/session/components/outer-header/metadata/participants/chip.tsx
@@ -3151,6 +3205,10 @@ msgstr ""
 
 #: src/settings/general/account.tsx
 msgid "Finish sign-in"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Finished?"
 msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
@@ -3905,6 +3963,10 @@ msgstr ""
 msgid "It sounded like more than one language ({heard}). Qwen3-ASR handles mixed languages."
 msgstr ""
 
+#: src/stt/long-recording-guard.tsx
+msgid "It stayed paused for 2 h, so Mirna stopped and saved it."
+msgstr ""
+
 #: src/session/components/note-input/transcript/engine-note.tsx
 msgid "It wasn't sure of the language ({heard}). Qwen3-ASR handles mixed languages."
 msgstr ""
@@ -3956,6 +4018,10 @@ msgstr ""
 
 #: src/settings/team/index.tsx
 msgid "Keep forever"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Keep going"
 msgstr ""
 
 #: src/lesson/tones.ts
@@ -4333,6 +4399,10 @@ msgstr ""
 #: src/settings/general/account-profile.tsx
 #: src/task/resource-view.tsx
 msgid "Loading..."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Loading…"
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -4746,6 +4816,14 @@ msgstr ""
 
 #: src/settings/sync/index.tsx
 msgid "Mirna could not start cloud sync on this device. It will keep retrying."
+msgstr ""
+
+#: src/session/components/outer-header/index.tsx
+msgid "Mirna couldn't pause the recording."
+msgstr ""
+
+#: src/session/components/outer-header/index.tsx
+msgid "Mirna couldn't resume the recording."
 msgstr ""
 
 #: src/settings/general/account.tsx
@@ -5241,6 +5319,10 @@ msgstr ""
 msgid "No words yet"
 msgstr ""
 
+#: src/stt/long-recording-guard.tsx
+msgid "Nobody has spoken for 15 min."
+msgstr ""
+
 #: src/settings/general/camera-watermark.tsx
 msgid "None"
 msgstr ""
@@ -5332,6 +5414,10 @@ msgstr ""
 #: src/folders/folder-editor.tsx
 #: src/sidebar/folder-materials.tsx
 msgid "Notes stay in All notes. Materials in this folder will be deleted."
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Nothing is lost. Resume to keep recording, or Mirna saves it in 2 h."
 msgstr ""
 
 #: src/lesson/components/practice-dialog.tsx
@@ -5439,6 +5525,7 @@ msgstr ""
 
 #: src/calendar/components/apple/permission.tsx
 #: src/main/empty.tsx
+#: src/stt/long-recording-guard.tsx
 #: src/task/resource-view.tsx
 msgid "Open"
 msgstr ""
@@ -5687,8 +5774,17 @@ msgstr ""
 msgid "Pause alerts while Do Not Disturb is on."
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
+msgid "Pause recording"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
 #: src/settings/developers/webhooks.tsx
 msgid "Paused"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Paused after 30 min of quiet"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -5808,6 +5904,10 @@ msgstr ""
 #: src/session/components/note-input/transcript/renderer/segment.tsx
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 msgid "Play from here"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Play the 5 s before the end"
 msgstr ""
 
 #. placeholder {0}: item.term
@@ -6048,6 +6148,10 @@ msgstr ""
 #~ msgid "Reading"
 #~ msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Reading the recording…"
+msgstr ""
+
 #: src/settings/dictation-engine.tsx
 msgid "Reads the field once after you dictate and suggests dictionary words you corrected. Suggestions wait for your review in Dictionary."
 msgstr ""
@@ -6156,6 +6260,10 @@ msgstr ""
 msgid "Recording"
 msgstr ""
 
+#: src/stt/long-recording-guard.tsx
+msgid "Recording for 2 h"
+msgstr ""
+
 #: src/session/components/note-input/transcript/actions.ts
 #: src/session/components/outer-header/overflow/index.tsx
 msgid "Recording not found. It may have been deleted."
@@ -6165,8 +6273,16 @@ msgstr ""
 msgid "Recording not transcribed yet."
 msgstr ""
 
+#: src/stt/long-recording-guard.tsx
+msgid "Recording on purpose?"
+msgstr ""
+
 #: src/session/components/note-input/transcript/renderer/separator.tsx
 msgid "Recording resumed"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Recording saved"
 msgstr ""
 
 #: src/settings/general/notification.tsx
@@ -6180,6 +6296,10 @@ msgstr ""
 
 #: src/session/components/outer-header/record-control.tsx
 msgid "Recording time"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Recording trimmed"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
@@ -6469,8 +6589,14 @@ msgstr ""
 msgid "Restoring cloud sync..."
 msgstr ""
 
+#: src/session/components/outer-header/record-control.tsx
 #: src/settings/general/billing.tsx
+#: src/stt/long-recording-guard.tsx
 msgid "Resume"
+msgstr ""
+
+#: src/session/components/outer-header/record-control.tsx
+msgid "Resume recording"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -7586,8 +7712,16 @@ msgstr ""
 msgid "Steps run from top to bottom."
 msgstr ""
 
+#: src/stt/long-recording-guard.tsx
+msgid "Still going?"
+msgstr ""
+
 #: src/lesson/components/lesson-board.tsx
 msgid "Still open:"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Still recording?"
 msgstr ""
 
 #: src/settings/appearance/app-icon.tsx
@@ -7595,8 +7729,13 @@ msgid "Stone"
 msgstr ""
 
 #: src/composer/index.tsx
+#: src/session/components/outer-header/overflow/trim-recording.tsx
 #: src/session/components/outer-header/record-control.tsx
 msgid "Stop"
+msgstr ""
+
+#: src/stt/long-recording-guard.tsx
+msgid "Stop & save"
 msgstr ""
 
 #: src/calendar/components/event-chip.tsx
@@ -7914,6 +8053,10 @@ msgstr ""
 msgid "text file"
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "The cut part is deleted from this Mac, with its words in the transcript. This can't be undone."
+msgstr ""
+
 #: src/lesson/components/lesson-board.tsx
 msgid "the last lesson"
 msgstr ""
@@ -7956,6 +8099,10 @@ msgstr ""
 
 #: src/session/components/note-input/transcript/actions.ts
 msgid "The summary still reflects the old transcript."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "The talking seems to stop around {stops}."
 msgstr ""
 
 #: src/lesson/components/pitch-chart.tsx
@@ -8053,8 +8200,24 @@ msgstr ""
 msgid "This note was edited on another device at the same time. The later edit was kept."
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "This note was recorded in more than one part, so it can't be trimmed yet."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "This recording came from your phone. Trim it in Mirna on your phone instead, so both copies stay the same. The phone trims the copy on this Mac too."
+msgstr ""
+
 #: src/store/zustand/listener/general-live.ts
 msgid "This recording follows your Mac's default microphone. To select a different microphone, stop and start a new recording."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "This recording is {length} long. Choose where it should end."
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "This recording is too short to trim."
 msgstr ""
 
 #: src/chat/components/session-provider.tsx
@@ -8234,6 +8397,18 @@ msgstr ""
 #: src/settings/automations/index.tsx
 #: src/settings/automations/workflow-builder.tsx
 msgid "Trigger"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Trim recording"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/index.tsx
+msgid "Trim recording…"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Trimming…"
 msgstr ""
 
 #: src/contacts/details.tsx
@@ -8762,6 +8937,10 @@ msgstr ""
 msgid "Where it was said"
 msgstr ""
 
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Where the recording ends"
+msgstr ""
+
 #: src/settings/ai/stt/local-file-model.tsx
 msgid "whisper.cpp models"
 msgstr ""
@@ -8870,6 +9049,10 @@ msgstr ""
 
 #: src/lesson/components/new-lesson-dialog.tsx
 msgid "Write the study sheet"
+msgstr ""
+
+#: src/session/components/outer-header/overflow/trim-recording.tsx
+msgid "Write the summary again too"
 msgstr ""
 
 #: src/automations/starters.tsx

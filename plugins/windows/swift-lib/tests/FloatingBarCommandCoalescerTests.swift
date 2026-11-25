@@ -6,6 +6,9 @@ import XCTest
 @_cdecl("rust_on_floating_bar_stop")
 func rustOnFloatingBarStop() {}
 
+@_cdecl("rust_on_floating_bar_pause")
+func rustOnFloatingBarPause(_: Int32) {}
+
 @_cdecl("rust_on_floating_bar_open_main")
 func rustOnFloatingBarOpenMain() {}
 
@@ -292,9 +295,29 @@ final class FloatingBarCommandCoalescerTests: XCTestCase {
     XCTAssertLessThan(slope, 2 * 1024 * 1024)
   }
 
+  func testPausedStateSurvivesCoalescedAmplitudeAndTranscriptMerges() {
+    let scheduler = ManualScheduler()
+    var actions: [FloatingBarCommandCoalescer.Action] = []
+    let coalescer = FloatingBarCommandCoalescer(
+      scheduler: scheduler.schedule,
+      apply: { actions.append($0) })
+
+    coalescer.enqueueUpdate(state(amplitude: 0.4, bubbles: [bubble(id: "first")]))
+    coalescer.enqueueUpdate(state(amplitude: 0, bubbles: nil, paused: true))
+    coalescer.enqueueAmplitude(0)
+    scheduler.runNext()
+
+    guard case .update(let latest) = actions.last else {
+      return XCTFail("Expected a coalesced update")
+    }
+    XCTAssertTrue(latest.isPaused)
+    XCTAssertEqual(latest.transcriptBubbles?.map(\.id), ["first"])
+  }
+
   private func state(
     amplitude: Double,
-    bubbles: [FloatingTranscriptBubblePayload]?
+    bubbles: [FloatingTranscriptBubblePayload]?,
+    paused: Bool = false
   ) -> FloatingBarStatePayload {
     FloatingBarStatePayload(
       dictation: nil,
@@ -309,7 +332,8 @@ final class FloatingBarCommandCoalescerTests: XCTestCase {
       liveCaptionPosition: .topCenter,
       liveCaptionMinimized: true,
       liveCaptionToggleVisible: true,
-      transcriptBubbles: bubbles)
+      transcriptBubbles: bubbles,
+      paused: paused)
   }
 
   private func bubble(id: String) -> FloatingTranscriptBubblePayload {
