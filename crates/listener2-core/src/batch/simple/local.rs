@@ -584,8 +584,9 @@ pub(super) fn soniqo_detects_language(model: anlg_transcribe_soniqo::SoniqoModel
 pub(super) struct SoniqoRouting {
     pub(super) requested_model: anlg_transcribe_soniqo::SoniqoModel,
     pub(super) model: anlg_transcribe_soniqo::SoniqoModel,
-    /// Top language per channel, when that channel had enough speech to tell.
-    pub(super) languages_by_channel: Vec<Option<anlg_transcribe_soniqo::LanguagePrediction>>,
+    /// Top language guesses per channel, likeliest first; empty when that
+    /// channel had too little speech to tell.
+    pub(super) predictions_by_channel: Vec<Vec<anlg_transcribe_soniqo::LanguagePrediction>>,
     /// A language Parakeet doesn't know was heard, but Qwen3-ASR isn't downloaded.
     pub(super) qwen3_suggested: bool,
 }
@@ -595,57 +596,86 @@ impl SoniqoRouting {
         Self {
             requested_model: model,
             model,
-            languages_by_channel: Vec::new(),
+            predictions_by_channel: Vec::new(),
             qwen3_suggested: false,
         }
     }
 
     /// The language that decided the engine: the one that rerouted the
-    /// recording, otherwise the most confident one heard.
+    /// recording, otherwise the most confident top guess.
     pub(super) fn language(&self) -> Option<&str> {
-        let heard = self.languages_by_channel.iter().flatten();
-        let rerouting = heard.clone().find(|prediction| {
-            anlg_transcribe_soniqo::route_batch_model(
-                self.requested_model,
-                std::slice::from_ref(prediction),
-            ) != self.requested_model
-        });
+        let rerouting = self
+            .predictions_by_channel
+            .iter()
+            .filter(|predictions| {
+                anlg_transcribe_soniqo::route_batch_model(self.requested_model, predictions)
+                    != self.requested_model
+            })
+            .find_map(|predictions| anlg_transcribe_soniqo::routing_language(predictions));
         rerouting
-            .or_else(|| heard.max_by(|a, b| a.probability.total_cmp(&b.probability)))
+            .or_else(|| {
+                self.predictions_by_channel
+                    .iter()
+                    .filter_map(|predictions| predictions.first())
+                    .max_by(|a, b| a.probability.total_cmp(&b.probability))
+            })
             .map(|prediction| prediction.code.as_str())
     }
 
-    fn to_json(&self) -> serde_json::Value {
+    /// Saved with the transcript as `metadata_json.engine`; the desktop reads
+    /// the guesses to offer Qwen3-ASR when the language was unclear.
+    pub(super) fn to_json(&self) -> serde_json::Value {
+        let guess = |prediction: &anlg_transcribe_soniqo::LanguagePrediction| {
+            serde_json::json!({
+                "code": prediction.code,
+                "probability": prediction.probability,
+            })
+        };
         serde_json::json!({
             "requested_model": self.requested_model.to_string(),
             "model": self.model.to_string(),
             "language": self.language(),
-            "languages_by_channel": self.languages_by_channel.iter().map(|prediction| {
-                prediction.as_ref().map(|prediction| serde_json::json!({
-                    "code": prediction.code,
-                    "probability": prediction.probability,
-                }))
-            }).collect::<Vec<_>>(),
+            "languages_by_channel": self
+                .predictions_by_channel
+                .iter()
+                .map(|predictions| predictions.first().map(guess))
+                .collect::<Vec<_>>(),
+            "predictions_by_channel": self
+                .predictions_by_channel
+                .iter()
+                .map(|predictions| {
+                    predictions
+                        .iter()
+                        .map(|prediction| {
+                            let mut value = guess(prediction);
+                            value["parakeet_knows"] = serde_json::Value::Bool(
+                                anlg_transcribe_soniqo::parakeet_knows_language(&prediction.code),
+                            );
+                            value
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>(),
             "qwen3_suggested": self.qwen3_suggested,
         })
     }
 }
 
 /// Picks the engine for the whole recording. Parakeet only knows 25 European
-/// languages, so when any channel is clearly speaking another language (a
-/// Mandarin lesson, say), the recording goes to Qwen3-ASR, which also handles
-/// the English around it. One engine per recording keeps both sides of a
-/// conversation consistent.
+/// languages, so when any channel speaks another language, or mixes one into
+/// English (a Mandarin lesson, say), the recording goes to Qwen3-ASR, which
+/// also handles the English around it. One engine per recording keeps both
+/// sides of a conversation consistent.
 pub(super) fn soniqo_recording_route(
     model: anlg_transcribe_soniqo::SoniqoModel,
-    languages_by_channel: Vec<Option<anlg_transcribe_soniqo::LanguagePrediction>>,
+    predictions_by_channel: Vec<Vec<anlg_transcribe_soniqo::LanguagePrediction>>,
     qwen3_downloaded: bool,
 ) -> SoniqoRouting {
-    let wants_qwen3 = languages_by_channel.iter().flatten().any(|prediction| {
-        anlg_transcribe_soniqo::route_batch_model(model, std::slice::from_ref(prediction)) != model
-    });
+    let wants_qwen3 = predictions_by_channel
+        .iter()
+        .any(|predictions| anlg_transcribe_soniqo::route_batch_model(model, predictions) != model);
     let mut routing = SoniqoRouting {
-        languages_by_channel,
+        predictions_by_channel,
         ..SoniqoRouting::unrouted(model)
     };
     if wants_qwen3 {
@@ -667,25 +697,35 @@ fn route_soniqo_recording(
         return Ok(SoniqoRouting::unrouted(model));
     }
 
-    let mut languages_by_channel = Vec::with_capacity(channel_files.len());
+    let mut predictions_by_channel = Vec::with_capacity(channel_files.len());
     for (channel_index, channel) in channel_files.iter().enumerate() {
         ensure_local_batch_running(progress)?;
-        languages_by_channel.push(identify_soniqo_channel_language(channel_index, channel));
+        predictions_by_channel.push(identify_soniqo_channel_language(channel_index, channel));
     }
 
     let qwen3_downloaded = anlg_transcribe_soniqo::is_model_downloaded(
         anlg_transcribe_soniqo::SoniqoModel::Qwen3Small,
     )
     .unwrap_or(false);
-    let routing = soniqo_recording_route(model, languages_by_channel, qwen3_downloaded);
+    let routing = soniqo_recording_route(model, predictions_by_channel, qwen3_downloaded);
     tracing::info!(
         anarlog.stt.provider.name = "soniqo",
         anarlog.stt.requested_model = %routing.requested_model,
         anarlog.stt.model = %routing.model,
         languages = ?routing
-            .languages_by_channel
+            .predictions_by_channel
             .iter()
-            .map(|prediction| prediction.as_ref().map(|p| (p.code.as_str(), p.probability)))
+            .map(|predictions| predictions.first().map(|p| (p.code.as_str(), p.probability)))
+            .collect::<Vec<_>>(),
+        predictions = ?routing
+            .predictions_by_channel
+            .iter()
+            .map(|predictions| {
+                predictions
+                    .iter()
+                    .map(|p| (p.code.as_str(), p.probability))
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>(),
         qwen3_suggested = routing.qwen3_suggested,
         "soniqo_recording_routed"
@@ -693,35 +733,42 @@ fn route_soniqo_recording(
     Ok(routing)
 }
 
+/// The channel's top language guesses, likeliest first, or none when it had
+/// too little speech to tell.
 fn identify_soniqo_channel_language(
     channel_index: usize,
     channel: &ResampledChannelFile,
-) -> Option<anlg_transcribe_soniqo::LanguagePrediction> {
+) -> Vec<anlg_transcribe_soniqo::LanguagePrediction> {
     let started_at = Instant::now();
     let excerpt = match soniqo_language_id_excerpt(channel.file.path()) {
         Ok(Some(excerpt)) => excerpt,
-        Ok(None) => return None,
+        Ok(None) => return Vec::new(),
         Err(error) => {
             tracing::warn!(channel.index = channel_index, error = %error, "soniqo_language_id_read_failed");
-            return None;
+            return Vec::new();
         }
     };
     match anlg_transcribe_soniqo::identify_language(&excerpt) {
-        Ok(predictions) => {
-            let top = predictions.into_iter().next();
+        Ok(mut predictions) => {
+            predictions.truncate(anlg_transcribe_soniqo::LANGUAGE_ROUTING_GUESSES);
+            let top = predictions.first();
             tracing::info!(
                 channel.index = channel_index,
                 excerpt.seconds = excerpt.len() as f64 / TARGET_SAMPLE_RATE as f64,
-                language = top.as_ref().map(|p| p.code.as_str()).unwrap_or("unknown"),
-                probability = top.as_ref().map(|p| p.probability).unwrap_or_default(),
+                language = top.map(|p| p.code.as_str()).unwrap_or("unknown"),
+                probability = top.map(|p| p.probability).unwrap_or_default(),
+                predictions = ?predictions
+                    .iter()
+                    .map(|p| (p.code.as_str(), p.probability))
+                    .collect::<Vec<_>>(),
                 elapsed_ms = started_at.elapsed().as_millis() as u64,
                 "soniqo_language_identified"
             );
-            top
+            predictions
         }
         Err(error) => {
             tracing::warn!(channel.index = channel_index, error = %error, "soniqo_language_id_failed");
-            None
+            Vec::new()
         }
     }
 }

@@ -25,8 +25,18 @@ pub use types::{
     ModelDownloadState, TranscriptSource,
 };
 
-/// Below this, a language guess is too unsure to move a recording off Parakeet.
+/// Below this, a top language guess is too unsure to move a recording off Parakeet.
 pub const LANGUAGE_ROUTING_MIN_PROBABILITY: f32 = 0.4;
+
+/// A language Parakeet doesn't know that gets this much of the guess, even
+/// behind English, means it's mixed in throughout (a Mandarin lesson taught in
+/// English), so the recording goes to Qwen3-ASR. Measured on real recordings:
+/// Mandarin lessons taught in English gave Chinese at least 0.25; English-only
+/// ones gave languages Parakeet doesn't know (Welsh, Latin) at most 0.07.
+pub const LANGUAGE_ROUTING_MIXED_MIN_PROBABILITY: f32 = 0.15;
+
+/// How many ranked guesses per channel routing looks at.
+pub const LANGUAGE_ROUTING_GUESSES: usize = 3;
 
 /// Ranks the spoken language of 16 kHz mono samples, most likely first.
 pub fn identify_language(samples: &[f32]) -> Result<Vec<LanguagePrediction>> {
@@ -34,20 +44,34 @@ pub fn identify_language(samples: &[f32]) -> Result<Vec<LanguagePrediction>> {
     platform::identify_language(samples)
 }
 
-/// Parakeet covers 25 European languages. When the identified language is
-/// another one (Chinese, Japanese, Arabic…), Qwen3-ASR transcribes it instead.
-pub fn route_batch_model(model: SoniqoModel, predictions: &[LanguagePrediction]) -> SoniqoModel {
-    if model != SoniqoModel::ParakeetBatch {
-        return model;
+pub fn parakeet_knows_language(code: &str) -> bool {
+    anlg_language::PARAKEET_TDT_V3_LANGUAGE_CODES.contains(&code)
+}
+
+/// The language Parakeet doesn't know that should move a recording to
+/// Qwen3-ASR: the top guess when it's likely enough, otherwise any of the top
+/// guesses with a large enough share to be mixed in.
+pub fn routing_language(predictions: &[LanguagePrediction]) -> Option<&LanguagePrediction> {
+    let top = predictions.first()?;
+    if !parakeet_knows_language(&top.code) && top.probability >= LANGUAGE_ROUTING_MIN_PROBABILITY {
+        return Some(top);
     }
-    match predictions.first() {
-        Some(top)
-            if top.probability >= LANGUAGE_ROUTING_MIN_PROBABILITY
-                && !anlg_language::PARAKEET_TDT_V3_LANGUAGE_CODES.contains(&top.code.as_str()) =>
-        {
-            SoniqoModel::Qwen3Small
-        }
-        _ => model,
+    predictions
+        .iter()
+        .take(LANGUAGE_ROUTING_GUESSES)
+        .find(|prediction| {
+            !parakeet_knows_language(&prediction.code)
+                && prediction.probability >= LANGUAGE_ROUTING_MIXED_MIN_PROBABILITY
+        })
+}
+
+/// Parakeet covers 25 European languages. When the recording is in another
+/// one (Chinese, Japanese, Arabic…), or mixes one in, Qwen3-ASR transcribes it.
+pub fn route_batch_model(model: SoniqoModel, predictions: &[LanguagePrediction]) -> SoniqoModel {
+    if model == SoniqoModel::ParakeetBatch && routing_language(predictions).is_some() {
+        SoniqoModel::Qwen3Small
+    } else {
+        model
     }
 }
 
@@ -261,10 +285,17 @@ mod routing_tests {
     use super::*;
 
     fn guess(code: &str, probability: f32) -> Vec<LanguagePrediction> {
-        vec![LanguagePrediction {
-            code: code.to_string(),
-            probability,
-        }]
+        guesses(&[(code, probability)])
+    }
+
+    fn guesses(ranked: &[(&str, f32)]) -> Vec<LanguagePrediction> {
+        ranked
+            .iter()
+            .map(|(code, probability)| LanguagePrediction {
+                code: code.to_string(),
+                probability: *probability,
+            })
+            .collect()
     }
 
     #[test]
@@ -272,6 +303,59 @@ mod routing_tests {
         assert_eq!(
             route_batch_model(SoniqoModel::ParakeetBatch, &guess("zh", 0.82)),
             SoniqoModel::Qwen3Small
+        );
+    }
+
+    #[test]
+    fn mandarin_mixed_into_english_moves_parakeet_batch_to_qwen3() {
+        // What the two Chinese lessons, taught in English, measured.
+        for lesson in [
+            guesses(&[("en", 0.604), ("zh", 0.251), ("ko", 0.074)]),
+            guesses(&[("en", 0.403), ("zh", 0.329), ("ko", 0.173)]),
+        ] {
+            assert_eq!(
+                route_batch_model(SoniqoModel::ParakeetBatch, &lesson),
+                SoniqoModel::Qwen3Small
+            );
+            assert_eq!(
+                routing_language(&lesson).map(|p| p.code.as_str()),
+                Some("zh")
+            );
+        }
+    }
+
+    #[test]
+    fn english_with_stray_guesses_stays_on_parakeet() {
+        // What English-only recordings measured: Welsh, Latin and Norwegian
+        // (none of them Parakeet languages) trail far behind.
+        for english in [
+            guesses(&[("en", 0.993), ("da", 0.002), ("pt", 0.001)]),
+            guesses(&[("en", 0.928), ("cy", 0.027), ("la", 0.010)]),
+            guesses(&[("en", 0.890), ("cy", 0.024), ("no", 0.022)]),
+        ] {
+            assert_eq!(
+                route_batch_model(SoniqoModel::ParakeetBatch, &english),
+                SoniqoModel::ParakeetBatch
+            );
+        }
+    }
+
+    #[test]
+    fn unsure_english_with_a_european_runner_up_stays_on_parakeet() {
+        let english_or_portuguese = guesses(&[("en", 0.55), ("pt", 0.35), ("es", 0.05)]);
+        assert_eq!(
+            route_batch_model(SoniqoModel::ParakeetBatch, &english_or_portuguese),
+            SoniqoModel::ParakeetBatch
+        );
+        assert_eq!(routing_language(&english_or_portuguese), None);
+    }
+
+    #[test]
+    fn only_the_top_guesses_count() {
+        let fourth = guesses(&[("en", 0.4), ("pt", 0.2), ("es", 0.2), ("zh", 0.2)]);
+        assert_eq!(
+            route_batch_model(SoniqoModel::ParakeetBatch, &fourth),
+            SoniqoModel::ParakeetBatch
         );
     }
 
@@ -284,7 +368,7 @@ mod routing_tests {
             );
         }
         assert_eq!(
-            route_batch_model(SoniqoModel::ParakeetBatch, &guess("zh", 0.2)),
+            route_batch_model(SoniqoModel::ParakeetBatch, &guess("zh", 0.1)),
             SoniqoModel::ParakeetBatch
         );
         assert_eq!(

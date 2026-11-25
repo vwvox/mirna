@@ -39,6 +39,8 @@ vi.mock("~/audio-player", () => ({
   useAudioPlayer: useAudioPlayerMock,
 }));
 
+// The engine line checks downloaded models; it has its own tests.
+vi.mock("./engine-note", () => ({ TranscriptEngineNote: () => null }));
 vi.mock("./screens/batch", () => ({
   BatchState: () => <div data-testid="batch-state" />,
 }));

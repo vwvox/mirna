@@ -901,11 +901,17 @@ fn collect_soniqo_channel_transcripts_errors_when_all_channels_fail() {
     assert_eq!(error, "Soniqo failed to transcribe all 2 audio channel(s).");
 }
 
-fn prediction(code: &str, probability: f32) -> Option<anlg_transcribe_soniqo::LanguagePrediction> {
-    Some(anlg_transcribe_soniqo::LanguagePrediction {
-        code: code.to_string(),
-        probability,
-    })
+/// A channel's ranked language guesses, likeliest first.
+fn guesses(ranked: &[(&str, f32)]) -> Vec<anlg_transcribe_soniqo::LanguagePrediction> {
+    ranked
+        .iter()
+        .map(
+            |(code, probability)| anlg_transcribe_soniqo::LanguagePrediction {
+                code: code.to_string(),
+                probability: *probability,
+            },
+        )
+        .collect()
 }
 
 #[test]
@@ -915,7 +921,10 @@ fn soniqo_routes_a_mandarin_recording_to_qwen3() {
     // Teacher speaks Mandarin on Mac audio; the student mostly speaks English.
     let routing = soniqo_recording_route(
         SoniqoModel::ParakeetBatch,
-        vec![prediction("en", 0.7), prediction("zh", 0.82)],
+        vec![
+            guesses(&[("en", 0.7), ("de", 0.1)]),
+            guesses(&[("zh", 0.82), ("ko", 0.1)]),
+        ],
         true,
     );
     assert_eq!(routing.model, SoniqoModel::Qwen3Small);
@@ -926,24 +935,64 @@ fn soniqo_routes_a_mandarin_recording_to_qwen3() {
 }
 
 #[test]
+fn soniqo_routes_a_lesson_mixing_mandarin_into_english_to_qwen3() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    // Measured on two real Chinese lessons taught in English (one channel).
+    for lesson in [
+        guesses(&[("en", 0.604), ("zh", 0.251), ("ko", 0.074)]),
+        guesses(&[("en", 0.403), ("zh", 0.329), ("ko", 0.173)]),
+    ] {
+        let routing = soniqo_recording_route(SoniqoModel::ParakeetBatch, vec![lesson], true);
+        assert_eq!(routing.model, SoniqoModel::Qwen3Small);
+        assert!(!routing.qwen3_suggested);
+        assert_eq!(routing.language(), Some("zh"));
+
+        let not_downloaded = soniqo_recording_route(
+            SoniqoModel::ParakeetBatch,
+            routing.predictions_by_channel.clone(),
+            false,
+        );
+        assert_eq!(not_downloaded.model, SoniqoModel::ParakeetBatch);
+        assert!(not_downloaded.qwen3_suggested);
+    }
+}
+
+#[test]
 fn soniqo_keeps_parakeet_for_european_or_unclear_speech() {
     use anlg_transcribe_soniqo::SoniqoModel;
 
-    for languages in [
-        vec![prediction("en", 0.96), prediction("pt", 0.9)],
-        vec![None, prediction("zh", 0.2)],
-        vec![None, None],
+    for (channels, language) in [
+        // Confident English, with languages Parakeet doesn't know far behind.
+        (
+            vec![guesses(&[("en", 0.928), ("cy", 0.027), ("la", 0.010)])],
+            Some("en"),
+        ),
+        (
+            vec![guesses(&[("en", 0.993), ("da", 0.002), ("pt", 0.001)])],
+            Some("en"),
+        ),
+        // Unsure, but between languages Parakeet knows.
+        (
+            vec![guesses(&[("en", 0.55), ("pt", 0.35), ("es", 0.05)])],
+            Some("en"),
+        ),
+        (
+            vec![
+                guesses(&[("en", 0.96), ("cy", 0.02)]),
+                guesses(&[("pt", 0.9), ("gl", 0.05)]),
+            ],
+            Some("en"),
+        ),
+        (
+            vec![Vec::new(), guesses(&[("zh", 0.1), ("en", 0.09)])],
+            Some("zh"),
+        ),
+        (vec![Vec::new(), Vec::new()], None),
     ] {
-        let routing = soniqo_recording_route(SoniqoModel::ParakeetBatch, languages.clone(), true);
+        let routing = soniqo_recording_route(SoniqoModel::ParakeetBatch, channels, true);
         assert_eq!(routing.model, SoniqoModel::ParakeetBatch);
-        assert_eq!(
-            routing.language(),
-            languages
-                .iter()
-                .flatten()
-                .max_by(|a, b| a.probability.total_cmp(&b.probability))
-                .map(|p| p.code.as_str())
-        );
+        assert_eq!(routing.language(), language);
         assert!(!routing.qwen3_suggested);
     }
 }
@@ -954,11 +1003,46 @@ fn soniqo_suggests_qwen3_when_it_is_not_downloaded() {
 
     let routing = soniqo_recording_route(
         SoniqoModel::ParakeetBatch,
-        vec![None, prediction("ja", 0.9)],
+        vec![Vec::new(), guesses(&[("ja", 0.9)])],
         false,
     );
     assert_eq!(routing.model, SoniqoModel::ParakeetBatch);
     assert!(routing.qwen3_suggested);
+}
+
+#[test]
+fn soniqo_routing_saves_each_channels_top_guesses() {
+    use anlg_transcribe_soniqo::SoniqoModel;
+
+    let routing = soniqo_recording_route(
+        SoniqoModel::ParakeetBatch,
+        vec![
+            guesses(&[("en", 0.5), ("zh", 0.25), ("ko", 0.125)]),
+            Vec::new(),
+        ],
+        false,
+    );
+    let json = routing.to_json();
+
+    assert_eq!(json["requested_model"], "soniqo-parakeet-batch");
+    assert_eq!(json["model"], "soniqo-parakeet-batch");
+    assert_eq!(json["language"], "zh");
+    assert_eq!(json["qwen3_suggested"], true);
+    assert_eq!(
+        json["languages_by_channel"],
+        serde_json::json!([{ "code": "en", "probability": 0.5 }, null])
+    );
+    assert_eq!(
+        json["predictions_by_channel"],
+        serde_json::json!([
+            [
+                { "code": "en", "probability": 0.5, "parakeet_knows": true },
+                { "code": "zh", "probability": 0.25, "parakeet_knows": false },
+                { "code": "ko", "probability": 0.125, "parakeet_knows": false },
+            ],
+            [],
+        ])
+    );
 }
 
 #[test]
