@@ -81,7 +81,7 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
           searchTerms: [
             t`Start Mirna at login`,
             t`Automatically install updates`,
-            t`Show release notes`,
+            t`What's new`,
             t`Show app in Dock`,
             t`Show tray icon`,
             t`Language & Region`,

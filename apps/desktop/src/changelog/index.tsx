@@ -7,7 +7,8 @@ import { Button } from "@anlg/ui/components/ui/button";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 import { cn } from "@anlg/utils";
 
-import { useChangelogContent } from "./data";
+import { useReleaseNotes } from "./data";
+import { isNewSince, type Release } from "./releases";
 
 import { useShell } from "~/contexts/shell";
 import {
@@ -23,7 +24,7 @@ export function TabContentChangelog({
 }: {
   tab: Extract<Tab, { type: "changelog" }>;
 }) {
-  const { current } = tab.state;
+  const { current, previous } = tab.state;
   const { chat, leftsidebar } = useShell();
   const close = useTabs((state) => state.close);
   const showSidebarTimelineHeaderGutter = !leftsidebar.expanded;
@@ -35,14 +36,13 @@ export function TabContentChangelog({
     }
   });
 
-  const { content, loading } = useChangelogContent(current);
+  const releases = useReleaseNotes(current);
 
   return (
     <StandardContentWrapper>
       <div className="flex h-full flex-col">
         <div data-tauri-drag-region className="shrink-0 pr-1 pl-3">
           <ChangelogHeader
-            version={current}
             showSidebarTimelineHeaderGutter={showSidebarTimelineHeaderGutter}
             showExpandedSidebarTimelineHeader={
               showExpandedSidebarTimelineHeader
@@ -53,7 +53,11 @@ export function TabContentChangelog({
 
         <div className="relative mt-2 min-h-0 flex-1 overflow-hidden">
           <div className="scroll-fade-y h-full overflow-y-auto px-3 pb-4">
-            <ChangelogBody content={content} loading={loading} />
+            <ReleaseList
+              releases={releases}
+              current={current}
+              previous={previous}
+            />
           </div>
         </div>
       </div>
@@ -82,25 +86,77 @@ function ExternalLink({
   );
 }
 
-function ChangelogBody({
-  content,
-  loading,
+export function ReleaseList({
+  releases,
+  current,
+  previous,
 }: {
-  content: string | null;
-  loading: boolean;
+  releases: Release[];
+  current: string;
+  previous: string | null;
 }) {
-  if (loading) {
+  if (releases.length === 0) {
     return (
-      <p className="text-muted-foreground">
-        <Trans>Loading...</Trans>
+      <p className="text-muted-foreground mx-auto max-w-[640px] pt-2">
+        <Trans>No release notes yet.</Trans>
       </p>
     );
   }
+  return (
+    <div className="mx-auto flex max-w-[640px] flex-col divide-y">
+      {releases.map((release) => (
+        <ReleaseNotes
+          key={release.version}
+          release={release}
+          isNew={isNewSince(release.version, previous, current)}
+          isCurrent={release.version === current}
+        />
+      ))}
+    </div>
+  );
+}
 
-  if (content) {
-    return (
+function ReleaseNotes({
+  release,
+  isNew,
+  isCurrent,
+}: {
+  release: Release;
+  isNew: boolean;
+  isCurrent: boolean;
+}) {
+  const { i18n } = useLingui();
+  const date = formatReleaseDate(release.date, i18n.locale);
+  return (
+    <section
+      aria-label={release.version}
+      data-release={release.version}
+      className="flex flex-col gap-2 py-6 first:pt-2"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2 className="text-foreground text-base font-semibold">
+          {release.version}
+        </h2>
+        {isNew ? (
+          <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-mist rounded-md px-1.5 py-0.5 text-[11px] font-semibold">
+            <Trans>New</Trans>
+          </span>
+        ) : isCurrent ? (
+          <span className="text-muted-foreground rounded-md border px-1.5 py-0.5 text-[11px] font-medium">
+            <Trans>This version</Trans>
+          </span>
+        ) : null}
+        {date ? (
+          <span className="text-muted-foreground ml-auto text-xs">{date}</span>
+        ) : null}
+      </div>
+      {release.summary ? (
+        <p className="text-foreground text-sm leading-6 font-medium">
+          {release.summary}
+        </p>
+      ) : null}
       <ChangelogContent
-        content={content}
+        content={release.content}
         components={{
           a: ({
             href,
@@ -116,25 +172,35 @@ function ChangelogBody({
             ),
         }}
       />
-    );
-  }
-
-  return (
-    <p className="text-muted-foreground">
-      <Trans>No changelog available for this version.</Trans>
-    </p>
+    </section>
   );
+}
+
+/** "25 Nov 2026" in the app's language; the notes give "2026-11-25". */
+export function formatReleaseDate(
+  date: string | null,
+  locale: string,
+): string | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${date}T12:00:00Z`));
+  } catch {
+    return date;
+  }
 }
 
 function ChangelogHeader({
   showExpandedSidebarTimelineHeader,
   showSidebarTimelineHeaderGutter,
-  version,
   onClose,
 }: {
   showExpandedSidebarTimelineHeader: boolean;
   showSidebarTimelineHeaderGutter: boolean;
-  version: string;
   onClose: () => void;
 }) {
   const { t } = useLingui();
@@ -174,7 +240,7 @@ function ChangelogHeader({
               : "text-center",
           ])}
         >
-          <Trans>What's new in {version}?</Trans>
+          <Trans>What's new in Mirna</Trans>
         </h1>
       </div>
 
@@ -184,7 +250,7 @@ function ChangelogHeader({
           variant="ghost"
           data-tauri-drag-region="false"
           className="text-muted-foreground hover:text-foreground"
-          aria-label={t`Close changelog`}
+          aria-label={t`Close What's new`}
           title={t`Close`}
           onClick={onClose}
         >

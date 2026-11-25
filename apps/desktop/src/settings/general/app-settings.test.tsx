@@ -60,7 +60,7 @@ describe("AppSettingsView", () => {
 
   it("reopens the installed version's release notes after closing them", async () => {
     renderAppSettings();
-    const button = screen.getByRole("button", { name: "Show release notes" });
+    const button = screen.getByRole("button", { name: "What's new" });
     await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
     fireEvent.click(button);
     const tab = useTabs.getState().currentTab!;

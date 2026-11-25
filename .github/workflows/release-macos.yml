@@ -178,7 +178,20 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           title="Mirna $VERSION"
-          cat > notes.md <<EOF
+          # What's new comes from the same note the app shows on its What's
+          # new page (without its frontmatter), when there is one.
+          release_notes="packages/changelog/content/mirna/${VERSION}.md"
+          : > notes.md
+          if [[ -f "$release_notes" ]]; then
+            {
+              echo "## What's new"
+              awk 'n >= 2 { print; next } /^---[[:space:]]*$/ { n++ }' "$release_notes"
+              echo
+            } >> notes.md
+          else
+            echo "::warning::No release note at $release_notes"
+          fi
+          cat >> notes.md <<EOF
           An early build of Mirna for Macs with Apple Silicon (M1 or newer), macOS 15 or later.
 
           ## Install

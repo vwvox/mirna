@@ -53,9 +53,7 @@ export function AppSettingsView({
             <>
               <SettingSwitchRow
                 title={<Trans>Start Mirna at login</Trans>}
-                description={
-                  <Trans>Have Mirna ready when you sign in.</Trans>
-                }
+                description={<Trans>Have Mirna ready when you sign in.</Trans>}
                 checked={autostart.value}
                 onChange={autostart.onChange}
               />
@@ -85,7 +83,7 @@ export function AppSettingsView({
               }
             }}
           >
-            <Trans>Show release notes</Trans>
+            <Trans>What's new</Trans>
           </Button>
           {isMacos && (
             <SettingSwitchRow
@@ -100,9 +98,7 @@ export function AppSettingsView({
           <SettingSwitchRow
             title={<Trans>Show tray icon</Trans>}
             description={
-              isMacos ? (
-                <Trans>Open Mirna from the menu bar.</Trans>
-              ) : undefined
+              isMacos ? <Trans>Open Mirna from the menu bar.</Trans> : undefined
             }
             checked={showTrayIcon.value}
             onChange={showTrayIcon.onChange}

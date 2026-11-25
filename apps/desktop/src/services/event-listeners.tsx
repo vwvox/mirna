@@ -1,3 +1,4 @@
+import { t } from "@lingui/core/macro";
 import { type UnlistenFn } from "@tauri-apps/api/event";
 
 import { events as notificationEvents } from "@anlg/plugin-notification";
@@ -11,6 +12,7 @@ import {
   events as updaterEvents,
 } from "@anlg/plugin-updater2";
 import { getCurrentWebviewWindowLabel } from "@anlg/plugin-windows";
+import { toast } from "@anlg/ui/components/ui/toast";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
 import {
@@ -599,11 +601,22 @@ function useUpdaterEvents() {
     let unlisten: UnlistenFn | null = null;
     let cancelled = false;
 
+    // A quiet note rather than a page over your notes; the release notes
+    // are one click away, and in Settings › General.
     void updaterEvents.updatedEvent
       .listen(({ payload: { previous, current } }) => {
-        openNewRef.current({
-          type: "changelog",
-          state: { previous, current },
+        toast.success(t`Mirna is now ${current}`, {
+          id: "mirna-updated",
+          description: t`See what's new in this version and the ones before.`,
+          duration: 20_000,
+          action: {
+            label: t`What's new`,
+            onClick: () =>
+              openNewRef.current({
+                type: "changelog",
+                state: { previous, current },
+              }),
+          },
         });
       })
       .then(async (f) => {

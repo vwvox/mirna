@@ -3,48 +3,33 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin, ViteDevServer } from "vite";
 
+// Mirna's release notes, one Markdown file per version, bundled into the app
+// so the What's new page never fetches anything.
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const changelogDir = resolve(
+const releasesDir = resolve(
   __dirname,
-  "../../../packages/changelog/content/desktop",
+  "../../../packages/changelog/content/mirna",
 );
 
 const VIRTUAL_ID = "virtual:changelog";
 const RESOLVED_ID = "\0" + VIRTUAL_ID;
+const RELEASE_FILE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\.md$/;
 
-function getLatestVersion(): string | null {
+function readReleases(): { version: string; raw: string }[] {
   try {
-    const files = readdirSync(changelogDir).filter((f) =>
-      /^\d+\.\d+\.\d+\.md$/.test(f),
-    );
-    const versions = files.map((f) => f.replace(".md", ""));
-    versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-    return versions[0] || null;
+    return readdirSync(releasesDir)
+      .filter((file) => RELEASE_FILE.test(file))
+      .map((file) => ({
+        version: file.slice(0, -".md".length),
+        raw: readFileSync(resolve(releasesDir, file), "utf-8"),
+      }));
   } catch {
-    return null;
+    return [];
   }
 }
 
 function buildModule(): string {
-  const nightly = process.env.RELEASE_CHANNEL === "nightly";
-  const latest = nightly
-    ? (process.env.VITE_APP_VERSION ?? null)
-    : process.env.VITE_APP_VERSION || getLatestVersion();
-  let content: string | null = null;
-
-  if (latest) {
-    try {
-      content = readFileSync(
-        resolve(changelogDir, nightly ? "../../nightly.md" : `${latest}.md`),
-        "utf-8",
-      );
-    } catch {}
-  }
-
-  return [
-    `export const latestVersion = ${JSON.stringify(latest)};`,
-    `export const latestContent = ${JSON.stringify(content)};`,
-  ].join("\n");
+  return `export const releases = ${JSON.stringify(readReleases())};`;
 }
 
 export function changelog(): Plugin {
@@ -62,7 +47,7 @@ export function changelog(): Plugin {
       }
 
       try {
-        watch(resolve(changelogDir, "../.."), { recursive: true }, () => {
+        watch(releasesDir, () => {
           const mod = server.moduleGraph.getModuleById(RESOLVED_ID);
           if (mod) {
             server.moduleGraph.invalidateModule(mod);
