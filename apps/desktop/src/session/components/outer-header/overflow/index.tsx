@@ -13,6 +13,7 @@ import {
   FileText,
   FolderOpen,
   PictureInPicture,
+  Scissors,
   Waveform,
 } from "@anlg/ui/components/icons";
 import { Button } from "@anlg/ui/components/ui/button";
@@ -38,6 +39,7 @@ import { ExportModal } from "./export-modal";
 import { Listening } from "./listening";
 import { LockNote } from "./lock-note";
 import { TranscribeAgain } from "./transcribe-again";
+import { TrimRecordingDialog } from "./trim-recording";
 
 import { useAudioPlayer } from "~/audio-player";
 import { DEVICE_AUTH_REASON } from "~/lock/auth";
@@ -79,6 +81,8 @@ export function OverflowButton({
   const [exportOpenCount, setExportOpenCount] = useState(0);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [hasOpenedVersionHistory, setHasOpenedVersionHistory] = useState(false);
+  const [isTrimOpen, setIsTrimOpen] = useState(false);
+  const [trimOpenCount, setTrimOpenCount] = useState(0);
   const hasTranscript = useHasTranscript(sessionId);
   const currentNoteHasContent = useCurrentNoteHasContent(
     sessionId,
@@ -138,6 +142,17 @@ export function OverflowButton({
   const handleUploadTranscript = () => {
     setOpen(false);
     uploadTranscript();
+  };
+  const openTrim = async () => {
+    setOpen(false);
+    if (noteLocked) {
+      const ok = await useAppLock
+        .getState()
+        .authenticate(DEVICE_AUTH_REASON.openApp);
+      if (!ok) return;
+    }
+    setTrimOpenCount((count) => count + 1);
+    requestAnimationFrame(() => setIsTrimOpen(true));
   };
   const handleRetranscribe = (engine?: TranscriptEngineChoice) => {
     setOpen(false);
@@ -226,6 +241,14 @@ export function OverflowButton({
             {showRetranscribeAction && (
               <TranscribeAgain onTranscribe={handleRetranscribe} />
             )}
+            {showRetranscribeAction && (
+              <DropdownMenuItem onClick={openTrim} className="cursor-pointer">
+                <Scissors />
+                <span>
+                  <Trans>Trim recording…</Trans>
+                </span>
+              </DropdownMenuItem>
+            )}
             {showUploadActions && (
               <>
                 <DropdownMenuItem
@@ -304,6 +327,14 @@ export function OverflowButton({
           currentView={currentView}
           open={isExportModalOpen}
           onOpenChange={setIsExportModalOpen}
+        />
+      )}
+      {trimOpenCount > 0 && (
+        <TrimRecordingDialog
+          key={trimOpenCount}
+          sessionId={sessionId}
+          open={isTrimOpen}
+          onOpenChange={setIsTrimOpen}
         />
       )}
       {hasOpenedVersionHistory && (

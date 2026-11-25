@@ -65,7 +65,7 @@ const AUDIO_TYPES_BY_EXTENSION: Record<string, string> = {
 // Tauri's asset protocol sniffs content types, and headerless MP3 recordings
 // come back as text/html. WebKitGTK cannot stream asset:// URLs either, so
 // relabel the blob from the file extension before giving up on it.
-function playableBlob(
+export function playableBlob(
   media: Pick<HTMLMediaElement, "canPlayType">,
   blob: Blob,
   url: string,

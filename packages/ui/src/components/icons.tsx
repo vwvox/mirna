@@ -151,6 +151,7 @@ import {
   RocketIcon,
   RotateCcwIcon,
   RotateClockwiseIcon,
+  ScissorIcon,
   Search01Icon,
   SentIcon,
   Settings01Icon,
@@ -701,6 +702,7 @@ export const RadioButton = /* @__PURE__ */ createIcon(
 export const Repeat = /* @__PURE__ */ createIcon(RepeatIcon, "Repeat");
 export const Rocket = /* @__PURE__ */ createIcon(RocketIcon, "Rocket");
 export const Scales = /* @__PURE__ */ createIcon(BalanceScaleIcon, "Scales");
+export const Scissors = /* @__PURE__ */ createIcon(ScissorIcon, "Scissors");
 export const ShareNetwork = /* @__PURE__ */ createIcon(
   Share08Icon,
   "ShareNetwork",
