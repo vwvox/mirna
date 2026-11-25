@@ -46,7 +46,7 @@ fn publish_all(server: &PhoneLinkServer, dir: &str, include_mac_notes: bool) {
                 started_at_ms: 1,
                 ended_at_ms: Some(8_000),
                 memo: String::new(),
-                words_json: words("This is the transcript the stub Mac made of your recording.", 0),
+                words_json: words("This is the transcript the stub Mac made of your recording. 我们今天练习了便宜和贵。", 0),
                 speaker_hints_json: "[]".into(),
             }];
             let mut summary =

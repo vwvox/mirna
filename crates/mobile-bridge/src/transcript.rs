@@ -124,6 +124,36 @@ mod tests {
     }
 
     #[test]
+    fn chinese_from_the_mac_keeps_its_characters() {
+        // As the phone stores a transcript the Mac sent: source and provider
+        // "mac", Qwen3-ASR words with Han characters and leading spaces.
+        let mut request = request(&[]);
+        request["source"] = json!("mac");
+        request["provider"] = json!("mac");
+        request["words_json"] = json!(serde_json::to_string(&json!([
+            {"id": "w1", "text": " Now", "start_ms": 0, "end_ms": 300, "channel": 0},
+            {"id": "w2", "text": " 这个。", "start_ms": 300, "end_ms": 700, "channel": 0},
+            {"id": "w3", "text": " 贵", "start_ms": 700, "end_ms": 900, "channel": 0},
+            {"id": "w4", "text": " guì.", "start_ms": 900, "end_ms": 1200, "channel": 0}
+        ]))
+        .unwrap());
+        request["speaker_hints_json"] = json!(serde_json::to_string(&json!([
+            {"id": "h1", "word_id": "w1", "type": "provider_speaker_index",
+                "value": "{\"provider\":\"soniqo\",\"channel\":0,\"speaker_index\":0}"}
+        ]))
+        .unwrap());
+        let segments = render(&request);
+        let text: String = segments
+            .iter()
+            .map(|segment| segment["text"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(text.contains("这个"), "{text}");
+        assert!(text.contains("贵"), "{text}");
+        assert!(text.contains("guì"), "{text}");
+    }
+
+    #[test]
     fn legacy_words_without_ids_keep_text_and_word_level_speakers() {
         let mut request = request(&[]);
         request["words_json"] = json!(

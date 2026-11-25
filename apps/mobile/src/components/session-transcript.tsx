@@ -1,11 +1,13 @@
-import { useRef, type ReactNode } from "react";
-import { FlatList, Text, View } from "react-native";
+import { memo, useMemo, useRef, type ReactNode } from "react";
+import { FlatList, Pressable, Text, View } from "react-native";
 
-import { Spacing, Typography } from "@/constants/theme";
+import { Radius, Spacing, Typography } from "@/constants/theme";
 import {
   useSessionTranscripts,
   type TranscriptSegment,
 } from "@/data/transcripts";
+import { loadPinyin, usePinyinPreference } from "@/note/pinyin";
+import { annotatePinyin, hasHan, wrapTokens } from "@/note/pinyin-model";
 import { createStyleHook } from "@/settings/theme-provider";
 
 export function SessionTranscript({
@@ -24,6 +26,12 @@ export function SessionTranscript({
   const { segments, isLoading, error } = useSessionTranscripts(sessionId, true);
   const listRef = useRef<FlatList<TranscriptSegment>>(null);
   const following = useRef(Boolean(live));
+  const hasChinese = useMemo(
+    () => segments.some((segment) => hasHan(segment.text)),
+    [segments],
+  );
+  const [showPinyin, setShowPinyin] = usePinyinPreference();
+  const pinyinOn = hasChinese && showPinyin;
 
   return (
     <FlatList
@@ -43,12 +51,42 @@ export function SessionTranscript({
         if (live && following.current)
           listRef.current?.scrollToEnd({ animated: true });
       }}
+      extraData={pinyinOn}
+      ListHeaderComponent={
+        hasChinese ? (
+          <View style={styles.pinyinRow}>
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: showPinyin }}
+              onPress={() => setShowPinyin(!showPinyin)}
+              style={({ pressed }) => [
+                styles.pinyinChip,
+                showPinyin && styles.pinyinChipOn,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.pinyinChipLabel,
+                  showPinyin && styles.pinyinChipLabelOn,
+                ]}
+              >
+                {showPinyin ? "Pinyin on" : "Show pinyin"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null
+      }
       renderItem={({ item }) => (
         <View style={styles.turn}>
           <Text style={styles.speaker}>{item.speaker}</Text>
-          <Text selectable style={styles.transcriptText}>
-            {item.text}
-          </Text>
+          {pinyinOn && hasHan(item.text) ? (
+            <PinyinText text={item.text} />
+          ) : (
+            <Text selectable style={styles.transcriptText}>
+              {item.text}
+            </Text>
+          )}
         </View>
       )}
       ListEmptyComponent={
@@ -81,6 +119,31 @@ export function SessionTranscript({
   );
 }
 
+/** Chinese with pinyin over each character, wrapping like normal text. */
+const PinyinText = memo(function PinyinText({ text }: { text: string }) {
+  const styles = useStyles();
+  const tokens = useMemo(
+    () => wrapTokens(annotatePinyin(text, loadPinyin())),
+    [text],
+  );
+  return (
+    <View accessible accessibilityLabel={text} style={styles.pinyinFlow}>
+      {tokens.map((token, index) =>
+        token.pinyin === undefined ? (
+          <Text key={index} style={styles.transcriptText}>
+            {token.text}
+          </Text>
+        ) : (
+          <View key={index} style={styles.ruby}>
+            <Text style={styles.rubyPinyin}>{token.pinyin}</Text>
+            <Text style={styles.transcriptText}>{token.text}</Text>
+          </View>
+        ),
+      )}
+    </View>
+  );
+});
+
 const useStyles = createStyleHook((Colors) => ({
   list: { flex: 1 },
   content: {
@@ -91,4 +154,26 @@ const useStyles = createStyleHook((Colors) => ({
   speaker: { ...Typography.captionStrong, color: Colors.muted },
   transcriptText: { ...Typography.body, color: Colors.ink },
   hint: { ...Typography.caption, color: Colors.muted },
+  pinyinRow: { flexDirection: "row", paddingTop: Spacing.sm },
+  pinyinChip: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.control,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+  },
+  pinyinChipOn: {
+    backgroundColor: Colors.accentSurface,
+    borderColor: Colors.accentSurface,
+  },
+  pinyinChipLabel: { ...Typography.captionStrong, color: Colors.muted },
+  pinyinChipLabelOn: { color: Colors.ink },
+  pressed: { opacity: 0.7 },
+  pinyinFlow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-end",
+  },
+  ruby: { alignItems: "center", marginHorizontal: 1 },
+  rubyPinyin: { fontSize: 11, lineHeight: 13, color: Colors.muted },
 }));

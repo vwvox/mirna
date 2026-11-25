@@ -1,7 +1,7 @@
 {
   "name": "@anlg/mobile",
   "main": "expo-router/entry",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "scripts": {
     "eas-build-post-install": "bash scripts/eas-build-post-install.sh",
@@ -64,6 +64,7 @@
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "~57.0.15",
     "js-sha256": "0.10.1",
+    "pinyin-pro": "3.29.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
