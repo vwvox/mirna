@@ -30,6 +30,12 @@ msgstr ""
 msgid "(Unavailable — using current default)"
 msgstr ""
 
+#. placeholder {0}: labels[kind]
+#. placeholder {1}: formatClock(mark.atMs)
+#: src/lesson/components/services.tsx
+msgid "{0} · marked at {1}"
+msgstr ""
+
 #. placeholder {0}: group.sessionIds.length
 #: src/sidebar/toast/undo-delete-toast.tsx
 msgid "{0} {noteLabel} deleted"
@@ -48,6 +54,11 @@ msgstr ""
 #. placeholder {0}: status.commandName
 #: src/settings/developers/cli.tsx
 msgid "{0} is ready to use"
+msgstr ""
+
+#. placeholder {0}: lessons.length
+#: src/lesson/components/course-panel.tsx
+msgid "{0} lessons"
 msgstr ""
 
 #. placeholder {0}: number.format(stats.medianMinutes)
@@ -91,6 +102,21 @@ msgstr ""
 msgid "{0} s"
 msgstr ""
 
+#. placeholder {0}: sheet.corrections.length
+#: src/lesson/components/study-sheet.tsx
+msgid "{0} times the teacher fixed what you said"
+msgstr ""
+
+#. placeholder {0}: sheet.vocabulary.length
+#: src/lesson/components/course-panel.tsx
+msgid "{0} words"
+msgstr ""
+
+#. placeholder {0}: practice.due
+#: src/lesson/components/sidebar-courses.tsx
+msgid "{0} words due"
+msgstr ""
+
 #. placeholder {0}: Math.round((percentage ?? 0) * 100)
 #: src/session/components/note-input/transcript/screens/empty.tsx
 msgid "{0}% complete"
@@ -108,12 +134,29 @@ msgstr ""
 msgid "{count} of {total} collected"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "{courseName} course"
+msgstr ""
+
 #: src/settings/stats/index.tsx
 msgid "{date}. Conversations: {count}"
 msgstr ""
 
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 msgid "{entryCount} selected"
+msgstr ""
+
+#. placeholder {0}: sheet.vocabulary.length - fresh
+#: src/lesson/components/study-sheet.tsx
+msgid "{fresh} new · {0} from earlier lessons"
+msgstr ""
+
+#: src/session/components/note-input/transcript/renderer/word-card.tsx
+msgid "{heard, plural, one {Heard # time in this note} other {Heard # times in this note}}"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "{inChinese}% of the lesson was in Chinese"
 msgstr ""
 
 #. placeholder {0}: formatLanguageList(unsupportedLanguages)
@@ -143,6 +186,11 @@ msgstr ""
 
 #: src/settings/general/billing.tsx
 msgid "{remaining} days left"
+msgstr ""
+
+#. placeholder {0}: Math.min(done + 1, total)
+#: src/lesson/components/practice-dialog.tsx
+msgid "{title} · {0} of {total}"
 msgstr ""
 
 #: src/sidebar/toast/undo-delete-toast.tsx
@@ -187,6 +235,10 @@ msgstr ""
 msgid "1 day left"
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+msgid "1 lesson"
+msgstr ""
+
 #: src/settings/general/audio-settings.tsx
 msgid "1 month"
 msgstr ""
@@ -211,12 +263,28 @@ msgstr ""
 msgid "1 week"
 msgstr ""
 
+#: src/lesson/components/tone-legend.tsx
+msgid "1st tone"
+msgstr ""
+
+#: src/lesson/components/tone-legend.tsx
+msgid "2nd tone"
+msgstr ""
+
 #: src/settings/general/audio-settings.tsx
 msgid "3 days"
 msgstr ""
 
 #: src/settings/stats/date-range.tsx
 msgid "30 days"
+msgstr ""
+
+#: src/lesson/components/tone-legend.tsx
+msgid "3rd tone"
+msgstr ""
+
+#: src/lesson/components/tone-legend.tsx
+msgid "4th tone"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/transcribe-again.tsx
@@ -405,6 +473,10 @@ msgstr ""
 msgid "Add a trigger, then stack actions like Zapier."
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Add a word about it"
+msgstr ""
+
 #: src/settings/automations/workflow-builder.tsx
 msgid "Add an action"
 msgstr ""
@@ -524,6 +596,10 @@ msgstr ""
 msgid "Add to this recording"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "Add to to-dos"
+msgstr ""
+
 #: src/settings/developers/webhooks.tsx
 msgid "Add webhook"
 msgstr ""
@@ -559,6 +635,10 @@ msgstr ""
 msgid "After the meeting summary is ready"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Again"
+msgstr ""
+
 #: src/settings/developers/skills.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Agent skills"
@@ -576,6 +656,10 @@ msgstr ""
 msgid "All 3 invites have been accepted."
 msgstr "초대 3개가 모두 수락되었습니다."
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "All done for now"
+msgstr ""
+
 #: src/settings/developers/webhooks.tsx
 msgid "All events"
 msgstr ""
@@ -589,12 +673,20 @@ msgstr ""
 msgid "All Notes"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "All practised for now"
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "All Set"
 msgstr ""
 
 #: src/settings/stats/date-range.tsx
 msgid "All time"
+msgstr ""
+
+#: src/lesson/components/sidebar-courses.tsx
+msgid "All your lessons"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -730,9 +822,23 @@ msgstr ""
 msgid "Ask each meeting"
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Ask later:"
+msgstr ""
+
 #: src/composer/index.tsx
 #: src/shared/chat-cta.tsx
 msgid "Ask Mirna anything"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Ask:"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/lesson-board.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Asked"
 msgstr ""
 
 #: src/task/resource-view.tsx
@@ -970,6 +1076,7 @@ msgstr ""
 #: src/calendar/components/apple/permission.tsx
 #: src/folders/folder-editor.tsx
 #: src/imports/screen.tsx
+#: src/lesson/components/new-lesson-dialog.tsx
 #: src/resource-sharing/library.tsx
 #: src/session-sharing/comments.tsx
 #: src/settings/ai/llm/subscriptions/connect.tsx
@@ -1084,12 +1191,21 @@ msgstr ""
 msgid "Changes stay on this device until you resume sync."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Characters"
+msgstr ""
+
 #: src/dictation/recovery.tsx
 msgid "Chat"
 msgstr ""
 
 #: src/chat/components/toolbar-controls.tsx
 msgid "Chat history"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Check your tones"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -1123,6 +1239,10 @@ msgstr ""
 
 #: src/settings/general/notification.tsx
 msgid "Chime"
+msgstr ""
+
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Chinese text"
 msgstr ""
 
 #. placeholder {0}: provider.name
@@ -1333,6 +1453,7 @@ msgid "Clone"
 msgstr ""
 
 #: src/changelog/index.tsx
+#: src/lesson/components/practice-dialog.tsx
 #: src/main/windows-title-bar.tsx
 #: src/main/windows-window-controls.tsx
 #: src/session/components/note-input/search/bar.tsx
@@ -1723,6 +1844,7 @@ msgstr ""
 
 #: src/dictation/recovery.tsx
 #: src/main/windows-title-bar.tsx
+#: src/session/components/note-input/transcript/renderer/segment.tsx
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 #: src/settings/ai/llm/subscriptions/connect.tsx
 #: src/settings/developers/cloud-api.tsx
@@ -1770,6 +1892,10 @@ msgstr ""
 
 #: src/settings/developers/webhooks.tsx
 msgid "Copy this signing secret now — it is only shown once."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Corrections"
 msgstr ""
 
 #. placeholder {0}: error.message
@@ -1952,6 +2078,10 @@ msgstr ""
 msgid "Could not use the selected model"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "Couldn't add it to your to-dos."
+msgstr ""
+
 #: src/settings/team/index.tsx
 msgid "Couldn’t check availability. You can still try Save."
 msgstr ""
@@ -1968,6 +2098,10 @@ msgstr ""
 msgid "Couldn't export the logs"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Couldn't hear a clear voice in the teacher's clip."
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "Couldn't load your badges. Reopen this page to try again."
 msgstr ""
@@ -1978,6 +2112,10 @@ msgstr ""
 
 #: src/settings/general/account-profile.tsx
 msgid "Couldn't load your profile. Reopen this page to try again."
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Couldn't make it a lesson."
 msgstr ""
 
 #: src/settings/general/account.tsx
@@ -1992,6 +2130,15 @@ msgstr ""
 msgid "Couldn't open sign-in. Try again."
 msgstr "로그인 화면을 열지 못했어요. 다시 시도해 주세요."
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Couldn't read the teacher's clip."
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Couldn't save the file."
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "Couldn't save your new badges."
 msgstr ""
@@ -2001,8 +2148,34 @@ msgstr ""
 msgid "Couldn't save your profile. Try again."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Couldn't start the lesson."
+msgstr ""
+
 #: src/onboarding/account/after-login.tsx
 msgid "Couldn't switch accounts. Please try again."
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Couldn't update the homework."
+msgstr ""
+
+#. placeholder {0}: status.message
+#: src/lesson/components/study-sheet.tsx
+msgid "Couldn't write the study sheet: {0}"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Course"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Course name"
+msgstr ""
+
+#: src/lesson/components/sidebar-courses.tsx
+msgid "Courses"
 msgstr ""
 
 #: src/folders/sidebar.tsx
@@ -2299,6 +2472,14 @@ msgstr ""
 msgid "Dictionary"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Didn't catch your voice. Try again a little louder."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Didn't get it"
+msgstr ""
+
 #: src/settings/automations/index.tsx
 msgid "Disable"
 msgstr ""
@@ -2333,6 +2514,10 @@ msgstr ""
 msgid "Dismiss {term}"
 msgstr ""
 
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Display"
+msgstr ""
+
 #: src/main/windows-title-bar.tsx
 #: src/settings/imports/index.tsx
 msgid "Documentation"
@@ -2345,6 +2530,11 @@ msgstr ""
 #: src/resource-sharing/share-dialog.tsx
 #: src/settings/sync/index.tsx
 msgid "Done"
+msgstr ""
+
+#. placeholder {0}: item.text
+#: src/lesson/components/course-panel.tsx
+msgid "Done: {0}"
 msgstr ""
 
 #: src/settings/ai/stt/select.tsx
@@ -2396,6 +2586,10 @@ msgstr ""
 msgid "Draft follow-up email."
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+msgid "Due to practise"
+msgstr ""
+
 #: src/templates/details.tsx
 #: src/templates/template-form.tsx
 msgid "Duplicate"
@@ -2415,6 +2609,10 @@ msgstr ""
 
 #: src/session/components/version-history-dialog.tsx
 msgid "Earlier versions of this note, newest first."
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Easy"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
@@ -2621,6 +2819,10 @@ msgstr ""
 msgid "Expected output"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Explain in"
+msgstr ""
+
 #: src/session/components/outer-header/overflow/export-modal.tsx
 #: src/session/components/outer-header/overflow/index.tsx
 msgid "Export"
@@ -2645,6 +2847,11 @@ msgstr ""
 
 #: src/settings/automations/workflow-builder.tsx
 msgid "Export the meeting as Markdown"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Export words"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/export-modal.tsx
@@ -2810,8 +3017,18 @@ msgstr ""
 msgid "Food & Drink"
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "For Anki (text file)"
+msgstr ""
+
 #: src/settings/general/notification.tsx
 msgid "For enabled notifications"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "For Pleco (text file)"
 msgstr ""
 
 #: src/settings/general/audio-settings.tsx
@@ -2833,6 +3050,11 @@ msgstr ""
 
 #: src/templates/template-icon-picker.tsx
 msgid "Frequently used"
+msgstr ""
+
+#. placeholder {0}: previous.title || t`the last lesson`
+#: src/lesson/components/lesson-board.tsx
+msgid "From {0}"
 msgstr ""
 
 #: src/session-sharing/draft-panel.tsx
@@ -2893,6 +3115,10 @@ msgstr ""
 msgid "Get your attention when a summary is ready in the background."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Give the course a name first."
+msgstr ""
+
 #: src/sidebar/timeline/index.tsx
 msgid "Go back to now"
 msgstr ""
@@ -2920,6 +3146,10 @@ msgstr ""
 
 #: src/chat/components/body/index.tsx
 msgid "Go to recent"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Good"
 msgstr ""
 
 #: src/main/empty.tsx
@@ -2984,6 +3214,10 @@ msgstr ""
 msgid "Hands-free dictation"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Hard"
+msgstr ""
+
 #: src/settings/general/app-settings.tsx
 msgid "Have Mirna ready when you sign in."
 msgstr ""
@@ -2994,6 +3228,11 @@ msgstr ""
 
 #: src/settings/ai/llm/subscriptions/connect.tsx
 msgid "Having trouble? Paste the redirect URL"
+msgstr ""
+
+#. placeholder {0}: formatClock(item.atMs)
+#: src/lesson/components/study-sheet.tsx
+msgid "Heard at {0}"
 msgstr ""
 
 #: src/settings/stats/badge-collection.tsx
@@ -3053,6 +3292,10 @@ msgstr ""
 msgid "High"
 msgstr ""
 
+#: src/lesson/components/pitch-chart.tsx
+msgid "Higher on the chart means a higher voice."
+msgstr ""
+
 #: src/session/components/note-conflict-banner.tsx
 msgid "History"
 msgstr ""
@@ -3075,9 +3318,31 @@ msgstr ""
 msgid "Home and questions about all your notes ({homeShortcut})"
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Homework"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "Homework (Alt+3)"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Homework open"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Homework:"
+msgstr ""
+
 #: src/settings/stats/index.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Hours transcribed"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "How did it go?"
 msgstr ""
 
 #: src/settings/ai/llm/select.tsx
@@ -3096,8 +3361,21 @@ msgstr ""
 msgid "Human"
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "I didn't get this"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "I didn't get this (Alt+2)"
+msgstr ""
+
 #: src/settings/general/e2ee-setup.tsx
 msgid "I saved it"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "I'm learning"
 msgstr ""
 
 #: src/templates/template-icon-picker.tsx
@@ -3122,6 +3400,15 @@ msgstr "친구가 내 링크로 가입하고 무료 체험을 시작했는데도
 
 #: src/onboarding/index.tsx
 msgid "Import notes and transcripts from the meeting apps you already use."
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Important"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "Important (Alt+1)"
 msgstr ""
 
 #. placeholder {0}: result.imported
@@ -3173,6 +3460,19 @@ msgstr ""
 msgid "in {weeks} weeks"
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+msgid "In Chinese, last lesson"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "In your to-dos"
+msgstr ""
+
+#. placeholder {0}: practice.fromOtherLessons
+#: src/lesson/components/study-sheet.tsx
+msgid "incl. {0} from earlier lessons"
+msgstr ""
+
 #: src/session/components/outer-header/overflow/export-modal.tsx
 #: src/settings/automations/markdown-export-options.tsx
 msgid "Include"
@@ -3181,6 +3481,11 @@ msgstr ""
 #: src/settings/automations/markdown-export-options.tsx
 msgid "Include meeting ID"
 msgstr "회의 ID 포함"
+
+#. placeholder {0}: practice.fromOtherLessons
+#: src/lesson/components/study-sheet.tsx
+msgid "Includes {0} words from earlier lessons that are due again"
+msgstr ""
 
 #: src/settings/stats/index.tsx
 msgid "Includes imported transcripts. Deleted conversations are excluded."
@@ -3391,6 +3696,10 @@ msgstr ""
 msgid "Keep your recovery key saved somewhere safe. You can still use it if another synced device is unavailable."
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+msgid "Keeps coming up"
+msgstr ""
+
 #: src/dictation/recovery.tsx
 msgid "Kept on this device for 24 hours. Mirna never inserts these by itself."
 msgstr ""
@@ -3495,6 +3804,31 @@ msgstr ""
 
 #: src/settings/stats/index.tsx
 msgid "Less"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Lesson"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#~ msgid "Lesson {0}"
+#~ msgstr ""
+
+#: src/lesson/title.ts
+msgid "Lesson {number}"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Lesson board"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/outer-header/overflow/index.tsx
+msgid "Lesson settings"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Lessons"
 msgstr ""
 
 #: src/session-sharing/attachment-controls.tsx
@@ -3627,6 +3961,10 @@ msgstr ""
 msgid "Loading your invites..."
 msgstr "초대권을 불러오는 중..."
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Loading your words…"
+msgstr ""
+
 #: src/contacts/details.tsx
 #: src/settings/general/account-profile.tsx
 #: src/task/resource-view.tsx
@@ -3717,6 +4055,11 @@ msgstr ""
 msgid "Make the summary shorter."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/outer-header/overflow/index.tsx
+msgid "Make this a lesson"
+msgstr ""
+
 #: src/settings/general/billing.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Manage billing"
@@ -3739,12 +4082,36 @@ msgstr ""
 msgid "Manage your sign-in methods on the Mirna website."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Mandarin with my teacher"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "Mark as didn't get it"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "Mark as homework"
+msgstr ""
+
+#: src/meeting-float/overlay/bar.tsx
+msgid "Mark as important"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Mark this moment"
+msgstr ""
+
 #: src/settings/automations/google-drive-config.tsx
 msgid "Markdown (.md)"
 msgstr ""
 
 #: src/settings/automations/workflow-builder.tsx
 msgid "Markdown export"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Marked"
 msgstr ""
 
 #: src/session/components/note-input/search/bar.tsx
@@ -3783,6 +4150,10 @@ msgstr ""
 #: src/settings/developers/cli.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "MCP server"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Meaning"
 msgstr ""
 
 #. placeholder {0}: number.format(stats.timedConversations)
@@ -3970,6 +4341,10 @@ msgstr ""
 msgid "Mirna can read meeting details"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Mirna can't use the microphone here. You can still listen and grade yourself."
+msgstr ""
+
 #: src/settings/developers/cli.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Mirna CLI"
@@ -4051,6 +4426,10 @@ msgstr ""
 
 #: src/onboarding/index.tsx
 msgid "Mirna will sync your calendar to get meeting reminders"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Mirna writes a study sheet from this recording: words, patterns, corrections and homework."
 msgstr ""
 
 #: src/settings/referrals.tsx
@@ -4139,6 +4518,14 @@ msgstr "시간이 더 필요하신가요? 친구를 초대하세요."
 msgid "Needs setup"
 msgstr ""
 
+#: src/lesson/components/tone-legend.tsx
+msgid "neutral"
+msgstr ""
+
+#: src/lesson/components/tone-legend.tsx
+msgid "Neutral tone"
+msgstr ""
+
 #: src/settings/dictation-engine.tsx
 msgid "Never read these apps"
 msgstr ""
@@ -4163,8 +4550,17 @@ msgstr ""
 msgid "New chat"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "New course…"
+msgstr ""
+
 #: src/folders/sidebar.tsx
 msgid "New folder"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/main/sidebar-timeline-chrome.tsx
+msgid "New lesson"
 msgstr ""
 
 #: src/imports/screen.tsx
@@ -4408,6 +4804,10 @@ msgstr ""
 msgid "No speech was detected in this recording."
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+msgid "No study sheet yet"
+msgstr ""
+
 #: src/settings/sync/log.tsx
 msgid "No sync activity yet."
 msgstr ""
@@ -4428,12 +4828,20 @@ msgstr ""
 msgid "No upcoming bots."
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "No words to practise"
+msgstr ""
+
 #: src/settings/general/camera-watermark.tsx
 msgid "None"
 msgstr ""
 
 #: src/settings/phone/index.tsx
 msgid "None yet. The phone shows up here once it has scanned the code."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Not answered in class:"
 msgstr ""
 
 #: src/settings/stats/insights.tsx
@@ -4477,6 +4885,10 @@ msgstr ""
 msgid "note"
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Note for this mark"
+msgstr ""
+
 #: src/lock/screen.tsx
 msgid "Note is Locked"
 msgstr ""
@@ -4503,6 +4915,10 @@ msgstr ""
 #: src/folders/folder-editor.tsx
 #: src/sidebar/folder-materials.tsx
 msgid "Notes stay in All notes. Materials in this folder will be deleted."
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Nothing to practise yet"
 msgstr ""
 
 #: src/settings/general/index.tsx
@@ -4559,6 +4975,10 @@ msgstr ""
 
 #: src/settings/general/billing.tsx
 msgid "On-device transcription, recordings, and your own keys."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "once the teacher fixed what you said"
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -4818,6 +5238,10 @@ msgstr ""
 msgid "Paste the localhost redirect URL"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "Patterns"
+msgstr ""
+
 #: src/settings/developers/webhooks.tsx
 msgid "Pause"
 msgstr ""
@@ -4901,8 +5325,22 @@ msgstr ""
 msgid "Pin"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Pinyin above"
+msgstr ""
+
 #: src/session/components/note-input/transcript/engine-note.tsx
-msgid "Pinyin on"
+#~ msgid "Pinyin on"
+#~ msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Pinyin only"
+msgstr ""
+
+#: src/lesson/components/pitch-chart.tsx
+msgid "Pitch of the teacher's voice and yours over the word"
 msgstr ""
 
 #: src/settings/general/billing.tsx
@@ -4913,12 +5351,30 @@ msgstr ""
 msgid "Plans"
 msgstr ""
 
+#: src/session/components/note-input/transcript/renderer/word-card.tsx
+msgid "Play"
+msgstr ""
+
 #: src/settings/general/notification.tsx
 msgid "Play a sound when transcription, summaries, or cloud sync finish."
 msgstr ""
 
+#: src/session/components/note-input/transcript/renderer/segment.tsx
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 msgid "Play from here"
+msgstr ""
+
+#. placeholder {0}: item.term
+#: src/lesson/components/study-sheet.tsx
+msgid "Play the teacher saying {0}"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Play this example"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Play this moment"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -4944,6 +5400,20 @@ msgstr ""
 
 #: src/automations/starters.tsx
 msgid "Post to a channel"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+#: src/lesson/components/sidebar-courses.tsx
+msgid "Practise"
+msgstr ""
+
+#. placeholder {0}: practice.due
+#: src/lesson/components/study-sheet.tsx
+msgid "Practise {0} words"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Practise {due}"
 msgstr ""
 
 #: src/settings/general/primary-recording-device.tsx
@@ -5048,6 +5518,18 @@ msgstr ""
 msgid "Public on the web"
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Question for after class"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Question for the next class"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Questions for the next class"
+msgstr ""
+
 #: src/session/components/note-input/transcript/engine-note.tsx
 msgid "Qwen3-ASR is downloading"
 msgstr ""
@@ -5070,6 +5552,10 @@ msgstr ""
 
 #: src/settings/general/permissions.tsx
 msgid "Read meeting controls and visible chat."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Reading"
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
@@ -5160,6 +5646,10 @@ msgstr ""
 msgid "Record"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Record a class and get a study sheet afterwards: words, patterns, corrections and homework."
+msgstr ""
+
 #: src/session/components/outer-header/index.tsx
 msgid "Record more"
 msgstr ""
@@ -5183,6 +5673,10 @@ msgstr ""
 
 #: src/dictation/recovery.tsx
 msgid "Recording not transcribed yet."
+msgstr ""
+
+#: src/session/components/note-input/transcript/renderer/separator.tsx
+msgid "Recording resumed"
 msgstr ""
 
 #: src/settings/general/notification.tsx
@@ -5307,6 +5801,10 @@ msgstr ""
 msgid "Remove repository"
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Remove this mark"
+msgstr ""
+
 #: src/settings/team/index.tsx
 msgid "Remove workspace logo"
 msgstr ""
@@ -5376,6 +5874,10 @@ msgstr ""
 
 #: src/settings/dictionary/replacements.tsx
 msgid "Replacements"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Replay this moment"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
@@ -5612,6 +6114,11 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
+#: src/lesson/components/course-panel.tsx
+#: src/lesson/components/study-sheet.tsx
+msgid "Saved {path}"
+msgstr ""
+
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 msgid "Saved as your name"
 msgstr ""
@@ -5623,6 +6130,10 @@ msgstr ""
 #: src/contacts/profile-photo.tsx
 #: src/settings/general/account-profile.tsx
 msgid "Saving..."
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Say it"
 msgstr ""
 
 #: src/settings/phone/index.tsx
@@ -5746,6 +6257,10 @@ msgstr ""
 
 #: src/services/event-listeners.tsx
 msgid "See what's new in this version and the ones before."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "seen before"
 msgstr ""
 
 #: src/settings/ai/shared/model-combobox.tsx
@@ -6010,6 +6525,10 @@ msgstr ""
 msgid "Show All Recurring Events"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Show answer"
+msgstr ""
+
 #: src/settings/general/app-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Show app in Dock"
@@ -6029,6 +6548,10 @@ msgstr ""
 
 #: src/session/components/outer-header/overflow/index.tsx
 msgid "Show Audio in Folder"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Show Chinese as"
 msgstr ""
 
 #: src/sidebar/timeline/index.tsx
@@ -6068,8 +6591,8 @@ msgid "Show notes: {label}"
 msgstr ""
 
 #: src/session/components/note-input/transcript/engine-note.tsx
-msgid "Show pinyin"
-msgstr ""
+#~ msgid "Show pinyin"
+#~ msgstr ""
 
 #: src/settings/general/app-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
@@ -6293,6 +6816,10 @@ msgstr ""
 msgid "Slack recap"
 msgstr ""
 
+#: src/lesson/components/practice-dialog.tsx
+msgid "Slower"
+msgstr ""
+
 #: src/templates/template-icon-picker.tsx
 msgid "Smileys & People"
 msgstr ""
@@ -6317,6 +6844,14 @@ msgstr ""
 
 #: src/settings/general/notification.tsx
 msgid "Sound"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Sound is set up for you. No call is running, so Mirna treats it as a class in the same room, on one microphone."
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Sound is set up for you. Online class: the teacher comes through {appNames}, and you're on the microphone."
 msgstr ""
 
 #: src/session/components/note-input/enhanced/enhance-error.tsx
@@ -6361,6 +6896,15 @@ msgstr ""
 
 #: src/settings/general/billing.tsx
 msgid "Start free trial"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Start lesson"
+msgstr ""
+
+#. placeholder {0}: lessons.length + 1
+#: src/lesson/components/course-panel.tsx
+msgid "Start lesson {0}"
 msgstr ""
 
 #: src/settings/general/meeting-settings.tsx
@@ -6448,11 +6992,16 @@ msgstr ""
 msgid "Steps run from top to bottom."
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "Still open:"
+msgstr ""
+
 #: src/settings/appearance/app-icon.tsx
 msgid "Stone"
 msgstr ""
 
 #: src/composer/index.tsx
+#: src/lesson/components/practice-dialog.tsx
 #: src/session/components/outer-header/record-control.tsx
 msgid "Stop"
 msgstr ""
@@ -6501,6 +7050,10 @@ msgstr ""
 
 #: src/settings/general/camera-watermark.tsx
 msgid "Studio"
+msgstr ""
+
+#: src/session/components/note-input/header-lesson.tsx
+msgid "Study sheet"
 msgstr ""
 
 #: src/instruction/index.tsx
@@ -6669,6 +7222,23 @@ msgstr ""
 msgid "Teach coding agents when and how to use the Mirna CLI and MCP"
 msgstr ""
 
+#: src/lesson/components/pitch-chart.tsx
+#: src/lesson/components/practice-dialog.tsx
+msgid "Teacher"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Teacher said"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Teacher says it"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Teacher's pitch"
+msgstr ""
+
 #: src/resource-sharing/share-dialog.tsx
 msgid "Team"
 msgstr ""
@@ -6728,6 +7298,14 @@ msgstr ""
 msgid "Test runs are not available yet."
 msgstr ""
 
+#: src/lesson/components/lesson-board.tsx
+msgid "the last lesson"
+msgstr ""
+
+#: src/lesson/components/services.tsx
+msgid "The lesson shortcuts are taken by another app. Use the buttons instead."
+msgstr ""
+
 #: src/shared-notes/index.tsx
 msgid "The link may have expired or its access may have changed."
 msgstr ""
@@ -6752,8 +7330,16 @@ msgstr ""
 msgid "The recording reached the 12-hour limit."
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "The recording stays on this Mac. After class, the transcript goes to the AI picked in Intelligence, which writes the study sheet. Let your teacher know you're recording."
+msgstr ""
+
 #: src/session/components/note-input/transcript/actions.ts
 msgid "The summary still reflects the old transcript."
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "The transcript goes to the AI picked in Intelligence, which writes the study sheet. The recording stays on this Mac."
 msgstr ""
 
 #: src/session/components/note-input/enhanced/outdated-notice.tsx
@@ -6762,6 +7348,14 @@ msgstr ""
 
 #: src/sidebar/toast/registry.tsx
 msgid "The update download failed"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "The words come back when they're due."
+msgstr ""
+
+#: src/lesson/components/talk-strip.tsx
+msgid "Them"
 msgstr ""
 
 #: src/settings/appearance/theme.tsx
@@ -6812,6 +7406,10 @@ msgstr ""
 
 #: src/session/components/outer-header/index.tsx
 msgid "This is a prerecorded demo, so your camera stays off. Click Join & record to see Mirna in action."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "This lesson"
 msgstr ""
 
 #: src/settings/sync/index.tsx
@@ -6874,12 +7472,21 @@ msgstr ""
 msgid "Tip: The Mirna team loves our users!"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Title"
+msgstr ""
+
 #: src/sidebar/timeline/utils/index.ts
 msgid "Today"
 msgstr ""
 
 #: src/sidebar/timeline/utils/index.ts
 msgid "Tomorrow"
+msgstr ""
+
+#: src/lesson/components/tone-legend.tsx
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Tone colours"
 msgstr ""
 
 #: src/dictation/recovery.tsx
@@ -6952,6 +7559,14 @@ msgstr ""
 msgid "Transfer primary ownership before changing your role."
 msgstr ""
 
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Translation"
+msgstr ""
+
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Translations come from a lesson's study sheet."
+msgstr ""
+
 #: src/templates/template-icon-picker.tsx
 msgid "Travel & Places"
 msgstr ""
@@ -6970,6 +7585,7 @@ msgid "Trigger"
 msgstr ""
 
 #: src/contacts/details.tsx
+#: src/lesson/components/study-sheet.tsx
 #: src/onboarding/permissions.tsx
 #: src/session-sharing/management-panel.tsx
 #: src/settings/general/permissions.tsx
@@ -7014,6 +7630,10 @@ msgstr ""
 
 #: src/settings/dictionary/replacements.tsx
 msgid "Type"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Type it now, ask it later…"
 msgstr ""
 
 #: src/settings/appearance/app-icon.tsx
@@ -7114,6 +7734,10 @@ msgstr ""
 #: src/settings/automations/index.tsx
 #: src/sidebar/automations.tsx
 msgid "Untitled automation"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Untitled lesson"
 msgstr ""
 
 #: src/sidebar/timeline/item.tsx
@@ -7458,6 +8082,10 @@ msgstr ""
 msgid "When off, summaries follow the detected meeting language."
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "When the lesson's summary is ready, the AI picked in Settings › Intelligence writes its study sheet here: words, patterns, corrections and homework."
+msgstr ""
+
 #: src/billing/trial-payment-reminder-dialog.tsx
 msgid "When they start their free trial, yours gets one more month. Up to 3 friends."
 msgstr "친구가 무료 체험을 시작하면 내 체험이 한 달 더 연장돼요. 최대 3명까지 초대할 수 있어요."
@@ -7470,6 +8098,18 @@ msgstr ""
 msgid "whisper.cpp models"
 msgstr ""
 
+#: src/lesson/components/talk-strip.tsx
+msgid "Who has been talking so far"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Who talked"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Who's talking"
+msgstr ""
+
 #: src/settings/dictation-engine.tsx
 msgid "With text selected in another app, say how to change it. The selection is sent to your selected AI model and is left unchanged if editing fails."
 msgstr ""
@@ -7478,8 +8118,37 @@ msgstr ""
 msgid "With your settings"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "Word"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+#: src/session/components/note-input/transcript/display-menu.tsx
+msgid "Word by word"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Words"
+msgstr ""
+
+#: src/lesson/components/practice-dialog.tsx
+msgid "Words appear here once a lesson's study sheet is written."
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Words collected"
+msgstr ""
+
 #: src/settings/dictionary/replacements.tsx
 msgid "Words you fixed after dictating. Add them so dictation spells them right next time."
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "Words you keep missing"
+msgstr ""
+
+#: src/lesson/components/lesson-board.tsx
+msgid "Words, patterns, corrections and homework come after class: when you stop, Mirna transcribes the lesson on this Mac, then the AI picked in Intelligence writes the study sheet."
 msgstr ""
 
 #: src/task/tab-content.tsx
@@ -7510,12 +8179,33 @@ msgstr ""
 msgid "Write a note"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "Write again"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Write it now"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Write the study sheet"
+msgstr ""
+
 #: src/automations/starters.tsx
 msgid "Write to a folder"
 msgstr ""
 
 #: src/sidebar/timeline/item.tsx
 msgid "Writing summary"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Writing the study sheet from the lesson…"
+msgstr ""
+
+#. placeholder {0}: sheetDocument.model
+#: src/lesson/components/study-sheet.tsx
+msgid "Written by {0}"
 msgstr ""
 
 #: src/settings/general/billing.tsx
@@ -7530,6 +8220,8 @@ msgstr ""
 msgid "Yesterday"
 msgstr ""
 
+#: src/lesson/components/pitch-chart.tsx
+#: src/lesson/components/talk-strip.tsx
 #: src/session-sharing/comments.tsx
 #: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 #: src/settings/team/index.tsx
@@ -7552,8 +8244,25 @@ msgstr ""
 msgid "You have an active plan"
 msgstr ""
 
+#: src/lesson/components/study-sheet.tsx
+msgid "You said"
+msgstr ""
+
 #: src/services/meeting-capture-stop.tsx
 msgid "You signed out or changed accounts."
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "You spoke {share}% of the time"
+msgstr ""
+
+#. placeholder {0}: formatClock(chinese.studentChineseMs)
+#: src/lesson/components/study-sheet.tsx
+msgid "You spoke Chinese for {0}"
+msgstr ""
+
+#: src/lesson/components/course-panel.tsx
+msgid "You spoke, last lesson"
 msgstr ""
 
 #: src/settings/team/index.tsx
@@ -7620,6 +8329,10 @@ msgstr ""
 
 #: src/settings/stats/index.tsx
 msgid "Your insights"
+msgstr ""
+
+#: src/lesson/components/study-sheet.tsx
+msgid "Your marks and questions"
 msgstr ""
 
 #: src/settings/general/your-name.tsx
