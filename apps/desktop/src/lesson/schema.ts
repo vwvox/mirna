@@ -128,6 +128,11 @@ const cardStateSchema = z.object({
 const practiceDocumentSchema = z.object({
   version: z.literal(1).catch(1),
   cards: z.record(z.string(), cardStateSchema).catch({}),
+  skipped: z.array(z.string()).optional().catch(undefined),
+  toneChecks: z
+    .array(z.object({ tone: z.number(), ok: z.boolean(), at: z.string() }))
+    .optional()
+    .catch(undefined),
 });
 
 export function parseLessonPractice(

@@ -75,13 +75,17 @@ export function usePracticeLessons(sessionIds: string[]): PracticeLesson[] {
   return sessionIds.length > 0 ? data : EMPTY;
 }
 
-export function practiceCardsOf(lessons: PracticeLesson[]): PracticeCard[] {
+export function practiceCardsOf(
+  lessons: PracticeLesson[],
+  options?: { includeSkipped?: boolean },
+): PracticeCard[] {
   return buildPracticeCards(
     lessons.map((lesson) => ({
       sessionId: lesson.sessionId,
       vocabulary: lesson.sheet?.sheet.vocabulary ?? [],
       practice: lesson.practice,
     })),
+    options,
   );
 }
 

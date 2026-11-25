@@ -21,9 +21,21 @@ import {
 } from "~/stt/pinyin";
 
 /** How Chinese in the transcript reads: characters, pinyin, word by word, tone colours and translations. */
-export function ChineseDisplayMenu({ sessionId }: { sessionId: string }) {
+export function ChineseDisplayMenu({
+  sessionId,
+  lesson,
+  label,
+  triggerClassName,
+}: {
+  /** The note whose transcript this is; leave out on pages about many lessons. */
+  sessionId?: string;
+  /** Use the lesson display without looking the note up. */
+  lesson?: boolean;
+  label?: string;
+  triggerClassName?: string;
+}) {
   const { t } = useLingui();
-  const isLesson = useLessonSession(sessionId).isLesson;
+  const isLesson = useLessonSession(sessionId).isLesson || lesson === true;
   const shown = useEffectiveChineseDisplay(isLesson);
   const save = useChineseDisplay((state) => state.update);
   // Saves what the note shows plus the change, so picking one option doesn't
@@ -54,9 +66,10 @@ export function ChineseDisplayMenu({ sessionId }: { sessionId: string }) {
             customised
               ? "bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-mist font-semibold"
               : "border-border hover:text-foreground border font-medium",
+            triggerClassName,
           ])}
         >
-          {t`Display`}
+          {label ?? t`Display`}
           <CaretDown aria-hidden size={11} />
         </button>
       </PopoverTrigger>
@@ -98,26 +111,32 @@ export function ChineseDisplayMenu({ sessionId }: { sessionId: string }) {
           />
         </div>
         {display.toneColours ? <ToneLegend className="px-2 pb-1.5" /> : null}
-        <div className="flex items-center justify-between gap-3 px-2 py-1.5">
-          <label
-            htmlFor={translationId}
-            className={cn([!hasTranslations && "text-muted-foreground"])}
-          >
-            {t`Translation`}
-          </label>
-          <Switch
-            id={translationId}
-            size="sm"
-            disabled={!hasTranslations}
-            checked={hasTranslations && display.translation}
-            onCheckedChange={(translation) => display.update({ translation })}
-          />
-        </div>
-        {hasTranslations ? null : (
-          <p className="text-muted-foreground px-2 pb-1 text-xs">
-            {t`Translations come from a lesson's study sheet.`}
-          </p>
-        )}
+        {sessionId ? (
+          <>
+            <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+              <label
+                htmlFor={translationId}
+                className={cn([!hasTranslations && "text-muted-foreground"])}
+              >
+                {t`Translation`}
+              </label>
+              <Switch
+                id={translationId}
+                size="sm"
+                disabled={!hasTranslations}
+                checked={hasTranslations && display.translation}
+                onCheckedChange={(translation) =>
+                  display.update({ translation })
+                }
+              />
+            </div>
+            {hasTranslations ? null : (
+              <p className="text-muted-foreground px-2 pb-1 text-xs">
+                {t`Translations come from a lesson's study sheet.`}
+              </p>
+            )}
+          </>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

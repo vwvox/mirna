@@ -9,6 +9,7 @@ import type {
   LessonQuestion,
 } from "./types";
 
+import { useLiveQuery } from "~/db";
 import { loadCaptureLifecycleMarker } from "~/stt/capture-lifecycle-storage";
 
 const EMPTY = emptyLessonMarks();
@@ -142,3 +143,37 @@ export function removeLessonQuestion(sessionId: string, questionId: string) {
     ),
   }));
 }
+
+type MarksRow = { session_id: string; body: string };
+
+/** The marks and questions of several lessons, by lesson id. */
+export function useCourseMarks(sessionIds: string[]) {
+  const placeholders = sessionIds.map(() => "?").join(", ");
+  const { data = EMPTY_MARKS } = useLiveQuery<
+    MarksRow,
+    Map<string, LessonMarksDocument>
+  >({
+    sql: `
+      SELECT session_id, body FROM session_documents
+      WHERE session_id IN (${placeholders || "''"})
+        AND kind = 'lesson_marks' AND deleted_at IS NULL
+    `,
+    params: sessionIds,
+    enabled: sessionIds.length > 0,
+    mapRows: (rows) => {
+      const marks = new Map<string, LessonMarksDocument>();
+      for (const row of rows) {
+        try {
+          const parsed = parseLessonMarks(JSON.parse(row.body));
+          if (parsed) marks.set(row.session_id, parsed);
+        } catch {
+          // Leave out marks that can't be read.
+        }
+      }
+      return marks;
+    },
+  });
+  return data;
+}
+
+const EMPTY_MARKS = new Map<string, LessonMarksDocument>();

@@ -95,12 +95,15 @@ export function buildPracticeCards(
     vocabulary: LessonVocabularyItem[];
     practice: LessonPracticeDocument | null;
   }>,
+  { includeSkipped = false }: { includeSkipped?: boolean } = {},
 ): PracticeCard[] {
   const seen = new Set<string>();
   const cards: PracticeCard[] = [];
   for (const lesson of lessons) {
+    const skipped = new Set(lesson.practice?.skipped ?? []);
     for (const item of lesson.vocabulary) {
       if (seen.has(item.term)) continue;
+      if (!includeSkipped && skipped.has(item.term)) continue;
       seen.add(item.term);
       cards.push({
         id: item.term,
@@ -142,4 +145,106 @@ export function recordPracticeGrade(
       },
     }),
   );
+}
+
+export type WordState = "new" | "learning" | "known";
+
+const KNOWN_AFTER_DAYS = 21;
+
+/** New until first practised, known once it comes back three weeks or more apart. */
+export function wordState(state: LessonCardState | undefined): WordState {
+  if (!state) return "new";
+  return state.intervalDays >= KNOWN_AFTER_DAYS ? "known" : "learning";
+}
+
+/** Puts a word away for two months, for words the student already knows well. */
+export function markWordKnown(
+  card: Pick<PracticeCard, "sessionId" | "id">,
+  now = new Date(),
+): Promise<LessonPracticeDocument> {
+  return updateLessonDocument(
+    card.sessionId,
+    "lesson_practice",
+    parseLessonPractice,
+    emptyLessonPractice,
+    (current) => {
+      const previous = current.cards[card.id];
+      return {
+        ...current,
+        cards: {
+          ...current.cards,
+          [card.id]: {
+            due: new Date(now.getTime() + 60 * DAY).toISOString(),
+            intervalDays: 60,
+            ease: Math.max(previous?.ease ?? START_EASE, START_EASE),
+            reps: Math.max(previous?.reps ?? 0, 3),
+            lapses: previous?.lapses ?? 0,
+            lastReviewedAt: now.toISOString(),
+          },
+        },
+      };
+    },
+  );
+}
+
+/** Turns a word's practice card on or off on its lesson's sheet. */
+export function setWordCard(
+  sessionId: string,
+  term: string,
+  on: boolean,
+): Promise<LessonPracticeDocument> {
+  return updateLessonDocument(
+    sessionId,
+    "lesson_practice",
+    parseLessonPractice,
+    emptyLessonPractice,
+    (current) => {
+      const skipped = new Set(current.skipped ?? []);
+      if (on) skipped.delete(term);
+      else skipped.add(term);
+      return { ...current, skipped: [...skipped] };
+    },
+  );
+}
+
+const TONE_CHECKS_KEPT = 200;
+
+/** Saves how each syllable's tone went, for "Tones you miss most". */
+export function recordToneChecks(
+  sessionId: string,
+  checks: Array<{ tone: number; ok: boolean }>,
+  now = new Date(),
+): Promise<LessonPracticeDocument> {
+  return updateLessonDocument(
+    sessionId,
+    "lesson_practice",
+    parseLessonPractice,
+    emptyLessonPractice,
+    (current) => ({
+      ...current,
+      toneChecks: [
+        ...(current.toneChecks ?? []),
+        ...checks.map((check) => ({ ...check, at: now.toISOString() })),
+      ].slice(-TONE_CHECKS_KEPT),
+    }),
+  );
+}
+
+/** The tones missed most in the last `window` syllables checked, worst first. */
+export function missedTones(
+  checks: Array<{ tone: number; ok: boolean; at: string }>,
+  window = 20,
+): { tone: number; missed: number; of: number }[] {
+  const recent = [...checks]
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .slice(-window);
+  const missed = new Map<number, number>();
+  for (const check of recent) {
+    if (!check.ok && check.tone > 0) {
+      missed.set(check.tone, (missed.get(check.tone) ?? 0) + 1);
+    }
+  }
+  return [...missed.entries()]
+    .map(([tone, count]) => ({ tone, missed: count, of: recent.length }))
+    .sort((a, b) => b.missed - a.missed);
 }

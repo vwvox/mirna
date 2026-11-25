@@ -79,11 +79,13 @@ describe("term clips", () => {
 
   it("plays the teacher's occurrence closest to when it was taught", () => {
     const found = findTermOccurrences(segments, "饺子");
+    // Padded 0.3 s before and 0.6 s after; "我喜欢饺子。" is stretched from
+    // 1.5 s to its five syllables' 1.65 s.
     expect(pickTermClip(found, 29_000)).toEqual({
-      startMs: 29_750,
-      endMs: 31_950,
+      startMs: 29_700,
+      endMs: 32_250,
     });
-    expect(pickTermClip(found, null)?.startMs).toBe(1_850);
+    expect(pickTermClip(found, null)?.startMs).toBe(1_800);
     expect(pickTermClip([], 0)).toBeNull();
   });
 });

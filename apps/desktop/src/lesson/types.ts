@@ -115,4 +115,10 @@ export type LessonCardState = {
 export type LessonPracticeDocument = {
   version: 1;
   cards: Record<string, LessonCardState>;
+  /** Words of this lesson's sheet the student chose not to practise. */
+  skipped?: string[];
+  /** Recent tone checks, one per syllable said, newest last. */
+  toneChecks?: LessonToneCheck[];
 };
+
+export type LessonToneCheck = { tone: number; ok: boolean; at: string };

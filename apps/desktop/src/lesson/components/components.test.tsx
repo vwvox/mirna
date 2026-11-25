@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   addLessonMark: vi.fn(async () => null),
   addLessonQuestion: vi.fn(async () => null),
   addHomeworkTodo: vi.fn(async () => {}),
+  setHomeworkDone: vi.fn(async () => {}),
   requestLessonSheet: vi.fn(async () => {}),
   playRange: vi.fn(),
 }));
@@ -23,8 +24,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../practice-data", () => ({
   usePracticeDue: () => ({ cards: 3, due: 3, fromOtherLessons: 2 }),
 }));
+vi.mock("../documents", () => ({
+  useLessonDocument: () => null,
+  updateLessonDocument: vi.fn(),
+}));
 vi.mock("../queries", () => ({
   useCourseLessons: () => [],
+  useCourseSheets: () => new Map(),
   useLessonSession: () => ({
     isLesson: true,
     settings: { learning: "zh", explainIn: "en" },
@@ -59,6 +65,7 @@ vi.mock("../marks", () => ({
   removeLessonMark: vi.fn(),
   updateLessonMarkNote: vi.fn(),
   setLessonQuestionAsked: vi.fn(),
+  useCourseMarks: () => new Map(),
 }));
 vi.mock("../auto", () => ({
   requestLessonSheet: mocks.requestLessonSheet,
@@ -67,6 +74,9 @@ vi.mock("../auto", () => ({
 }));
 vi.mock("../homework", () => ({
   addHomeworkTodo: mocks.addHomeworkTodo,
+  setHomeworkDone: mocks.setHomeworkDone,
+  useHomeworkStatuses: () => new Map(),
+  courseHomework: () => [],
   homeworkTodoId: (sessionId: string, text: string) => `${sessionId}:${text}`,
   useHomeworkTodoIds: () => new Set<string>(),
 }));
@@ -87,7 +97,15 @@ vi.mock("~/audio-player/provider", () => ({
 vi.mock("~/session/queries", () => ({
   useSession: () => ({ title: "Lesson 14" }),
 }));
+vi.mock("~/session/components/note-input/transcript/display-menu", () => ({
+  ChineseDisplayMenu: () => null,
+}));
 vi.mock("~/stt/pinyin", () => ({
+  useEffectiveChineseDisplay: () => ({
+    mode: "characters",
+    toneColours: true,
+    translation: false,
+  }),
   CJK_FONT_STACK: "sans-serif",
   hasHan: (text: string) => /\p{Script=Han}/u.test(text),
   toneClass: () => "",
@@ -155,14 +173,33 @@ describe("lesson screens", () => {
     render(wrap(<LessonStudySheet sessionId="s1" />));
     expect(screen.getByText("You practised 都.")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Practise 3 words" }),
+      screen.getByRole("button", { name: "Practise 3 cards" }),
     ).toBeTruthy();
-    expect(screen.getByText("incl. 2 from earlier lessons")).toBeTruthy();
+    expect(
+      screen.getByText(/2 more are due from earlier lessons/),
+    ).toBeTruthy();
+    expect(
+      (screen.getByLabelText("Make a card for 饺子") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
     expect(screen.getByText("dumplings")).toBeTruthy();
     expect(screen.getByText("Subject + 都 + verb")).toBeTruthy();
     expect(screen.getByText("jiāozi")).toBeTruthy();
     expect(screen.getByText("Explained at 18:40.")).toBeTruthy();
-    expect(screen.getByText("You spoke 25% of the time")).toBeTruthy();
+    expect(screen.getByText("25%")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("checkbox", {
+        name: "Done: Write five sentences with 都",
+      }),
+    );
+    await waitFor(() =>
+      expect(mocks.setHomeworkDone).toHaveBeenCalledWith(
+        "s1",
+        SHEET.homework[0],
+        true,
+      ),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /Add to to-dos/ }));
     await waitFor(() =>

@@ -16,7 +16,11 @@ import { commands as fsSyncCommands } from "@anlg/plugin-fs-sync";
 import type { SessionAudioRetentionEvent } from "@anlg/plugin-transcription";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
-import { configureCenteredPlayback, shouldResumeBeforePlay } from "./playback";
+import {
+  centeredGain,
+  configureCenteredPlayback,
+  shouldResumeBeforePlay,
+} from "./playback";
 import { loadWaveform } from "./waveform";
 
 import { useBillingAccess } from "~/auth/billing-context";
@@ -316,12 +320,68 @@ export function AudioPlayerProvider({
     [wavesurfer],
   );
 
-  const play = useCallback(() => playBetween(), [playBetween]);
+  const rangeRequestRef = useRef(0);
+  const play = useCallback(() => {
+    // A clip switch may have left the volume down; the main player plays at full.
+    rangeRequestRef.current++;
+    const gain = wavesurfer ? centeredGain(wavesurfer.getMediaElement()) : null;
+    const context = audioContextRef.current;
+    if (gain && context) {
+      gain.gain.cancelScheduledValues(context.currentTime);
+      gain.gain.setValueAtTime(1, context.currentTime);
+    }
+    playBetween();
+  }, [playBetween, wavesurfer]);
 
+  // Jumping while the audio plays lets the old stretch run on until the seek
+  // lands, and the audio graph can replay a scrap it had buffered before the
+  // pause, so switching clips overlapped or stuttered. Mute, stop, jump, play
+  // once the jump has landed, then fade back in; only the latest request plays.
   const playRange = useCallback(
-    (startSec: number, endSec: number) =>
-      playBetween(Math.max(0, startSec), Math.max(startSec, endSec)),
-    [playBetween],
+    (startSec: number, endSec: number) => {
+      if (!wavesurfer) return;
+      const start = Math.max(0, startSec);
+      const end = Math.max(start, endSec);
+      const request = ++rangeRequestRef.current;
+      const media = wavesurfer.getMediaElement();
+      const gain = centeredGain(media);
+      const context = audioContextRef.current;
+      const setVolume = (value: number, fade: boolean) => {
+        if (!gain || !context) return;
+        const now = context.currentTime;
+        gain.gain.cancelScheduledValues(now);
+        if (fade) gain.gain.setTargetAtTime(value, now, 0.015);
+        else gain.gain.setValueAtTime(value, now);
+      };
+      const fadeIn = () => {
+        if (rangeRequestRef.current === request) setVolume(1, true);
+      };
+
+      setVolume(0, false);
+      if (wavesurfer.isPlaying()) wavesurfer.pause();
+
+      let started = false;
+      const go = () => {
+        media.removeEventListener("seeked", go);
+        if (started || rangeRequestRef.current !== request) return;
+        started = true;
+        media.addEventListener("playing", () => window.setTimeout(fadeIn, 40), {
+          once: true,
+        });
+        // Never leave the player silent if "playing" doesn't come.
+        window.setTimeout(fadeIn, 600);
+        playBetween(undefined, end);
+      };
+      if (Math.abs(media.currentTime - start) < 0.02) {
+        go();
+        return;
+      }
+      media.addEventListener("seeked", go);
+      wavesurfer.setTime(start);
+      // Some sources never report the seek; don't leave the clip silent.
+      window.setTimeout(go, 400);
+    },
+    [playBetween, wavesurfer],
   );
 
   const pause = useCallback(() => {
