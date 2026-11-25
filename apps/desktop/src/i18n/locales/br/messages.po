@@ -1341,11 +1341,15 @@ msgid "Close"
 msgstr ""
 
 #: src/changelog/index.tsx
-msgid "Close changelog"
-msgstr ""
+#~ msgid "Close changelog"
+#~ msgstr ""
 
 #: src/chat/components/toolbar-controls.tsx
 msgid "Close chat"
+msgstr ""
+
+#: src/changelog/index.tsx
+msgid "Close What's new"
 msgstr ""
 
 #: src/task/resource-view.tsx
@@ -3623,7 +3627,6 @@ msgstr ""
 msgid "Loading your invites..."
 msgstr ""
 
-#: src/changelog/index.tsx
 #: src/contacts/details.tsx
 #: src/settings/general/account-profile.tsx
 #: src/task/resource-view.tsx
@@ -3996,6 +3999,10 @@ msgstr ""
 msgid "Mirna is Locked"
 msgstr ""
 
+#: src/services/event-listeners.tsx
+msgid "Mirna is now {current}"
+msgstr ""
+
 #: src/services/camera-guidance.tsx
 msgid "Mirna left {app}'s blur or background on because it couldn't confirm Mirna Camera hides your room yet."
 msgstr ""
@@ -4140,6 +4147,10 @@ msgstr ""
 msgid "Never read these websites"
 msgstr ""
 
+#: src/changelog/index.tsx
+msgid "New"
+msgstr ""
+
 #: src/sidebar/automations.tsx
 msgid "New automation"
 msgstr ""
@@ -4229,8 +4240,8 @@ msgid "No calendars found"
 msgstr ""
 
 #: src/changelog/index.tsx
-msgid "No changelog available for this version."
-msgstr ""
+#~ msgid "No changelog available for this version."
+#~ msgstr ""
 
 #: src/settings/automations/starter-config.tsx
 msgid "No channel selected yet."
@@ -4363,6 +4374,10 @@ msgstr ""
 
 #: src/contacts/related-notes.tsx
 msgid "No related notes found"
+msgstr ""
+
+#: src/changelog/index.tsx
+msgid "No release notes yet."
 msgstr ""
 
 #: src/contacts/related-notes.tsx
@@ -5729,6 +5744,10 @@ msgstr ""
 msgid "See all templates"
 msgstr ""
 
+#: src/services/event-listeners.tsx
+msgid "See what's new in this version and the ones before."
+msgstr ""
+
 #: src/settings/ai/shared/model-combobox.tsx
 #: src/settings/ai/stt/select.tsx
 msgid "Select a model"
@@ -6054,8 +6073,8 @@ msgstr ""
 
 #: src/settings/general/app-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
-msgid "Show release notes"
-msgstr ""
+#~ msgid "Show release notes"
+#~ msgstr ""
 
 #: src/main/windows-title-bar.tsx
 msgid "Show sidebar"
@@ -6824,6 +6843,10 @@ msgstr ""
 msgid "This requires Mirna Enterprise"
 msgstr ""
 
+#: src/changelog/index.tsx
+msgid "This version"
+msgstr ""
+
 #: src/settings/sync/index.tsx
 msgid "This version can no longer sync. Your notes stay on this device, and changes made here will sync after you update."
 msgstr ""
@@ -7405,8 +7428,18 @@ msgstr ""
 msgid "What were the key decisions that have been made?"
 msgstr ""
 
+#: src/services/event-listeners.tsx
+#: src/settings/general/app-settings.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "What's new"
+msgstr ""
+
 #: src/changelog/index.tsx
-msgid "What's new in {version}?"
+#~ msgid "What's new in {version}?"
+#~ msgstr ""
+
+#: src/changelog/index.tsx
+msgid "What's new in Mirna"
 msgstr ""
 
 #: src/settings/dictionary/replacements.tsx
