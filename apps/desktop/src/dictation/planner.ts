@@ -8,6 +8,7 @@ import {
   type PreviewConfig,
 } from "@anlg/plugin-dictation";
 
+import { useDictationAccount } from "./account";
 import { DictationRetired, type DictationPlan } from "./engine";
 import {
   addSuggestions,
@@ -98,6 +99,7 @@ export function useDictationPlanner(sessionId: string) {
   const runBatch = useRunBatch(sessionId);
   const stt = useSTTConnection();
   const auth = useAuth();
+  const account = useDictationAccount();
   const model = useLanguageModel();
   const settingsReady = useSettingsReady();
   const values = useConfigValues(SETTING_KEYS);
@@ -105,6 +107,7 @@ export function useDictationPlanner(sessionId: string) {
     runBatch,
     stt,
     auth,
+    account,
     model,
     settingsReady,
     values,
@@ -113,6 +116,7 @@ export function useDictationPlanner(sessionId: string) {
     runBatch,
     stt,
     auth,
+    account,
     model,
     settingsReady,
     values,
@@ -120,7 +124,7 @@ export function useDictationPlanner(sessionId: string) {
 
   // Learning writes only while the same account is signed in with learning still on.
   const isLearning = (accountId: string) =>
-    latest.current.auth.session?.user.id === accountId &&
+    latest.current.account === accountId &&
     latest.current.values.dictation_learning;
 
   const planner = useRef({

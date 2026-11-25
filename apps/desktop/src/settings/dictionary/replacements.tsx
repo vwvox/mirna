@@ -5,7 +5,7 @@ import { ArrowRight, MinusCircle, Plus } from "@anlg/ui/components/icons";
 import { Button } from "@anlg/ui/components/ui/button";
 import { Input } from "@anlg/ui/components/ui/input";
 
-import { useAuth } from "~/auth";
+import { useDictationAccount } from "~/dictation/account";
 import {
   parseReplacements,
   parseSuggestions,
@@ -141,10 +141,10 @@ export function DictionarySuggestions({
   onSave: (value: string) => void;
 }) {
   const { t } = useLingui();
-  const { session } = useAuth();
+  const accountId = useDictationAccount();
   const stored = useConfigValue("dictation_dictionary_suggestions");
   const setStored = useSetSettingValue("dictation_dictionary_suggestions");
-  const suggestions = parseSuggestions(stored, session?.user.id ?? null);
+  const suggestions = parseSuggestions(stored, accountId);
   if (!suggestions?.terms.length) return null;
 
   const settle = (term: string) =>

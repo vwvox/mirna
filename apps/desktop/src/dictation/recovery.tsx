@@ -9,12 +9,11 @@ import {
 } from "@anlg/plugin-dictation";
 import { Button } from "@anlg/ui/components/ui/button";
 
+import { useDictationAccount } from "./account";
 import { errorMessage } from "./engine";
 import { unwrapDictation } from "./native";
 import { useDictationPlanner } from "./planner";
 import { useDictationStatus } from "./state";
-
-import { useAuth } from "~/auth";
 
 /**
  * Dictations kept on this device because they couldn't be transcribed or inserted. Nothing
@@ -22,8 +21,7 @@ import { useAuth } from "~/auth";
  */
 export function DictationRecoveryList() {
   const { t } = useLingui();
-  const { session } = useAuth();
-  const accountId = session?.user.id ?? null;
+  const accountId: string | null = useDictationAccount();
   const currentAccount = useRef(accountId);
   currentAccount.current = accountId;
   const sessionId = useRef(`dictation-recovery-${crypto.randomUUID()}`).current;
@@ -100,8 +98,7 @@ export function DictationRecoveryList() {
       </h3>
       <p className="text-muted-foreground text-xs">
         <Trans>
-          Kept on this device for 24 hours. Mirna never inserts these by
-          itself.
+          Kept on this device for 24 hours. Mirna never inserts these by itself.
         </Trans>
       </p>
       <div className="border-border divide-border divide-y rounded-lg border">
