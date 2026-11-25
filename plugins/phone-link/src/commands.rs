@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anlg_phone_link::protocol::{NoteSnapshot, NoteTranscript, RecordingState};
+use anlg_phone_link::protocol::{NoteJob, NoteSnapshot, NoteTranscript, RecordingState};
 use anlg_phone_link::server::{PhoneLinkServer, StatusUpdate};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -52,6 +52,44 @@ pub struct InboxEntry {
     pub state: String,
     pub stage: Option<String>,
     pub session_id: Option<String>,
+    /// Set when the phone asked for more work on a note it already has.
+    pub job: Option<InboxJob>,
+}
+
+/// Work the phone asked for on a note: transcribe again (`engine` is `auto`,
+/// `parakeet` or `qwen3`) or keep only the first `keep_ms` of the recording.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum InboxJob {
+    Retranscribe {
+        engine: String,
+        update_summary: bool,
+    },
+    Trim {
+        keep_ms: f64,
+        update_summary: bool,
+    },
+}
+
+impl From<NoteJob> for InboxJob {
+    fn from(job: NoteJob) -> Self {
+        match job {
+            NoteJob::Retranscribe {
+                engine,
+                update_summary,
+            } => InboxJob::Retranscribe {
+                engine,
+                update_summary,
+            },
+            NoteJob::Trim {
+                keep_ms,
+                update_summary,
+            } => InboxJob::Trim {
+                keep_ms: keep_ms as f64,
+                update_summary,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
@@ -308,6 +346,7 @@ pub(crate) async fn list_inbox<R: tauri::Runtime>(
             .to_string(),
             stage: item.status.stage,
             session_id: item.status.session_id,
+            job: item.job.map(InboxJob::from),
         })
         .collect())
 }
@@ -375,4 +414,111 @@ pub(crate) async fn publish_notes<R: tauri::Runtime>(
         .map_err(|error| error.to_string())?
         .map(|changed| changed as u32)
         .map_err(|error| error.to_string())
+}
+
+/// Largest part of this Mac's own log that goes into an export.
+const EXPORT_MAC_LOG_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Writes one text file for someone helping with a problem: this Mac's log
+/// (its most recent part) and the logs paired phones sent. The logs record
+/// what Mirna did and what went wrong, not notes, transcripts or audio.
+/// Returns where the file was written.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_logs<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    destination: String,
+) -> Result<String, String> {
+    let state = state(&app);
+    let phones = state
+        .server
+        .as_ref()
+        .map(PhoneLinkServer::phone_diagnostics)
+        .unwrap_or_default();
+    let log_dir = app.path().app_log_dir().map_err(|error| error.to_string())?;
+    let version = app.package_info().version.to_string();
+    let destination = std::path::PathBuf::from(destination);
+    tauri::async_runtime::spawn_blocking(move || {
+        write_log_export(&destination, &version, &log_dir, &phones)?;
+        Ok::<_, std::io::Error>(destination.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| format!("Couldn't write the logs: {error}"))
+}
+
+pub(crate) fn write_log_export(
+    destination: &std::path::Path,
+    version: &str,
+    log_dir: &std::path::Path,
+    phones: &[anlg_phone_link::server::PhoneDiagnostics],
+) -> std::io::Result<()> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let mut out = std::io::BufWriter::new(std::fs::File::create(destination)?);
+    writeln!(out, "# Mirna logs")?;
+    writeln!(out, "# app: Mirna for Mac {version}")?;
+    writeln!(out, "# system: {} {}", std::env::consts::OS, std::env::consts::ARCH)?;
+    writeln!(
+        out,
+        "# exported: {}",
+        chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+    )?;
+    writeln!(out, "# phones: {}", phones.len())?;
+    writeln!(out)?;
+
+    writeln!(out, "===== Mac log =====")?;
+    let mac_log = log_dir.join("app.log");
+    match std::fs::File::open(&mac_log) {
+        Ok(mut file) => {
+            let len = file.metadata()?.len();
+            if len > EXPORT_MAC_LOG_BYTES {
+                writeln!(out, "(earlier lines left out; showing the last 8 MB)")?;
+                file.seek(SeekFrom::Start(len - EXPORT_MAC_LOG_BYTES))?;
+            }
+            let mut text = Vec::new();
+            file.read_to_end(&mut text)?;
+            out.write_all(&text)?;
+        }
+        Err(error) => writeln!(out, "(no Mac log: {error})")?,
+    }
+
+    for phone in phones {
+        writeln!(out)?;
+        writeln!(out, "===== Phone log: {} =====", phone.phone_name)?;
+        match std::fs::read(&phone.path) {
+            Ok(text) => out.write_all(&text)?,
+            Err(error) => writeln!(out, "(couldn't read it: {error})")?,
+        }
+    }
+    out.flush()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn export_has_the_mac_log_and_each_phone_log() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("app.log"), "mac line\n").unwrap();
+        let phone_log = dir.path().join("phone.log");
+        std::fs::write(&phone_log, "# phone: Pixel\n{\"event\":\"recording_saved\"}\n").unwrap();
+        let destination = dir.path().join("export.txt");
+        write_log_export(
+            &destination,
+            "1.2.3",
+            dir.path(),
+            &[anlg_phone_link::server::PhoneDiagnostics {
+                phone_name: "Pixel".into(),
+                path: phone_log,
+                received_at_ms: 0,
+            }],
+        )
+        .unwrap();
+        let text = std::fs::read_to_string(destination).unwrap();
+        assert!(text.contains("# app: Mirna for Mac 1.2.3"));
+        assert!(text.contains("===== Mac log =====\nmac line"));
+        assert!(text.contains("===== Phone log: Pixel ====="));
+        assert!(text.contains("recording_saved"));
+    }
 }

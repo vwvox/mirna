@@ -349,6 +349,21 @@ pub fn import_to_session(
     }
 }
 
+/// Keeps only the first `keep` of a session's recording, re-encoded as
+/// `audio.mp3` like an import. Returns `None` when the session has no audio.
+pub fn trim(session_dir: &Path, keep: Duration) -> Result<Option<PathBuf>, AudioImportError> {
+    let Some(source) = path(session_dir) else {
+        return Ok(None);
+    };
+    let target = session_dir.join("audio.mp3");
+    let tmp = session_dir.join("audio.mp3.tmp");
+    anlg_audio_norm::normalize_file(&source, &tmp, &target, Some(keep), None::<fn(f64)>)?;
+    if source != target {
+        std::fs::remove_file(&source)?;
+    }
+    Ok(Some(target))
+}
+
 pub fn import_audio(
     source_path: &Path,
     tmp_path: &Path,
@@ -654,6 +669,41 @@ mod tests {
         test_import_aac: anlg_data::english_1::AUDIO_AAC_PATH,
         test_import_aiff: anlg_data::english_1::AUDIO_AIFF_PATH,
         test_import_caf: anlg_data::english_1::AUDIO_CAF_PATH,
+    }
+
+    #[test]
+    fn trim_keeps_only_the_start_of_the_recording() {
+        let temp = TempDir::new().unwrap();
+        let session_dir = temp.path();
+        std::fs::copy(
+            anlg_data::english_10::AUDIO_MP3_PATH,
+            session_dir.join("audio.wav.tmp"),
+        )
+        .unwrap();
+        // Start from an import, as a phone recording would be.
+        import_audio(
+            &session_dir.join("audio.wav.tmp"),
+            &session_dir.join("audio.mp3.tmp"),
+            &session_dir.join("audio.mp3"),
+        )
+        .unwrap();
+        let before = source_metadata(&session_dir.join("audio.mp3"))
+            .unwrap()
+            .duration_ms
+            .unwrap();
+        assert!(before > 5_000, "sample is only {before} ms");
+
+        let trimmed = trim(session_dir, Duration::from_millis(3_000)).unwrap();
+        assert_eq!(trimmed, Some(session_dir.join("audio.mp3")));
+        let after = source_metadata(&session_dir.join("audio.mp3"))
+            .unwrap()
+            .duration_ms
+            .unwrap();
+        assert!((2_800..=3_300).contains(&after), "trimmed to {after} ms");
+        assert!(!session_dir.join("audio.mp3.tmp").exists());
+
+        let empty = TempDir::new().unwrap();
+        assert_eq!(trim(empty.path(), Duration::from_secs(1)).unwrap(), None);
     }
 
     #[test]

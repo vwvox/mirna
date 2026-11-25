@@ -6,7 +6,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use phone_link::client::{Client, MacTarget};
 use phone_link::protocol::{
-    CompleteRequest, NoteSnapshot, NoteTranscript, RecordingMeta, RecordingState,
+    CompleteRequest, NoteJob, NoteSnapshot, NoteTranscript, RecordingMeta, RecordingState,
 };
 use phone_link::server::{PhoneLinkServer, ServerEvent, StatusUpdate};
 use phone_link::{Error, Identity};
@@ -397,4 +397,229 @@ async fn identity_survives_restart() {
         .unwrap()
         .fingerprint();
     assert_eq!(first, second);
+}
+
+/// A 16 kHz mono 16-bit WAV of `ms` milliseconds.
+fn wav(ms: u64) -> Vec<u8> {
+    let data_bytes = (ms * 32) as u32;
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data_bytes).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&16_000u32.to_le_bytes());
+    out.extend_from_slice(&32_000u32.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_bytes.to_le_bytes());
+    out.extend((0..data_bytes).map(|i| (i % 7) as u8));
+    out
+}
+
+async fn paired_phone(mac: &Mac, name: &str) -> Client {
+    let identity = Identity::generate().unwrap();
+    let offer =
+        mac.server
+            .begin_pairing(vec!["127.0.0.1".into()], mac.port, Duration::from_secs(60));
+    let client = client_for(mac, &identity, &offer.fingerprint);
+    client.pair(&offer.code, name).await.unwrap();
+    client
+}
+
+async fn send_recording(client: &Client, id: &str, audio: &[u8]) {
+    client
+        .upload_chunk(id, 0, Bytes::copy_from_slice(audio))
+        .await
+        .unwrap();
+    client
+        .complete(
+            id,
+            &CompleteRequest {
+                size: audio.len() as u64,
+                sha256: sha256_hex(audio),
+                meta: RecordingMeta {
+                    ext: "wav".into(),
+                    duration_ms: Some(10_000),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .unwrap();
+}
+
+fn conflict(result: Result<phone_link::protocol::RecordingStatus, Error>) -> String {
+    match result {
+        Err(Error::Http { status, message }) => format!("{status} {message}"),
+        other => panic!("expected an HTTP error, got {other:?}"),
+    }
+}
+
+#[test]
+fn trims_a_wav_in_place_even_when_its_header_undercounts() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("audio.wav");
+    let mut audio = wav(10_000);
+    // A header checkpointed mid-recording says only 1 s of data.
+    audio[40..44].copy_from_slice(&32_000u32.to_le_bytes());
+    std::fs::write(&path, &audio).unwrap();
+
+    let trimmed = phone_link::trim_wav_file(&path, 4_000).unwrap();
+    assert_eq!(trimmed.duration_ms, 4_000);
+    assert_eq!(trimmed.data_bytes, 128_000);
+    let bytes = std::fs::read(&path).unwrap();
+    assert_eq!(bytes.len(), 44 + 128_000);
+    assert_eq!(u32::from_le_bytes(bytes[40..44].try_into().unwrap()), 128_000);
+    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 36 + 128_000);
+    assert_eq!(&bytes[44..44 + 100], &audio[44..44 + 100]);
+
+    // Keeping more than there is changes nothing but the header.
+    let again = phone_link::trim_wav_file(&path, 60_000).unwrap();
+    assert_eq!(again.duration_ms, 4_000);
+
+    std::fs::write(&path, b"not a wav at all").unwrap();
+    assert!(phone_link::trim_wav_file(&path, 1_000).is_err());
+}
+
+#[tokio::test]
+async fn phone_asks_for_note_jobs_and_sends_its_log() {
+    let mac = start_mac().await;
+    let client = paired_phone(&mac, "Phone A").await;
+    let id = "0b5a4c1e-0000-4000-8000-0000000000aa";
+    send_recording(&client, id, &wav(10_000)).await;
+
+    // Not a note yet: a trim cuts the waiting file and its metadata.
+    let status = client
+        .note_job(
+            id,
+            &NoteJob::Trim {
+                keep_ms: 4_000,
+                update_summary: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.state, RecordingState::Queued);
+    assert_eq!(status.job, None);
+    let item = mac.server.inbox().unwrap().remove(0);
+    assert_eq!(item.meta.duration_ms, Some(4_000));
+    assert_eq!(std::fs::metadata(&item.audio_path).unwrap().len(), 44 + 128_000);
+
+    // It will be transcribed anyway, so asking again changes nothing.
+    let retranscribe = NoteJob::Retranscribe {
+        engine: "qwen3".into(),
+        update_summary: true,
+    };
+    let status = client.note_job(id, &retranscribe).await.unwrap();
+    assert_eq!(status.job, None);
+
+    // Nonsense and other phones are refused.
+    let bad = NoteJob::Retranscribe {
+        engine: "whisper".into(),
+        update_summary: false,
+    };
+    assert_eq!(conflict(client.note_job(id, &bad).await), "400 invalid_job");
+    let other = paired_phone(&mac, "Phone B").await;
+    assert_eq!(
+        conflict(other.note_job(id, &retranscribe).await),
+        "403 not_yours"
+    );
+
+    // While the Mac works on it, the phone has to wait.
+    mac.server
+        .update_status(
+            id,
+            StatusUpdate::Processing {
+                stage: "transcribing".into(),
+                session_id: Some("session-1".into()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(conflict(client.note_job(id, &retranscribe).await), "409 busy");
+
+    // Once it's a note, the job is queued even though the inbox copy is gone.
+    mac.server
+        .update_status(
+            id,
+            StatusUpdate::Done {
+                session_id: "session-1".into(),
+                title: None,
+                summary_md: None,
+            },
+        )
+        .await
+        .unwrap();
+    let status = client.note_job(id, &retranscribe).await.unwrap();
+    assert_eq!(status.state, RecordingState::Queued);
+    assert_eq!(status.job, Some(retranscribe.clone()));
+    let item = mac.server.inbox().unwrap().remove(0);
+    assert_eq!(item.job, Some(retranscribe.clone()));
+    assert!(!item.audio_path.exists());
+    assert_eq!(conflict(client.note_job(id, &retranscribe).await), "409 busy");
+
+    // A failed job can be tried again; finishing clears it.
+    mac.server
+        .update_status(
+            id,
+            StatusUpdate::Failed {
+                error: "Qwen3-ASR isn't downloaded.".into(),
+                session_id: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(client.status(id).await.unwrap().job, Some(retranscribe.clone()));
+    let status = client.retry(id).await.unwrap();
+    assert_eq!(status.state, RecordingState::Queued);
+    let status = mac
+        .server
+        .update_status(
+            id,
+            StatusUpdate::Done {
+                session_id: "session-1".into(),
+                title: None,
+                summary_md: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.job, None);
+
+    // A trim while the audio is still arriving drops what arrived.
+    let partial = "0b5a4c1e-0000-4000-8000-0000000000bb";
+    client
+        .upload_chunk(partial, 0, Bytes::from_static(&[1, 2, 3, 4]))
+        .await
+        .unwrap();
+    let status = client
+        .note_job(
+            partial,
+            &NoteJob::Trim {
+                keep_ms: 2_000,
+                update_summary: false,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.state, RecordingState::Missing);
+
+    // The phone's log replaces the last copy the Mac kept.
+    client
+        .upload_diagnostics(Bytes::from_static(b"{\"event\":\"first\"}\n"))
+        .await
+        .unwrap();
+    client
+        .upload_diagnostics(Bytes::from_static(b"{\"event\":\"second\"}\n"))
+        .await
+        .unwrap();
+    let logs = mac.server.phone_diagnostics();
+    assert_eq!(logs.len(), 1);
+    assert_eq!(logs[0].phone_name, "Phone A");
+    let text = std::fs::read_to_string(&logs[0].path).unwrap();
+    assert!(text.starts_with("# phone: Phone A\n"));
+    assert!(text.contains("second") && !text.contains("first"));
 }

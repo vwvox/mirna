@@ -12,6 +12,7 @@
 //! inbox/<id>/status.json   where the Mac is with it
 //! notes.json               text of the notes those recordings became, for
 //!                          the phones to download (never the audio)
+//! diagnostics/<phone>.log  each phone's problem log, as it last sent it
 //! ```
 
 use std::collections::BTreeMap;
@@ -37,12 +38,12 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::protocol::{
     ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
-    NoteSnapshot, PairRequest, PairResponse, RecordingMeta, RecordingState, RecordingStatus,
-    StatusesRequest, is_valid_recording_id,
+    NoteJob, NoteSnapshot, PairRequest, PairResponse, RecordingMeta, RecordingState,
+    RecordingStatus, StatusesRequest, is_valid_recording_id,
 };
 use crate::{
-    AUDIO_EXTENSIONS, Error, Identity, MAX_CHUNK_BYTES, MAX_RECORDING_BYTES, PROTOCOL_VERSION,
-    PairingOffer, fingerprint_of_der, now_ms, short_id,
+    AUDIO_EXTENSIONS, Error, Identity, MAX_CHUNK_BYTES, MAX_DIAGNOSTICS_BYTES, MAX_RECORDING_BYTES,
+    PROTOCOL_VERSION, PairingOffer, fingerprint_of_der, now_ms, short_id,
 };
 
 const TLS_ACCEPT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -70,7 +71,9 @@ pub enum ServerEvent {
     NotesRequested { include_mac_notes: bool },
 }
 
-/// A complete recording waiting for, or in, processing on the Mac.
+/// A complete recording waiting for, or in, processing on the Mac, or a note
+/// the phone asked the Mac to work on again (`job`). For a job the audio is
+/// the note's own copy, so `audio_path` may no longer exist.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InboxItem {
     pub id: String,
@@ -79,6 +82,15 @@ pub struct InboxItem {
     pub phone_name: String,
     pub received_at_ms: u64,
     pub status: RecordingStatus,
+    pub job: Option<NoteJob>,
+}
+
+/// A phone's problem log as the Mac last received it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneDiagnostics {
+    pub phone_name: String,
+    pub path: PathBuf,
+    pub received_at_ms: u64,
 }
 
 /// Changes the Mac app makes while it turns a recording into a note.
@@ -280,6 +292,29 @@ impl PhoneLinkServer {
         short_id(&self.inner.fingerprint)
     }
 
+    /// The problem logs paired phones have sent, newest first.
+    pub fn phone_diagnostics(&self) -> Vec<PhoneDiagnostics> {
+        let dir = self.inner.dir.join("diagnostics");
+        let phones = self.paired_phones();
+        let mut logs: Vec<PhoneDiagnostics> = phones
+            .iter()
+            .filter_map(|phone| {
+                let path = dir.join(format!("{}.log", short_id(&phone.fingerprint)));
+                let modified = std::fs::metadata(&path).ok()?.modified().ok()?;
+                Some(PhoneDiagnostics {
+                    phone_name: phone.name.clone(),
+                    path,
+                    received_at_ms: modified
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|duration| duration.as_millis() as u64)
+                        .unwrap_or_default(),
+                })
+            })
+            .collect();
+        logs.sort_by_key(|log| std::cmp::Reverse(log.received_at_ms));
+        logs
+    }
+
     pub fn mac_name(&self) -> String {
         self.inner
             .mac_name
@@ -377,7 +412,8 @@ impl PhoneLinkServer {
                 continue;
             };
             let audio_path = self.inner.audio_path(&id, &stored.meta.ext);
-            if !audio_path.exists() {
+            let job = status.job.clone().filter(|_| status.session_id.is_some());
+            if job.is_none() && !audio_path.exists() {
                 continue;
             }
             items.push(InboxItem {
@@ -387,6 +423,7 @@ impl PhoneLinkServer {
                 phone_name: stored.phone_name,
                 received_at_ms: stored.received_at_ms,
                 status,
+                job,
             });
         }
         items.sort_by_key(|item| item.received_at_ms);
@@ -433,6 +470,7 @@ impl PhoneLinkServer {
                 status.title = title;
                 status.summary_md = summary_md;
                 status.error = None;
+                status.job = None;
                 // The note now owns its own copy of the audio.
                 if let Some(stored) = self.inner.read_meta(id) {
                     let _ = std::fs::remove_file(self.inner.audio_path(id, &stored.meta.ext));
@@ -520,7 +558,12 @@ impl PhoneLinkServer {
             )
             .route("/v1/recordings/{id}/complete", post(complete))
             .route("/v1/recordings/{id}/retry", post(retry))
+            .route("/v1/recordings/{id}/job", post(request_job))
             .route("/v1/notes/changes", post(note_changes))
+            .route(
+                "/v1/diagnostics",
+                put(receive_diagnostics).layer(DefaultBodyLimit::max(MAX_DIAGNOSTICS_BYTES)),
+            )
             .layer(DefaultBodyLimit::max(256 * 1024))
             .with_state(self.inner.clone())
     }
@@ -860,9 +903,11 @@ async fn retry(
     if status.state != RecordingState::Failed {
         return json_error(StatusCode::CONFLICT, "not_failed");
     }
-    let has_audio = inner
-        .read_meta(&id)
-        .is_some_and(|stored| inner.audio_path(&id, &stored.meta.ext).exists());
+    // A failed job works on the note's own audio, not the inbox copy.
+    let has_audio = (status.job.is_some() && status.session_id.is_some())
+        || inner
+            .read_meta(&id)
+            .is_some_and(|stored| inner.audio_path(&id, &stored.meta.ext).exists());
     if !has_audio {
         return json_error(StatusCode::CONFLICT, "no_audio");
     }
@@ -877,6 +922,163 @@ async fn retry(
     drop(guard);
     inner.emit(ServerEvent::RecordingReceived { id });
     Json(status).into_response()
+}
+
+/// The phone asks for more work on a recording: transcribe it again, or cut
+/// its end. What happens depends on how far the Mac has got with it:
+/// - still arriving: a trim drops what has arrived, so the phone sends the
+///   shorter file from the start;
+/// - arrived but not yet a note: a trim cuts the waiting file;
+/// - a note (or failed): the job is queued for the Mac app.
+async fn request_job(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    UrlPath(id): UrlPath<String>,
+    Json(job): Json<NoteJob>,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    if !is_valid_recording_id(&id) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid_id");
+    }
+    if !job.is_valid() {
+        return json_error(StatusCode::BAD_REQUEST, "invalid_job");
+    }
+    let guard = inner.write_lock.lock().await;
+    if !inner.owned_by(&id, &peer.fingerprint) {
+        return json_error(StatusCode::FORBIDDEN, "not_yours");
+    }
+    let mut status = inner.read_status(&id);
+    let stored = inner.read_meta(&id);
+    let inbox_audio = stored
+        .as_ref()
+        .map(|stored| inner.audio_path(&id, &stored.meta.ext))
+        .filter(|path| path.exists());
+
+    match (status.state, &job) {
+        (RecordingState::Missing, _) => return json_error(StatusCode::CONFLICT, "no_audio"),
+        (RecordingState::Processing, _) => return json_error(StatusCode::CONFLICT, "busy"),
+        (RecordingState::Queued, _) if status.job.is_some() => {
+            return json_error(StatusCode::CONFLICT, "busy");
+        }
+        (RecordingState::Receiving, NoteJob::Trim { .. }) => {
+            let _ = std::fs::remove_file(inner.part_path(&id));
+            drop(guard);
+            return Json(inner.read_status(&id)).into_response();
+        }
+        (RecordingState::Receiving, NoteJob::Retranscribe { .. }) => {
+            return json_error(StatusCode::CONFLICT, "not_ready");
+        }
+        // Not a note yet: the waiting file itself is cut, then processed as usual.
+        (RecordingState::Queued | RecordingState::Failed, NoteJob::Trim { keep_ms, .. })
+            if inbox_audio.is_some() && status.job.is_none() =>
+        {
+            let (Some(path), Some(mut stored)) = (inbox_audio, stored) else {
+                return json_error(StatusCode::CONFLICT, "no_audio");
+            };
+            if stored.meta.ext != "wav" {
+                return json_error(StatusCode::CONFLICT, "unsupported_audio");
+            }
+            let keep_ms = *keep_ms;
+            let trimmed = tokio::task::spawn_blocking(move || {
+                let trimmed = crate::trim_wav_file(&path, keep_ms)?;
+                let sha256 = crate::sha256_file(&path)?;
+                let size = std::fs::metadata(&path)?.len();
+                Ok::<_, std::io::Error>((trimmed, sha256, size))
+            })
+            .await;
+            let Ok(Ok((trimmed, sha256, size))) = trimmed else {
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, "trim_failed");
+            };
+            stored.meta.duration_ms = Some(trimmed.duration_ms);
+            stored.size = size;
+            stored.sha256 = sha256;
+            status.state = RecordingState::Queued;
+            status.received_bytes = size;
+            status.stage = None;
+            status.error = None;
+            status.updated_at_ms = now_ms();
+            let saved = (|| -> Result<(), Error> {
+                write_json(&inner.recording_dir(&id).join("meta.json"), &stored)?;
+                inner.write_status(&id, &status)
+            })();
+            drop(guard);
+            if let Err(error) = saved {
+                tracing::error!(%error, "could not save trimmed recording");
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, "save_failed");
+            }
+            inner.emit(ServerEvent::RecordingReceived { id });
+            return Json(status).into_response();
+        }
+        (RecordingState::Queued, NoteJob::Retranscribe { .. }) => {
+            // It hasn't been transcribed yet; it will be.
+            drop(guard);
+            return Json(status).into_response();
+        }
+        (RecordingState::Failed, NoteJob::Retranscribe { .. })
+            if inbox_audio.is_some() && status.job.is_none() =>
+        {
+            // Same as Try again: the first attempt never became a note.
+            status.state = RecordingState::Queued;
+        }
+        (RecordingState::Done | RecordingState::Failed, _) => {
+            if status.session_id.is_none() {
+                return json_error(StatusCode::CONFLICT, "not_ready");
+            }
+            status.state = RecordingState::Queued;
+            status.job = Some(job);
+        }
+        (RecordingState::Queued, NoteJob::Trim { .. }) => {
+            return json_error(StatusCode::CONFLICT, "no_audio");
+        }
+    }
+    status.stage = None;
+    status.error = None;
+    status.updated_at_ms = now_ms();
+    if let Err(error) = inner.write_status(&id, &status) {
+        tracing::error!(%error, "could not queue the note job");
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "save_failed");
+    }
+    drop(guard);
+    inner.emit(ServerEvent::RecordingReceived { id });
+    Json(status).into_response()
+}
+
+/// Keeps the phone's problem log (it sends the whole log each time).
+async fn receive_diagnostics(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    body: Bytes,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    let dir = inner.dir.join("diagnostics");
+    let path = dir.join(format!("{}.log", short_id(&peer.fingerprint)));
+    let header = format!(
+        "# phone: {}\n# received: {}\n",
+        inner.phone_name(&peer.fingerprint),
+        now_ms()
+    );
+    let result = async {
+        tokio::fs::create_dir_all(&dir).await?;
+        let temp = path.with_extension("log.tmp");
+        let mut file = tokio::fs::File::create(&temp).await?;
+        file.write_all(header.as_bytes()).await?;
+        file.write_all(&body).await?;
+        file.flush().await?;
+        drop(file);
+        tokio::fs::rename(&temp, &path).await
+    }
+    .await;
+    match result {
+        Ok(()) => Json(serde_json::json!({ "received_bytes": body.len() })).into_response(),
+        Err(error) => {
+            tracing::error!(%error, "could not store the phone's log");
+            json_error(StatusCode::INSUFFICIENT_STORAGE, "write_failed")
+        }
+    }
 }
 
 #[derive(Deserialize)]

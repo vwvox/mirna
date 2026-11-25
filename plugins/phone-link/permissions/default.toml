@@ -10,4 +10,5 @@ permissions = [
   "allow-update-recording",
   "allow-list-linked-notes",
   "allow-publish-notes",
+  "allow-export-logs",
 ]

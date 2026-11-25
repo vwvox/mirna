@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { SettingsPage, SettingsRow } from "@/settings/components";
 import { FieldGroup } from "@/settings/field-group";
 import { Text } from "@/settings/fields";
+import { ProblemLog } from "@/settings/problem-log";
 
 export default function AboutSettings() {
   return (
@@ -19,6 +20,7 @@ export default function AboutSettings() {
           </Text>
         </FieldGroup.SectionFooter>
       </FieldGroup.Section>
+      <ProblemLog />
     </SettingsPage>
   );
 }

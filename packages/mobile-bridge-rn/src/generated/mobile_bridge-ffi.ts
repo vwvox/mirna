@@ -205,6 +205,9 @@ interface NativeModuleInterface {
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_complete(
     requestJson: Uint8Array,
   ): bigint;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_file_sha256(
+    file: Uint8Array,
+  ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_info(
     requestJson: Uint8Array,
   ): bigint;
@@ -212,6 +215,9 @@ interface NativeModuleInterface {
     uniffi_out_err: UniffiRustCallStatus,
   ): Uint8Array;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_note_changes(
+    requestJson: Uint8Array,
+  ): bigint;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_note_job(
     requestJson: Uint8Array,
   ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_pair(
@@ -228,6 +234,13 @@ interface NativeModuleInterface {
     requestJson: Uint8Array,
   ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_phone_link_statuses(
+    requestJson: Uint8Array,
+  ): bigint;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_trim_wav(
+    file: Uint8Array,
+    keepMs: bigint,
+  ): bigint;
+  ubrn_uniffi_mobile_bridge_fn_func_phone_link_upload_diagnostics(
     requestJson: Uint8Array,
   ): bigint;
   ubrn_uniffi_mobile_bridge_fn_func_render_stored_transcript(
@@ -450,14 +463,18 @@ interface NativeModuleInterface {
   ): void;
   ubrn_ffi_mobile_bridge_uniffi_contract_version(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_complete(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_file_sha256(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_info(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_new_identity(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_note_changes(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_note_job(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_pair(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_parse_offer(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_retry(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_send(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_phone_link_statuses(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_trim_wav(): number;
+  ubrn_uniffi_mobile_bridge_checksum_func_phone_link_upload_diagnostics(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_render_stored_transcript(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_start_provider_live_transcription(): number;
   ubrn_uniffi_mobile_bridge_checksum_func_transcribe_provider_audio(): number;

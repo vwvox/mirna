@@ -896,6 +896,45 @@ export function splitTranscriptSpeaker({
   });
 }
 
+/**
+ * Keeps only what was said in the first `keepMs` of a recording: later words,
+ * and speaker hints on them, are removed, and the transcript ends at the cut.
+ */
+export async function trimTranscriptAfter(
+  transcriptId: string,
+  keepMs: number,
+): Promise<{ removedWords: number }> {
+  let removedWords = 0;
+  await mutateTranscript(transcriptId, (store) => {
+    const words = parseTranscriptWords(store, transcriptId);
+    const kept = words.filter((word) => (word.start_ms ?? 0) < keepMs);
+    removedWords = words.length - kept.length;
+    if (removedWords === 0) return false;
+    const keptIds = new Set(kept.map((word) => word.id));
+    updateTranscriptWords(store, transcriptId, kept);
+    updateTranscriptHints(
+      store,
+      transcriptId,
+      parseTranscriptHints(store, transcriptId).filter(
+        (hint) => !hint.word_id || keptIds.has(hint.word_id),
+      ),
+    );
+  });
+  await enqueueDatabaseWrite(`transcript:${transcriptId}`, () =>
+    executeTransaction([
+      {
+        sql: `UPDATE transcripts
+          SET ended_at_ms = started_at_ms + ?,
+            updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+          WHERE id = ? AND deleted_at IS NULL AND started_at_ms > 0
+            AND (ended_at_ms IS NULL OR ended_at_ms > started_at_ms + ?)`,
+        params: [keepMs, transcriptId, keepMs],
+      },
+    ]),
+  );
+  return { removedWords };
+}
+
 export function softDeleteTranscript(transcriptId: string): Promise<void> {
   return enqueueDatabaseWrite(`transcript:${transcriptId}`, async () => {
     const now = new Date().toISOString();

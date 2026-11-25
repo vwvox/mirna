@@ -8,6 +8,7 @@ const COMMANDS: &[&str] = &[
     "update_recording",
     "list_linked_notes",
     "publish_notes",
+    "export_logs",
 ];
 
 fn main() {

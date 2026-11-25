@@ -30,11 +30,13 @@ export function NoteRecordings({
     return null;
   }
   const phoneMs = wavDurationMs(audio.data.filename, audio.data.sizeBytes);
+  // A WAV's length follows from its size, which stays right after a trim; the
+  // player keeps the length it loaded first.
   const phoneSeconds =
-    audio.player.duration > 0
-      ? audio.player.duration
-      : phoneMs !== null
-        ? phoneMs / 1000
+    phoneMs !== null
+      ? phoneMs / 1000
+      : audio.player.duration > 0
+        ? audio.player.duration
         : null;
   const several = onMac.length > 0;
 

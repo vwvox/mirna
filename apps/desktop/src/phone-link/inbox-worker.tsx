@@ -4,9 +4,14 @@ import { useState } from "react";
 import { md2json } from "@anlg/editor/markdown";
 import { commands as fsSyncCommands } from "@anlg/plugin-fs-sync";
 import {
+  commands as localSttCommands,
+  type LocalModel,
+} from "@anlg/plugin-local-stt";
+import {
   commands as phoneLinkCommands,
   events as phoneLinkEvents,
   type InboxEntry,
+  type InboxJob,
   type RecordingUpdate,
 } from "@anlg/plugin-phone-link";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
@@ -16,13 +21,19 @@ import { publishLinkedNotes } from "~/phone-link/notes-publisher";
 import { getEnhancerService } from "~/services/enhancer";
 import { catalogLocalSessionAudio } from "~/session/attachments";
 import { enqueueSessionAudioOperation } from "~/session/audio-operations";
+import { existingCaptureInterval } from "~/session/components/note-input/transcript/actions";
 import { loadSessionContentSnapshot } from "~/session/content-queries";
-import { createSession } from "~/session/queries/creation";
 import { updateSession, useSession } from "~/session/queries";
+import { createSession } from "~/session/queries/creation";
+import {
+  clearSummaryOutdated,
+  markSummaryOutdated,
+} from "~/session/summary-outdated";
 import { useAiProvidersState } from "~/settings/providers";
 import { useSettingsReady } from "~/settings/queries";
 import { DEFAULT_USER_ID } from "~/shared/utils";
 import { useListener } from "~/stt/contexts";
+import { trimTranscriptAfter } from "~/stt/queries";
 import { isStoppedTranscriptionError, useRunBatch } from "~/stt/useRunBatch";
 
 export const PHONE_INBOX_QUERY_KEY = ["phone-link", "inbox"] as const;
@@ -142,7 +153,10 @@ function RunPhoneRecording({
     const start = setTimeout(() => {
       if (runningRecordings.has(item.id)) return;
       runningRecordings.add(item.id);
-      void processRecording(item, sessionId, runBatch)
+      const work = item.job
+        ? processJob(item, item.job, sessionId, runBatch)
+        : processRecording(item, sessionId, runBatch);
+      void work
         .catch((error: unknown) => {
           console.error("[phone-link] processing failed", error);
         })
@@ -170,9 +184,13 @@ async function ensureSession(item: InboxEntry): Promise<string> {
   }
 
   const notes = item.notes_md?.trim();
-  const sessionId = await createSession(item.title?.trim() ?? "", DEFAULT_USER_ID, {
-    raw_md: notes ? JSON.stringify(md2json(notes)) : "",
-  });
+  const sessionId = await createSession(
+    item.title?.trim() ?? "",
+    DEFAULT_USER_ID,
+    {
+      raw_md: notes ? JSON.stringify(md2json(notes)) : "",
+    },
+  );
   const startedAt = item.started_at ? new Date(item.started_at) : null;
   if (startedAt && !Number.isNaN(startedAt.getTime())) {
     await updateSession(sessionId, { created_at: startedAt.toISOString() });
@@ -259,6 +277,154 @@ async function processRecording(
           : "The Mac could not transcribe this recording. Open the note on your Mac to try again.",
       session_id: sessionId,
     });
+  }
+}
+
+/** Something the job can't do, said the way the phone shows it. */
+class JobProblem extends Error {}
+
+const ENGINES: Record<
+  string,
+  { provider: string; model: LocalModel & string; name: string } | undefined
+> = {
+  parakeet: {
+    provider: "soniqo",
+    model: "soniqo-parakeet-batch",
+    name: "Parakeet",
+  },
+  qwen3: { provider: "soniqo", model: "soniqo-qwen3-small", name: "Qwen3-ASR" },
+};
+
+// Work the phone asked for on a note it already has: transcribe it again, or
+// cut the end of the recording. Then the summary is written again (or marked
+// out of date), and the phone downloads the new text.
+export async function processJob(
+  item: InboxEntry,
+  job: InboxJob,
+  sessionId: string,
+  runBatch: ReturnType<typeof useRunBatch>,
+) {
+  let stage = job.type === "trim" ? "trimming" : "transcribing";
+  const setStage = async (next: string) => {
+    stage = next;
+    await reportUpdate(item.id, {
+      type: "processing",
+      stage: next,
+      session_id: sessionId,
+    });
+  };
+
+  try {
+    await setStage(stage);
+    if (job.type === "retranscribe") {
+      await retranscribe(item, job.engine, sessionId, runBatch);
+    } else {
+      await trimNote(sessionId, job.keep_ms);
+    }
+
+    if (job.update_summary) {
+      await setStage("summarizing");
+      await clearSummaryOutdated(sessionId);
+      try {
+        await getEnhancerService()?.enhanceAndWait(sessionId);
+      } catch (error) {
+        console.error("[phone-link] summary failed", error);
+        await markSummaryOutdated(sessionId);
+      }
+    } else {
+      await markSummaryOutdated(sessionId);
+    }
+
+    const { title, summary } = await readNote(sessionId);
+    await reportUpdate(item.id, {
+      type: "done",
+      session_id: sessionId,
+      title,
+      summary_md: summary,
+    });
+    void publishLinkedNotes();
+  } catch (error) {
+    if (!(error instanceof JobProblem) && !isStoppedTranscriptionError(error)) {
+      console.error(`[phone-link] ${stage} failed`, error);
+    }
+    await reportUpdate(item.id, {
+      type: "failed",
+      error:
+        error instanceof JobProblem
+          ? error.message
+          : isStoppedTranscriptionError(error)
+            ? "Transcription was stopped on the Mac."
+            : job.type === "trim"
+              ? "The Mac couldn't trim this recording."
+              : "The Mac couldn't transcribe this recording again.",
+      session_id: sessionId,
+    });
+  }
+}
+
+async function retranscribe(
+  item: InboxEntry,
+  engine: string,
+  sessionId: string,
+  runBatch: ReturnType<typeof useRunBatch>,
+) {
+  const choice = ENGINES[engine];
+  if (choice) {
+    const downloaded = await localSttCommands
+      .isModelDownloaded(choice.model)
+      .then((result) => result.status === "ok" && result.data)
+      .catch(() => false);
+    if (!downloaded) {
+      throw new JobProblem(
+        `${choice.name} isn't downloaded on the Mac. Download it in Mirna on your Mac, then try again.`,
+      );
+    }
+  }
+  const audio = await fsSyncCommands.audioPath(sessionId);
+  if (audio.status === "error") {
+    throw new JobProblem(
+      "The recording isn't on the Mac anymore, so it can't be transcribed again.",
+    );
+  }
+  await runBatch(audio.data, {
+    promotion: { scope: "whole_session" },
+    ...(choice ? { provider: choice.provider, model: choice.model } : {}),
+    captureInterval:
+      captureIntervalOf(item) ?? (await existingCaptureInterval(sessionId)),
+  });
+}
+
+async function trimNote(sessionId: string, keepMs: number) {
+  const transcripts = await liveQueryClient.execute<{ id: string }>(
+    `SELECT id FROM transcripts
+    WHERE session_id = ? AND deleted_at IS NULL
+    ORDER BY started_at_ms, created_at, id`,
+    [sessionId],
+  );
+  if (transcripts.length > 1) {
+    throw new JobProblem(
+      "This note has recordings added on the Mac, so it can't be trimmed from the phone yet.",
+    );
+  }
+  const trimmed = await enqueueSessionAudioOperation(sessionId, async () => {
+    const result = await fsSyncCommands.audioTrim(sessionId, keepMs);
+    if (result.status === "error") throw new Error(result.error);
+    if (result.data) {
+      try {
+        await catalogLocalSessionAudio(sessionId);
+      } catch (error) {
+        console.error("[phone-link] could not catalog the audio", error);
+      }
+    }
+    return result.data;
+  });
+  if (!trimmed) {
+    console.info(
+      "[phone-link] no audio on the Mac to trim; trimming text only",
+    );
+  }
+  for (const transcript of transcripts) {
+    await trimTranscriptAfter(transcript.id, keepMs);
   }
 }
 

@@ -18,6 +18,7 @@ Default permissions for the fs-sync plugin
 - `allow-audio-metadata`
 - `allow-audio-delete-orphaned-expired`
 - `allow-audio-import`
+- `allow-audio-trim`
 - `allow-audio-import-data`
 - `allow-audio-source-metadata`
 - `allow-audio-has-speech`
@@ -434,6 +435,32 @@ Enables the audio_source_metadata command without any pre-configured scope.
 <td>
 
 Denies the audio_source_metadata command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`fs-sync:allow-audio-trim`
+
+</td>
+<td>
+
+Enables the audio_trim command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`fs-sync:deny-audio-trim`
+
+</td>
+<td>
+
+Denies the audio_trim command without any pre-configured scope.
 
 </td>
 </tr>

@@ -93,6 +93,7 @@ const modules = {
     setItem: async (key, value) => { globalThis.mobileSettingsFixture.storage.set(key, value); },
     removeItem: async key => { globalThis.mobileSettingsFixture.storage.delete(key); }
   };`,
+  "@/lib/diagnostics": `export function logDiagnostic() {} export function logDiagnosticError() {}`,
   "expo-constants": `export default {expoConfig: {version: 'test'}};`,
   "expo-crypto": `export { randomUUID } from 'node:crypto';`,
   "react-native": `export const Platform = {OS: 'ios'}; export const AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };`,

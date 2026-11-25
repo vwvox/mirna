@@ -16,8 +16,9 @@ function savedLength(ms: number): string {
 }
 
 /**
- * The notice after Android closed Mirna mid-recording and the next launch
- * saved what was recorded.
+ * The notice when Mirna, on opening, finds a recording that hadn't finished
+ * saving and saves it. That happens when Android closed Mirna mid-recording,
+ * and also when saving on Stop failed, so it doesn't blame either.
  */
 export function recoveryNotice(
   durationsMs: readonly number[],
@@ -25,13 +26,13 @@ export function recoveryNotice(
   if (durationsMs.length === 0) return null;
   if (durationsMs.length === 1) {
     return {
-      title: "Recording stopped",
-      description: `Android closed Mirna. ${savedLength(durationsMs[0] ?? 0)} was saved.`,
+      title: "Recording recovered",
+      description: `${savedLength(durationsMs[0] ?? 0)} that hadn’t finished saving is safe now.`,
     };
   }
   const total = durationsMs.reduce((sum, ms) => sum + ms, 0);
   return {
-    title: "Recordings stopped",
-    description: `Android closed Mirna. ${durationsMs.length} recordings, ${savedLength(total)} in all, were saved.`,
+    title: "Recordings recovered",
+    description: `${durationsMs.length} recordings that hadn’t finished saving, ${savedLength(total)} in all, are safe now.`,
   };
 }

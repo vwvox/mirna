@@ -15,6 +15,7 @@ permissions = [
     "allow-audio-metadata",
     "allow-audio-delete-orphaned-expired",
     "allow-audio-import",
+    "allow-audio-trim",
     "allow-audio-import-data",
     "allow-audio-source-metadata",
     "allow-audio-has-speech",

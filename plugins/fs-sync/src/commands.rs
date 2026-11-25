@@ -381,6 +381,28 @@ fn audio_import_source_path(
     ))
 }
 
+/// Cuts the session's recording after its first `keep_ms`. Returns the
+/// audio's path, or `None` when the session has no recording on this Mac.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn audio_trim<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    session_id: String,
+    keep_ms: f64,
+) -> Result<Option<String>, String> {
+    if !keep_ms.is_finite() || keep_ms < 1_000.0 {
+        return Err("audio_trim_too_short".into());
+    }
+    let _guard = app.fs_sync().lock_session_audio(&session_id).await;
+    let session_dir = resolve_session_dir(&app, &session_id)?;
+    let keep = std::time::Duration::from_millis(keep_ms as u64);
+    spawn_blocking!({
+        crate::audio::trim(&session_dir, keep)
+            .map(|path| path.map(|path| path.to_string_lossy().to_string()))
+            .map_err(|e| e.to_string())
+    })
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn audio_import_data<R: tauri::Runtime>(

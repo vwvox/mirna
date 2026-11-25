@@ -1,9 +1,12 @@
 import { File, FileMode, Paths } from "expo-file-system";
+import { AppState } from "react-native";
 
 import { requestMobileAttachmentUploads } from "@/attachment-sync/upload-runner";
 import { requeueMobileAttachmentUpload } from "@/attachment-sync/upload-store";
 import { executeTransaction, useLiveQuery } from "@/db";
+import { logDiagnostic, logDiagnosticError } from "@/lib/diagnostics";
 import { id, nowIso } from "@/lib/ids";
+import { fileSha256 } from "@/mac-link/bridge";
 
 import {
   mapSessionAudioRows,
@@ -64,6 +67,49 @@ export async function recordSessionCaptureStart(sessionId: string) {
   ]);
 }
 
+/**
+ * Size and checksum of a recording. Read natively, which takes a second or two
+ * even for hours of audio; in JavaScript (the fallback) a long recording took
+ * long enough on Stop to matter.
+ */
+async function verifyFile(
+  localFile: File,
+  signal: AbortSignal | undefined,
+): Promise<{ sha256: string; sizeBytes: number }> {
+  const startedAt = Date.now();
+  const stopIfCancelled = () => {
+    if (signal?.aborted) throw new Error("File verification was cancelled");
+  };
+  try {
+    stopIfCancelled();
+    const digest = await fileSha256(localFile.uri);
+    stopIfCancelled();
+    logDiagnostic("audio_verified", {
+      bytes: digest.size_bytes,
+      ms: Date.now() - startedAt,
+      native: true,
+    });
+    return { sha256: digest.sha256, sizeBytes: digest.size_bytes };
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    logDiagnosticError("audio_verify_native_failed", error, {}, "warning");
+  }
+  const verified = await hashFileSha256(
+    { open: () => localFile.open(FileMode.ReadOnly) },
+    signal,
+    () =>
+      AppState.currentState === "active"
+        ? new Promise<void>((resolve) => setTimeout(resolve, 0))
+        : Promise.resolve(),
+  );
+  logDiagnostic("audio_verified", {
+    bytes: verified.sizeBytes,
+    ms: Date.now() - startedAt,
+    native: false,
+  });
+  return verified;
+}
+
 export async function catalogSessionAudio(
   sessionId: string,
   file: {
@@ -82,12 +128,7 @@ export async function catalogSessionAudio(
     sessionId,
     file.filename,
   );
-  const verified = await hashFileSha256(
-    {
-      open: () => localFile.open(FileMode.ReadOnly),
-    },
-    file.signal,
-  );
+  const verified = await verifyFile(localFile, file.signal);
 
   await executeTransaction([
     {
@@ -183,4 +224,30 @@ export async function retrySessionAudioUpload(
 ): Promise<void> {
   await requeueMobileAttachmentUpload(attachmentId);
   requestMobileAttachmentUploads();
+}
+
+/**
+ * After a recording was cut in place: records its new size and checksum,
+ * keeping everything else about it (where it is on its way to the Mac).
+ */
+export async function refreshSessionAudioFile(
+  sessionId: string,
+  filename: string,
+): Promise<{ sizeBytes: number }> {
+  const localFile = new File(Paths.document, "sessions", sessionId, filename);
+  const verified = await verifyFile(localFile, undefined);
+  await executeTransaction([
+    {
+      sql: `UPDATE session_attachments
+        SET size_bytes = ?, sha256 = ?, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+      params: [
+        verified.sizeBytes,
+        verified.sha256,
+        nowIso(),
+        `session-audio:${sessionId}`,
+      ],
+    },
+  ]);
+  return { sizeBytes: verified.sizeBytes };
 }

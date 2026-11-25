@@ -15,6 +15,7 @@ import {
   CORE_TRANSCRIPTION_LANGUAGE_CODES,
   getAdditionalSpokenLanguages,
 } from "./language";
+import { LogsSettingsView } from "./logs";
 import { MainLanguageView } from "./main-language";
 import { MeetingSettingsView } from "./meeting-settings";
 import { NotificationSettingsView } from "./notification";
@@ -314,6 +315,8 @@ function SettingsSectionContent({
           </div>
 
           <StorageSettingsView />
+
+          <LogsSettingsView />
         </>
       )}
 

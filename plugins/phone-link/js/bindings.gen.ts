@@ -80,6 +80,20 @@ async publishNotes(notes: PublishedNote[]) : Promise<Result<number, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * Writes one text file for someone helping with a problem: this Mac's log
+ * (its most recent part) and the logs paired phones sent. The logs record
+ * what Mirna did and what went wrong, not notes, transcripts or audio.
+ * Returns where the file was written.
+ */
+async exportLogs(destination: string) : Promise<Result<string, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|export_logs", { destination }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -102,7 +116,16 @@ export type InboxEntry = { id: string; audio_path: string; title: string | null;
 /**
  * `queued` or `processing`.
  */
-state: string; stage: string | null; session_id: string | null }
+state: string; stage: string | null; session_id: string | null; 
+/**
+ * Set when the phone asked for more work on a note it already has.
+ */
+job: InboxJob | null }
+/**
+ * Work the phone asked for on a note: transcribe again (`engine` is `auto`,
+ * `parakeet` or `qwen3`) or keep only the first `keep_ms` of the recording.
+ */
+export type InboxJob = { type: "retranscribe"; engine: string; update_summary: boolean } | { type: "trim"; keep_ms: number; update_summary: boolean }
 /**
  * A phone recording that became a note on this Mac.
  */

@@ -16,6 +16,12 @@ import { defaultSummaryDocumentId } from "@anlg/utils/session";
 
 import { isRecordingNow } from "@/audio/capture-lifecycle";
 import { execute, executeTransaction } from "@/db";
+import {
+  diagnosticsFileUri,
+  logDiagnostic,
+  logDiagnosticError,
+  readDiagnostics,
+} from "@/lib/diagnostics";
 import { nowIso } from "@/lib/ids";
 
 import {
@@ -26,7 +32,7 @@ import {
   probePort,
 } from "../../modules/mac-discovery";
 import * as bridge from "./bridge";
-import { LinkError, type RemoteStatus } from "./bridge";
+import { LinkError, type NoteJob, type RemoteStatus } from "./bridge";
 import {
   hotspotCandidates,
   isBackingOff,
@@ -51,6 +57,7 @@ import {
 import {
   clearBackoff,
   loadBackoff,
+  loadDiagnosticsSent,
   loadIncludeMacNotes,
   loadKnownNetworks,
   loadNotesCursor,
@@ -58,6 +65,7 @@ import {
   noteMacUnreachable,
   recordLastSync,
   rememberMacNetwork,
+  saveDiagnosticsSent,
   saveNotesCursor,
 } from "./schedule";
 import { attachmentIdFor, setMacLinkStatus } from "./status";
@@ -149,10 +157,31 @@ export function sendRecordingsToMac(
 }
 
 function start(trigger: SendTrigger): Promise<SendOutcome> {
+  const startedAt = Date.now();
   const promise = run(trigger)
     .catch((error: unknown) => {
       console.warn("[mac-link] sync failed", error);
+      logDiagnosticError("mac_sync_failed", error, { trigger });
       return "mac_unreachable" as const;
+    })
+    .then((outcome) => {
+      // Automatic runs that didn't try to reach the Mac aren't worth a line
+      // each: they come every 30 s while something is waiting.
+      const quiet =
+        outcome === "nothing_to_send" ||
+        outcome === "recording" ||
+        ((trigger === "interval" || trigger === "background") &&
+          (outcome === "not_on_wifi" ||
+            outcome === "away" ||
+            outcome === "backing_off"));
+      if (!quiet) {
+        logDiagnostic("mac_sync", {
+          trigger,
+          outcome,
+          ms: Date.now() - startedAt,
+        });
+      }
+      return outcome;
     })
     .finally(() => {
       current = null;
@@ -202,7 +231,10 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
   }
   // Away from home, only a tap, or something waiting to go, makes the phone
   // look for the Mac; the background job never does.
-  if (!home && (trigger === "background" || (!userAsked && pending.length === 0))) {
+  if (
+    !home &&
+    (trigger === "background" || (!userAsked && pending.length === 0))
+  ) {
     return "away";
   }
 
@@ -220,28 +252,43 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
   await clearBackoff();
 
   const byId = new Map(remote.map((status) => [status.id, status]));
+  let finished = 0;
   for (const row of pending) {
     const status = byId.get(row.session_id);
     if (!status) continue;
     try {
-      await advance(connection, row, parseMacLink(row.mac_link), status, mode);
+      if (
+        await advance(connection, row, parseMacLink(row.mac_link), status, mode)
+      ) {
+        finished += 1;
+      }
     } catch (error) {
       if (error instanceof LinkError && error.code === "unreachable") {
         // Lost the Wi-Fi mid-way; the next run resumes where the Mac is.
         return "mac_unreachable";
       }
       console.warn("[mac-link] recording not sent", row.session_id, error);
+      logDiagnosticError("mac_send_failed", error, {});
     }
   }
 
   let pulled: PullResult = { updated: 0, failed: 0, error: null };
-  if (fresh) {
+  // A note the Mac just finished (or worked on again) comes back right away.
+  if (fresh || finished > 0) {
     try {
       pulled = await pullNoteChanges(connection, mac);
     } catch (error) {
       // An older Mac app doesn't have note changes yet; that's fine.
       console.warn("[mac-link] could not fetch note changes", error);
+      logDiagnosticError("mac_notes_fetch_failed", error, {}, "warning");
     }
+    if (pulled.updated > 0 || pulled.failed > 0) {
+      logDiagnostic("mac_notes_fetched", {
+        updated: pulled.updated,
+        failed: pulled.failed,
+      });
+    }
+    await sendDiagnostics(connection);
   }
   await recordLastSync({
     at: nowIso(),
@@ -256,7 +303,9 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
  * Asks the Mac to try a recording it couldn't transcribe again (from the
  * note's "Try again"), then syncs so the phone follows along.
  */
-export async function retryRecordingOnMac(sessionId: string): Promise<SendOutcome> {
+export async function retryRecordingOnMac(
+  sessionId: string,
+): Promise<SendOutcome> {
   const mac = await loadPairedMac();
   const identity = await loadIdentity();
   if (!mac || !identity) return "not_paired";
@@ -274,6 +323,104 @@ export async function retryRecordingOnMac(sessionId: string): Promise<SendOutcom
   }
   await setMacLinkStatus(sessionId, { state: "on_mac" });
   return sendRecordingsToMac("user");
+}
+
+export type NoteJobOutcome =
+  | "queued"
+  /** The Mac hadn't started on it yet; it cut its waiting copy instead. */
+  | "trimmed_on_mac"
+  /** The Mac dropped what had arrived; the phone sends the shorter file. */
+  | "send_again"
+  | "busy"
+  | "not_ready"
+  | "no_audio"
+  | "not_paired"
+  | "unpaired_by_mac"
+  | "not_on_wifi"
+  | "mac_unreachable"
+  | "other_mac"
+  /** The Mac's Mirna is older than this request. */
+  | "mac_too_old";
+
+/**
+ * Asks the Mac to transcribe a note's recording again, or to cut its end.
+ * The Mac has to be reachable now; the phone then follows along as it does
+ * for a new recording.
+ */
+export async function requestNoteJob(
+  sessionId: string,
+  job: NoteJob,
+): Promise<NoteJobOutcome> {
+  const mac = await loadPairedMac();
+  const identity = await loadIdentity();
+  if (!mac || !identity) return "not_paired";
+  const reached = await reachMac(mac, identity, [], isOnLocalNetwork());
+  if (reached.outcome) {
+    const outcome =
+      reached.outcome === "unpaired_by_mac" || reached.outcome === "other_mac"
+        ? reached.outcome
+        : isOnLocalNetwork()
+          ? "mac_unreachable"
+          : "not_on_wifi";
+    logDiagnostic(
+      "note_job_unreachable",
+      { job: job.type, outcome },
+      "warning",
+    );
+    return outcome;
+  }
+  let status: RemoteStatus;
+  try {
+    status = (await bridge.noteJob(reached.connection, sessionId, job)).status;
+  } catch (error) {
+    const reason = bridge.refusalReason(error);
+    logDiagnosticError("note_job_refused", error, { job: job.type }, "warning");
+    if (reason === "busy" || reason === "not_ready" || reason === "no_audio") {
+      return reason;
+    }
+    if (bridge.isUnknownRequest(error)) return "mac_too_old";
+    if (error instanceof LinkError && error.code === "unreachable") {
+      return "mac_unreachable";
+    }
+    throw error;
+  }
+  logDiagnostic("note_job_requested", {
+    job: job.type,
+    state: status.state,
+    queued_job: status.job?.type ?? null,
+  });
+  if (status.state === "missing") {
+    await setMacLinkStatus(sessionId, { state: "waiting", job: null });
+    return "send_again";
+  }
+  if (status.job) {
+    await setMacLinkStatus(sessionId, {
+      state: "on_mac",
+      job: status.job.type,
+      mac_session_id: status.session_id,
+    });
+  }
+  void sendRecordingsToMac("user");
+  return status.job
+    ? "queued"
+    : job.type === "trim"
+      ? "trimmed_on_mac"
+      : "queued";
+}
+
+/** Sends the problem log to the Mac when it has changed since last time. */
+async function sendDiagnostics(connection: Connection) {
+  try {
+    const log = readDiagnostics();
+    if (!log) return;
+    const marker = `${log.length}:${log.slice(-120)}`;
+    if ((await loadDiagnosticsSent()) === marker) return;
+    await bridge.uploadDiagnostics(connection, diagnosticsFileUri());
+    await saveDiagnosticsSent(marker);
+  } catch (error) {
+    // An older Mac app doesn't take logs; nothing else depends on this.
+    console.warn("[mac-link] could not send the log", error);
+  }
 }
 
 type Connection = Parameters<typeof bridge.statuses>[0];
@@ -311,7 +458,8 @@ async function reachMac(
       (onHotspot.length > 0 ? { hosts: onHotspot, port: mac.port } : null);
     if (!found) {
       return {
-        outcome: error.code === "mac_mismatch" ? "other_mac" : "mac_unreachable",
+        outcome:
+          error.code === "mac_mismatch" ? "other_mac" : "mac_unreachable",
       };
     }
     connection = { identity, mac: targetFor(mac, found) };
@@ -372,40 +520,48 @@ async function pullNoteChanges(
   return result;
 }
 
+/** Moves a recording along; returns whether the Mac just finished it. */
 async function advance(
   connection: Connection,
   row: PendingRow,
   local: MacLinkStatus,
   status: RemoteStatus,
   mode: "auto" | "manual",
-) {
+): Promise<boolean> {
+  const job = status.job?.type ?? null;
   switch (status.state) {
     case "missing":
     case "receiving": {
       // Sending only when it's automatic, or when someone tapped Sync now.
-      if (mode !== "auto") return;
+      if (mode !== "auto") return false;
       const reached = await upload(connection, row, status.received_bytes);
-      await advance(connection, row, local, reached, mode);
-      return;
+      return advance(connection, row, local, reached, mode);
     }
     case "queued":
-      return update(row.session_id, local, {
+      await update(row.session_id, local, {
         state: "on_mac",
         mac_session_id: status.session_id,
+        job,
       });
+      return false;
     case "processing":
-      return update(row.session_id, local, {
+      await update(row.session_id, local, {
         state: status.stage === "summarizing" ? "summarizing" : "transcribing",
         mac_session_id: status.session_id,
+        job,
       });
+      return false;
     case "failed":
-      return update(row.session_id, local, {
+      await update(row.session_id, local, {
         state: "failed",
         error: status.error,
         mac_session_id: status.session_id,
+        job,
       });
+      return false;
     case "done":
-      return applyDone(row.session_id, local, status);
+      await applyDone(row.session_id, local, status);
+      return true;
   }
 }
 
@@ -417,7 +573,8 @@ async function update(
   if (
     local.state === next.state &&
     (local.error ?? null) === (next.error ?? null) &&
-    (local.mac_session_id ?? null) === (next.mac_session_id ?? null)
+    (local.mac_session_id ?? null) === (next.mac_session_id ?? null) &&
+    (local.job ?? null) === (next.job ?? null)
   ) {
     return;
   }
@@ -437,6 +594,8 @@ async function upload(
   if (!file.exists) throw new Error("Recording file is missing");
   const total = file.size ?? row.size_bytes;
   let offset = from;
+  const sendStartedAt = Date.now();
+  logDiagnostic("recording_send_started", { from, bytes: total });
 
   await setMacLinkStatus(row.session_id, {
     state: "sending",
@@ -473,6 +632,11 @@ async function upload(
     },
   });
   await rememberWorkingHost(reply.working_host);
+  logDiagnostic("recording_sent", {
+    bytes: total,
+    ms: Date.now() - sendStartedAt,
+    state: reply.status.state,
+  });
   return reply.status;
 }
 

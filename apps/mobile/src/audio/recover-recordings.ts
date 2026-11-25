@@ -4,12 +4,13 @@ import { isCapturingSession } from "@/audio/capture-lifecycle";
 import { recoverableWav, WAV_HEADER_BYTES, wavHeader } from "@/audio/pcm-wav";
 import { recoveryNotice, wavDurationMs } from "@/audio/recovery-notice";
 import { catalogSessionAudio } from "@/data/audio-catalog";
-import { sendRecordingsToMac } from "@/mac-link/sender";
 import { execute } from "@/db";
 import { captureAnalytics } from "@/lib/analytics";
+import { logDiagnostic } from "@/lib/diagnostics";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { showToast } from "@/lib/toast";
 import { clearStaleMeetingRecordingActivities } from "@/live-activity/meeting-recording-activity";
+import { sendRecordingsToMac } from "@/mac-link/sender";
 
 const RECOVERY_CANDIDATES_SQL = `
 SELECT session.id
@@ -89,6 +90,10 @@ export async function recoverInterruptedRecordings(
       });
       recoveredSessionIds.push(session.id);
       recoveredDurationsMs.push(durationMs);
+      logDiagnostic("recording_recovered", {
+        minutes: Math.round(durationMs / 60_000),
+        bytes: file.size ?? null,
+      });
     } catch (error) {
       captureOperationalError(error, {
         operation: "recording_recovery",

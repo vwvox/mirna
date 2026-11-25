@@ -17,6 +17,7 @@ const NETWORKS_KEY = "mirna.mac_link.networks";
 const NOTES_CURSOR_KEY = "mirna.mac_link.notes_cursor";
 const MAC_NOTES_KEY = "mirna.mac_link.include_mac_notes";
 const LAST_SYNC_KEY = "mirna.mac_link.last_sync";
+const DIAGNOSTICS_SENT_KEY = "mirna.mac_link.diagnostics_sent";
 
 /** Tiny observable value kept in AsyncStorage, for settings the UI shows. */
 function storedValue<T>(key: string, fallback: T) {
@@ -77,6 +78,17 @@ const lastSync = storedValue<LastSync | null>(LAST_SYNC_KEY, null);
 export const loadLastSync = lastSync.load;
 export const recordLastSync = lastSync.set;
 export const useLastSync = lastSync.use;
+
+// --- The problem log the Mac last received ---------------------------------
+
+/** What the log looked like when it was last sent, so unchanged logs stay put. */
+export function loadDiagnosticsSent() {
+  return readJson<string>(DIAGNOSTICS_SENT_KEY);
+}
+
+export function saveDiagnosticsSent(marker: string) {
+  return writeJson(DIAGNOSTICS_SENT_KEY, marker);
+}
 
 async function readJson<T>(key: string): Promise<T | null> {
   try {

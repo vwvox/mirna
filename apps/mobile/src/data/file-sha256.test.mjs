@@ -78,3 +78,28 @@ test("does not open a file after verification is cancelled", async () => {
   );
   assert.equal(opened, false);
 });
+
+test("pauses only the way it's told, so the background never waits on a timer", async () => {
+  // Android runs no timers in the background: a long recording saved from the
+  // lock screen must not wait on one between megabytes.
+  const bytes = new Uint8Array(9 * 1024 * 1024);
+  let pauses = 0;
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = () => {
+    throw new Error("a timer was used");
+  };
+  try {
+    const result = await hashFileSha256(
+      memoryFile(bytes).file,
+      undefined,
+      () => {
+        pauses += 1;
+        return Promise.resolve();
+      },
+    );
+    assert.equal(result.sizeBytes, bytes.length);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  assert.equal(pauses, 2);
+});

@@ -3,14 +3,18 @@
 // TLS pinned to each side's certificate, chunked upload, checksums.
 import {
   phoneLinkComplete,
+  phoneLinkFileSha256,
   phoneLinkInfo,
   phoneLinkNewIdentity,
   phoneLinkNoteChanges,
+  phoneLinkNoteJob,
   phoneLinkPair,
   phoneLinkParseOffer,
   phoneLinkRetry,
   phoneLinkSend,
   phoneLinkStatuses,
+  phoneLinkTrimWav,
+  phoneLinkUploadDiagnostics,
 } from "@anlg/mobile-bridge";
 
 import type { RemoteNote } from "./model";
@@ -44,6 +48,15 @@ export type RemoteState =
   | "done"
   | "failed";
 
+/** Work on a note the phone can ask the Mac for. */
+export type NoteJob =
+  | {
+      type: "retranscribe";
+      engine: "auto" | "parakeet" | "qwen3";
+      update_summary: boolean;
+    }
+  | { type: "trim"; keep_ms: number; update_summary: boolean };
+
 export type RemoteStatus = {
   id: string;
   state: RemoteState;
@@ -53,6 +66,7 @@ export type RemoteStatus = {
   title: string | null;
   summary_md: string | null;
   error: string | null;
+  job?: NoteJob | null;
 };
 
 export type RecordingMeta = {
@@ -189,8 +203,64 @@ export function retry(
   recordingId: string,
 ): Promise<{ status: RemoteStatus; working_host: string | null }> {
   return call(() =>
-    phoneLinkRetry(JSON.stringify({ ...connection, recording_id: recordingId })),
+    phoneLinkRetry(
+      JSON.stringify({ ...connection, recording_id: recordingId }),
+    ),
   );
+}
+
+/** Asks the Mac to transcribe a recording again or cut its end. */
+export function noteJob(
+  connection: Connection,
+  recordingId: string,
+  job: NoteJob,
+): Promise<{ status: RemoteStatus; working_host: string | null }> {
+  return call(() =>
+    phoneLinkNoteJob(
+      JSON.stringify({ ...connection, recording_id: recordingId, job }),
+    ),
+  );
+}
+
+/** Sends this phone's problem log file to the Mac. */
+export function uploadDiagnostics(
+  connection: Connection,
+  file: string,
+): Promise<{ working_host: string | null }> {
+  return call(() =>
+    phoneLinkUploadDiagnostics(JSON.stringify({ ...connection, file })),
+  );
+}
+
+/** SHA-256 and size of a local file, read natively. */
+export function fileSha256(
+  file: string,
+): Promise<{ sha256: string; size_bytes: number }> {
+  return call(() => phoneLinkFileSha256(file));
+}
+
+/** Cuts a WAV recording after its first `keepMs`, in place. */
+export function trimWav(
+  file: string,
+  keepMs: number,
+): Promise<{ duration_ms: number; size_bytes: number }> {
+  return call(() =>
+    phoneLinkTrimWav(file, BigInt(Math.max(0, Math.round(keepMs)))),
+  );
+}
+
+/**
+ * The Mac's reason for refusing a request ("busy", "no_audio"…), when the
+ * refusal came with one.
+ */
+export function refusalReason(error: unknown): string | null {
+  if (!(error instanceof LinkError)) return null;
+  return /:\s*([a-z_]+)\s*$/.exec(error.message)?.[1] ?? null;
+}
+
+/** The Mac answered that it doesn't know this request: its Mirna is older. */
+export function isUnknownRequest(error: unknown): boolean {
+  return error instanceof LinkError && /answered 404\b/.test(error.message);
 }
 
 /** Text of this phone's notes that changed on the Mac since `since`. */
@@ -206,7 +276,11 @@ export function noteChanges(
 }> {
   return call(() =>
     phoneLinkNoteChanges(
-      JSON.stringify({ ...connection, since, include_mac_notes: includeMacNotes }),
+      JSON.stringify({
+        ...connection,
+        since,
+        include_mac_notes: includeMacNotes,
+      }),
     ),
   );
 }

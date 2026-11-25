@@ -58,9 +58,22 @@ test("remembers where the Mac answered", () => {
 test("tells the phone's own recording from ones added on the Mac", () => {
   const phoneStart = 1_795_000_000_000;
   const transcripts = [
-    { id: "later", started_at_ms: phoneStart + 3_600_000, ended_at_ms: phoneStart + 3_720_000 },
-    { id: "phone", started_at_ms: phoneStart + 2_000, ended_at_ms: phoneStart + 600_000 },
-  ].map((t) => ({ ...t, memo: "", words_json: "[]", speaker_hints_json: "[]" }));
+    {
+      id: "later",
+      started_at_ms: phoneStart + 3_600_000,
+      ended_at_ms: phoneStart + 3_720_000,
+    },
+    {
+      id: "phone",
+      started_at_ms: phoneStart + 2_000,
+      ended_at_ms: phoneStart + 600_000,
+    },
+  ].map((t) => ({
+    ...t,
+    memo: "",
+    words_json: "[]",
+    speaker_hints_json: "[]",
+  }));
   assert.deepEqual(macOnlyRecordings(transcripts, phoneStart), [
     { id: "later", duration_ms: 120_000 },
   ]);
@@ -184,14 +197,28 @@ test("looks for the Mac on every other address of the phone's hotspot", () => {
   assert.ok(!candidates.includes("10.181.42.255"));
 
   // A wider subnet is narrowed to the phone's /24; a small one stays small.
-  const wide = hotspotCandidates([{ address: "192.168.200.7", prefix_length: 16 }]);
+  const wide = hotspotCandidates([
+    { address: "192.168.200.7", prefix_length: 16 },
+  ]);
   assert.equal(wide.length, 253);
   assert.ok(wide.every((address) => address.startsWith("192.168.200.")));
   assert.deepEqual(
     hotspotCandidates([{ address: "172.20.10.1", prefix_length: 28 }]),
-    ["172.20.10.2", "172.20.10.3", "172.20.10.4", "172.20.10.5", "172.20.10.6",
-     "172.20.10.7", "172.20.10.8", "172.20.10.9", "172.20.10.10", "172.20.10.11",
-     "172.20.10.12", "172.20.10.13", "172.20.10.14"],
+    [
+      "172.20.10.2",
+      "172.20.10.3",
+      "172.20.10.4",
+      "172.20.10.5",
+      "172.20.10.6",
+      "172.20.10.7",
+      "172.20.10.8",
+      "172.20.10.9",
+      "172.20.10.10",
+      "172.20.10.11",
+      "172.20.10.12",
+      "172.20.10.13",
+      "172.20.10.14",
+    ],
   );
 
   // Two hotspots (Wi-Fi and USB), capped; nonsense addresses are skipped.
@@ -205,4 +232,26 @@ test("looks for the Mac on every other address of the phone's hotspot", () => {
   );
   assert.equal(both.length, 300);
   assert.equal(both[253], "192.168.42.1");
+});
+
+test("says what happens after asking the Mac to work on a note", async () => {
+  const { noteJobMessage } = await import("./model.ts");
+  assert.equal(
+    noteJobMessage("queued", "retranscribe", "Studio").description,
+    "Transcribing it again on Studio. The note updates here when it's done.",
+  );
+  assert.equal(
+    noteJobMessage("busy", "trim", "").title,
+    "Your Mac is still working on this note",
+  );
+  assert.match(
+    noteJobMessage("not_on_wifi", "trim", "Studio").description,
+    /same Wi-Fi as Studio/,
+  );
+  // An older Mac app doesn't know the request: say to update it, not that
+  // it couldn't be reached.
+  assert.equal(
+    noteJobMessage("mac_too_old", "retranscribe", "Studio").title,
+    "Update Mirna on Studio",
+  );
 });

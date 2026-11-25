@@ -15,7 +15,7 @@ use crate::Error;
 use crate::identity::{Identity, is_fingerprint};
 use crate::protocol::{
     ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
-    PairRequest, PairResponse, RecordingStatus, StatusesRequest,
+    NoteJob, PairRequest, PairResponse, RecordingStatus, StatusesRequest,
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -112,6 +112,27 @@ impl Client {
             Some(Bytes::from_static(b"{}")),
         )
         .await
+    }
+
+    /// Asks the Mac to transcribe a recording again or cut its end.
+    pub async fn note_job(
+        &self,
+        recording_id: &str,
+        job: &NoteJob,
+    ) -> Result<RecordingStatus, Error> {
+        let body = serde_json::to_vec(job)?;
+        self.call(
+            Method::POST,
+            &format!("/v1/recordings/{recording_id}/job"),
+            Some(body.into()),
+        )
+        .await
+    }
+
+    /// Sends this phone's problem log, replacing the copy the Mac has.
+    pub async fn upload_diagnostics(&self, log: Bytes) -> Result<(), Error> {
+        let _: serde_json::Value = self.call(Method::PUT, "/v1/diagnostics", Some(log)).await?;
+        Ok(())
     }
 
     /// Sends bytes that start at `offset` of the recording. Returns how many

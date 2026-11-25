@@ -15,6 +15,10 @@ export type NoteActionsSheetProps = {
   onSelectFolder: () => void;
   onToggleListening: () => void;
   onVersionHistory: () => void;
+  /** Ask the Mac to transcribe the recording again (when it has it). */
+  onRetranscribe?: () => void;
+  /** Cut the end off the recording (when there is one). */
+  onTrim?: () => void;
   visible: boolean;
 };
 
@@ -28,6 +32,8 @@ export function NoteActionsSheet({
   onSelectFolder,
   onToggleListening,
   onVersionHistory,
+  onRetranscribe,
+  onTrim,
   visible,
 }: NoteActionsSheetProps) {
   const styles = useStyles();
@@ -105,6 +111,32 @@ export function NoteActionsSheet({
             <Ionicons name="time-outline" size={20} color={Colors.ink} />
             <Text style={styles.actionLabel}>Version history</Text>
           </Pressable>
+          {!listening && onRetranscribe && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => select(onRetranscribe)}
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.actionPressed,
+              ]}
+            >
+              <Ionicons name="refresh-outline" size={20} color={Colors.ink} />
+              <Text style={styles.actionLabel}>Transcribe again on Mac</Text>
+            </Pressable>
+          )}
+          {!listening && onTrim && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => select(onTrim)}
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.actionPressed,
+              ]}
+            >
+              <Ionicons name="cut-outline" size={20} color={Colors.ink} />
+              <Text style={styles.actionLabel}>Trim recording</Text>
+            </Pressable>
+          )}
           {!listening && !hasRecordingHistory && (
             <Pressable
               accessibilityRole="button"

@@ -43,6 +43,7 @@ fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             commands::update_recording::<tauri::Wry>,
             commands::list_linked_notes::<tauri::Wry>,
             commands::publish_notes::<tauri::Wry>,
+            commands::export_logs::<tauri::Wry>,
         ])
         .events(tauri_specta::collect_events![PhoneLinkEvent])
         .error_handling(tauri_specta::ErrorHandlingMode::Result)

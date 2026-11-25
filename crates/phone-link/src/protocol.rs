@@ -79,6 +79,46 @@ pub struct RecordingStatus {
     pub error: Option<String>,
     #[serde(default)]
     pub updated_at_ms: u64,
+    /// Work the phone asked for on a recording that is already a note
+    /// (transcribe again, trim), while it is queued, running or failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub job: Option<NoteJob>,
+}
+
+/// Work on a note the phone can ask the Mac for after its recording became a
+/// note.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum NoteJob {
+    /// Transcribe the recording again: `auto` (the Mac's settings),
+    /// `parakeet` or `qwen3`.
+    Retranscribe {
+        engine: String,
+        #[serde(default = "yes")]
+        update_summary: bool,
+    },
+    /// Keep only the first `keep_ms` of the recording: the rest of the audio
+    /// and its words are deleted.
+    Trim {
+        keep_ms: u64,
+        #[serde(default = "yes")]
+        update_summary: bool,
+    },
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl NoteJob {
+    pub fn is_valid(&self) -> bool {
+        match self {
+            NoteJob::Retranscribe { engine, .. } => {
+                matches!(engine.as_str(), "auto" | "parakeet" | "qwen3")
+            }
+            NoteJob::Trim { keep_ms, .. } => *keep_ms >= 1_000,
+        }
+    }
 }
 
 impl RecordingStatus {
@@ -93,6 +133,7 @@ impl RecordingStatus {
             summary_md: None,
             error: None,
             updated_at_ms: 0,
+            job: None,
         }
     }
 }

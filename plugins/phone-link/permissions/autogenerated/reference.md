@@ -13,6 +13,7 @@ Default permissions for the plugin
 - `allow-update-recording`
 - `allow-list-linked-notes`
 - `allow-publish-notes`
+- `allow-export-logs`
 
 ## Permission Table
 
@@ -45,6 +46,32 @@ Enables the cancel_pairing command without any pre-configured scope.
 <td>
 
 Denies the cancel_pairing command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`phone-link:allow-export-logs`
+
+</td>
+<td>
+
+Enables the export_logs command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`phone-link:deny-export-logs`
+
+</td>
+<td>
+
+Denies the export_logs command without any pre-configured scope.
 
 </td>
 </tr>

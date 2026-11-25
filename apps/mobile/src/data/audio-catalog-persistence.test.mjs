@@ -17,6 +17,10 @@ const mocks = {
   "@/attachment-sync/upload-runner": `export function requestMobileAttachmentUploads() {}`,
   "@/attachment-sync/upload-store": `export function requeueMobileAttachmentUpload() {}`,
   "@/lib/ids": `export {randomUUID as id} from 'node:crypto'; export const nowIso = () => new Date().toISOString();`,
+  "@/lib/diagnostics": `export function logDiagnostic() {} export function logDiagnosticError() {}`,
+  "react-native": `export const AppState = { currentState: 'background' };`,
+  // Native checksums; the size changes as a trimmed file would.
+  "@/mac-link/bridge": `export async function fileSha256() { return {sha256: globalThis.nativeSha ?? 'a'.repeat(64), size_bytes: globalThis.nativeSize ?? 44}; }`,
 };
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -33,8 +37,11 @@ const hooks = registerHooks({
     return next(specifier, context);
   },
 });
-const { recordSessionCaptureStart, catalogSessionAudio } =
-  await import("./audio-catalog.ts");
+const {
+  recordSessionCaptureStart,
+  catalogSessionAudio,
+  refreshSessionAudioFile,
+} = await import("./audio-catalog.ts");
 for (const name of [
   "20260710223922_canonical_data_model.sql",
   "20260717140000_attachment_local_state.sql",
@@ -91,4 +98,38 @@ test("recording recovery preserves the durable capture time while imports ignore
     contentType: "audio/wav",
   });
   assert.equal(metadata("recorded").capture_started_at_ms, capture);
+});
+
+test("a trimmed recording gets its new size and checksum, and keeps its way to the Mac", async () => {
+  db.exec("INSERT INTO sessions (id) VALUES ('trimmed')");
+  await recordSessionCaptureStart("trimmed");
+  await catalogSessionAudio("trimmed", {
+    source: "recording",
+    filename: "audio.wav",
+    contentType: "audio/wav",
+  });
+  db.exec(`UPDATE session_attachments SET metadata_json = json_set(metadata_json,
+    '$.mac_link', json('{"state":"done","mac_session_id":"mac-1"}'),
+    '$.transcript_status', 'complete') WHERE session_id = 'trimmed'`);
+  globalThis.nativeSha = "b".repeat(64);
+  globalThis.nativeSize = 20_044;
+  try {
+    assert.deepEqual(await refreshSessionAudioFile("trimmed", "audio.wav"), {
+      sizeBytes: 20_044,
+    });
+  } finally {
+    delete globalThis.nativeSha;
+    delete globalThis.nativeSize;
+  }
+  const row = db
+    .prepare(
+      "SELECT size_bytes, sha256, metadata_json FROM session_attachments WHERE session_id = 'trimmed'",
+    )
+    .get();
+  assert.equal(row.size_bytes, 20_044);
+  assert.equal(row.sha256, "b".repeat(64));
+  const metadata = JSON.parse(row.metadata_json);
+  assert.equal(metadata.mac_link.state, "done");
+  assert.equal(metadata.mac_link.mac_session_id, "mac-1");
+  assert.equal(metadata.transcript_status, "complete");
 });

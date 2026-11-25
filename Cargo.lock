@@ -17367,6 +17367,7 @@ dependencies = [
 name = "tauri-plugin-phone-link"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "if-addrs",
  "mdns-sd",
  "phone-link",
@@ -17377,6 +17378,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tauri-specta",
+ "tempfile",
  "tokio",
  "tracing",
 ]

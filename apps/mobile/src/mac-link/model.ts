@@ -24,6 +24,8 @@ export type MacLinkStatus = {
   mac_recordings?: MacOnlyRecording[];
   /** When the Mac last changed this note after it first came back. */
   updated_on_mac_at?: string | null;
+  /** Work the phone asked the Mac for on this note, while it's under way. */
+  job?: "retranscribe" | "trim" | null;
   /** What the phone last took from the Mac, to spot later changes. */
   synced?: {
     title?: string | null;
@@ -111,9 +113,7 @@ export function isBackingOff(
   network: string | null,
   nowMs: number,
 ) {
-  return (
-    !!backoff && backoff.network === network && nowMs < backoff.next_at_ms
-  );
+  return !!backoff && backoff.network === network && nowMs < backoff.next_at_ms;
 }
 
 /** Wi-Fi networks where the Mac answered, most recent first. */
@@ -331,5 +331,105 @@ export function proseMirrorToMarkdown(node: PmNode, depth = 0): string {
         .join("\n");
     default:
       return children(depth === 0 ? "\n\n" : "\n");
+  }
+}
+
+// --- Asking the Mac to work on a note again ---------------------------------
+
+type JobOutcome =
+  | "queued"
+  | "trimmed_on_mac"
+  | "send_again"
+  | "busy"
+  | "not_ready"
+  | "no_audio"
+  | "not_paired"
+  | "unpaired_by_mac"
+  | "not_on_wifi"
+  | "mac_unreachable"
+  | "other_mac"
+  | "mac_too_old"
+  | "failed";
+
+/** What to tell someone after asking the Mac to transcribe again or trim. */
+export function noteJobMessage(
+  outcome: JobOutcome,
+  job: "retranscribe" | "trim",
+  macName: string,
+): { title: string; description: string } {
+  const mac = macName || "your Mac";
+  const Mac = mac.charAt(0).toUpperCase() + mac.slice(1);
+  const working =
+    job === "trim" ? "Trimming the recording" : "Transcribing it again";
+  switch (outcome) {
+    case "queued":
+      return {
+        title: job === "trim" ? "Trimming on the Mac" : "Transcribing again",
+        description: `${working} on ${mac}. The note updates here when it's done.`,
+      };
+    case "trimmed_on_mac":
+      return {
+        title: "Recording trimmed",
+        description: `${Mac} hadn't started on it yet, so it'll use the shorter recording.`,
+      };
+    case "send_again":
+      return {
+        title: "Recording trimmed",
+        description: `The shorter recording goes to ${mac} instead.`,
+      };
+    case "busy":
+      return {
+        title: `${Mac} is still working on this note`,
+        description: "Try again when it's done.",
+      };
+    case "not_ready":
+      return {
+        title: `${Mac} hasn't made this note yet`,
+        description: "Try again once the transcript is back.",
+      };
+    case "no_audio":
+      return {
+        title: `${Mac} doesn't have this recording`,
+        description: "Send it from this phone first.",
+      };
+    case "not_paired":
+      return {
+        title: "No Mac paired",
+        description: "Pair your Mac in Settings › Mac first.",
+      };
+    case "unpaired_by_mac":
+      return {
+        title: `${Mac} no longer knows this phone`,
+        description: "Pair again in Settings › Mac.",
+      };
+    case "not_on_wifi":
+      return {
+        title: "Not on Wi-Fi",
+        description: `Join the same Wi-Fi as ${mac}, then try again.`,
+      };
+    case "other_mac":
+      return {
+        title: "A different Mac answered",
+        description: `Make sure Mirna is open on ${mac}, then try again.`,
+      };
+    case "mac_unreachable":
+      return {
+        title: `Couldn't reach ${mac}`,
+        description:
+          "Check that Mirna is open on it and you're on the same Wi-Fi.",
+      };
+    case "mac_too_old":
+      return {
+        title: `Update Mirna on ${mac}`,
+        description:
+          job === "trim"
+            ? "Trimming a recording on the Mac needs the latest Mirna there."
+            : "Transcribing again from the phone needs the latest Mirna there.",
+      };
+    case "failed":
+      return {
+        title: "Couldn't trim the recording",
+        description: "Nothing was changed on this phone. Try again.",
+      };
   }
 }

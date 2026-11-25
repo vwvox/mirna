@@ -354,3 +354,99 @@ pub async fn phone_link_complete(request_json: String) -> Result<String, PhoneLi
         working_host: client.working_host(),
     })
 }
+
+#[derive(Deserialize)]
+struct NoteJobCall {
+    #[serde(flatten)]
+    connection: Connection,
+    recording_id: String,
+    job: anlg_phone_link::protocol::NoteJob,
+}
+
+#[derive(Serialize)]
+struct NoteJobReply {
+    status: anlg_phone_link::protocol::RecordingStatus,
+    working_host: Option<String>,
+}
+
+/// Asks the Mac to transcribe a recording again or cut its end.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_note_job(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: NoteJobCall = from_json(&request_json)?;
+    let client = request.connection.client()?;
+    let status = client.note_job(&request.recording_id, &request.job).await?;
+    to_json(&NoteJobReply {
+        status,
+        working_host: client.working_host(),
+    })
+}
+
+#[derive(Deserialize)]
+struct DiagnosticsCall {
+    #[serde(flatten)]
+    connection: Connection,
+    file: String,
+}
+
+/// Sends this phone's problem log to the Mac (at most the last 1 MiB).
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_upload_diagnostics(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: DiagnosticsCall = from_json(&request_json)?;
+    let path = local_path(&request.file)?;
+    let log = tokio::task::spawn_blocking(move || std::fs::read(&path))
+        .await
+        .map_err(io_error)?
+        .map_err(io_error)?;
+    let max = anlg_phone_link::MAX_DIAGNOSTICS_BYTES - 4096;
+    let start = log.len().saturating_sub(max);
+    let client = request.connection.client()?;
+    client
+        .upload_diagnostics(Bytes::copy_from_slice(&log[start..]))
+        .await?;
+    to_json(&serde_json::json!({ "working_host": client.working_host() }))
+}
+
+#[derive(Serialize)]
+struct FileDigest {
+    sha256: String,
+    size_bytes: u64,
+}
+
+/// SHA-256 and size of a local file, read natively (fast for long recordings).
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_file_sha256(file: String) -> Result<String, PhoneLinkError> {
+    let path = local_path(&file)?;
+    let digest = tokio::task::spawn_blocking(move || {
+        let size_bytes = std::fs::metadata(&path)?.len();
+        let sha256 = anlg_phone_link::sha256_file(&path)?;
+        Ok::<_, std::io::Error>(FileDigest { sha256, size_bytes })
+    })
+    .await
+    .map_err(io_error)?
+    .map_err(io_error)?;
+    to_json(&digest)
+}
+
+#[derive(Serialize)]
+struct TrimReply {
+    duration_ms: u64,
+    size_bytes: u64,
+}
+
+/// Cuts a WAV recording after its first `keep_ms`, in place.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_trim_wav(file: String, keep_ms: u64) -> Result<String, PhoneLinkError> {
+    let path = local_path(&file)?;
+    let reply = tokio::task::spawn_blocking(move || {
+        let trimmed = anlg_phone_link::trim_wav_file(&path, keep_ms)?;
+        let size_bytes = std::fs::metadata(&path)?.len();
+        Ok::<_, std::io::Error>(TrimReply {
+            duration_ms: trimmed.duration_ms,
+            size_bytes,
+        })
+    })
+    .await
+    .map_err(io_error)?
+    .map_err(io_error)?;
+    to_json(&reply)
+}

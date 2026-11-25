@@ -21,6 +21,12 @@ export async function hashFileSha256(
     };
   },
   signal?: AbortSignal,
+  /**
+   * Lets other work run every few megabytes. Android doesn't run timers while
+   * the app is in the background, so a pause there must not wait for one.
+   */
+  pause: () => Promise<void> = () =>
+    new Promise<void>((resolve) => setTimeout(resolve, 0)),
 ): Promise<{ sha256: string; sizeBytes: number }> {
   throwIfAborted(signal);
   const handle = file.open();
@@ -49,7 +55,7 @@ export async function hashFileSha256(
 
       if (bytesSinceYield >= YIELD_AFTER_BYTES) {
         bytesSinceYield = 0;
-        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        await pause();
         throwIfAborted(signal);
       }
     }

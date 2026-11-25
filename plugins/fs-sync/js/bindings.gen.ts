@@ -118,6 +118,18 @@ async audioImport(sessionId: string, sourcePath: string) : Promise<Result<string
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Cuts the session's recording after its first `keep_ms`. Returns the
+ * audio's path, or `None` when the session has no recording on this Mac.
+ */
+async audioTrim(sessionId: string, keepMs: number) : Promise<Result<string | null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:fs-sync|audio_trim", { sessionId, keepMs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async audioImportData(sessionId: string, data: number[], filename: string, contentType: string | null) : Promise<Result<string, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("plugin:fs-sync|audio_import_data", { sessionId, data, filename, contentType }) };

@@ -20,6 +20,7 @@ import { ToastHost } from "@/components/toast-host";
 import { Button } from "@/components/ui/button";
 import { Spacing, Typography } from "@/constants/theme";
 import { initializeAnalytics, screenAnalytics } from "@/lib/analytics";
+import { diagnosticsHeader, logDiagnostic } from "@/lib/diagnostics";
 import {
   addNavigationBreadcrumb,
   captureOperationalError,
@@ -78,6 +79,8 @@ function AnalyticsLifecycle() {
 function Screens({ accountUserId }: { accountUserId: string | null }) {
   const Colors = useColors();
   useMountEffect(() => {
+    const { version, device, system } = diagnosticsHeader();
+    logDiagnostic("app_opened", { version, device, system });
     void recoverInterruptedRecordings(accountUserId).catch((error) => {
       captureOperationalError(error, {
         operation: "recording_recovery",
