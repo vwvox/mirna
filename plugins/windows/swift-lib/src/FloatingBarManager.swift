@@ -129,6 +129,10 @@ final class FloatingBarManager {
     if model.liveCaptionToggleVisible != state.liveCaptionToggleVisible {
       model.liveCaptionToggleVisible = state.liveCaptionToggleVisible
     }
+    let marksEnabled = state.dictation == nil && state.marksEnabled == true
+    if model.marksEnabled != marksEnabled {
+      model.marksEnabled = marksEnabled
+    }
     if let transcriptBubbles = state.transcriptBubbles,
       model.transcriptBubbles != transcriptBubbles
     {
@@ -245,14 +249,16 @@ final class FloatingBarManager {
   private func layout(isExpanded: Bool) -> FloatingBarWindowLayout {
     FloatingBarWindowLayout(
       isExpanded: isExpanded,
-      showsExpand: model.liveCaptionToggleVisible
+      showsExpand: model.liveCaptionToggleVisible,
+      showsMarks: model.marksEnabled
     )
   }
 
   private func size(for layout: FloatingBarWindowLayout) -> NSSize {
     FloatingBarLayout.containerSize(
       isExpanded: layout.isExpanded,
-      showsExpand: layout.showsExpand
+      showsExpand: layout.showsExpand,
+      showsMarks: layout.showsMarks
     )
   }
 
@@ -288,6 +294,7 @@ final class FloatingBarManager {
 private struct FloatingBarWindowLayout {
   let isExpanded: Bool
   let showsExpand: Bool
+  let showsMarks: Bool
 }
 
 final class FloatingBarPanel: NSPanel {

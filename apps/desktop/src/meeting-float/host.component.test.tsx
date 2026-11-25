@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
     | null
     | ((event: { payload: { sessionId: string; action: string } }) => void),
   meetingStop: null as null | (() => void),
+  mark: null as
+    | null
+    | ((event: { payload: { sessionId: string; kind: string } }) => void),
+  addLessonMark: vi.fn(async () => null),
   settings: {
     current: {
       floating_bar_opacity: 0.78,
@@ -27,7 +31,9 @@ const mocks = vi.hoisted(() => ({
   listen: vi.fn(async () => vi.fn()),
   setSettingValue: vi.fn(async () => undefined),
   setSettingValues: vi.fn(),
-  subscribeMeetingFloatData: vi.fn(async () => vi.fn(async () => undefined)),
+  subscribeMeetingFloatData: vi.fn(async (_onData: (data: unknown) => void) =>
+    vi.fn(async () => undefined),
+  ),
   listenerState: {
     live: {
       status: "active",
@@ -74,8 +80,17 @@ vi.mock("@anlg/plugin-windows", () => ({
         return vi.fn();
       }),
     },
+    floatingBarMark: {
+      listen: vi.fn(async (callback) => {
+        mocks.mark = callback;
+        return vi.fn();
+      }),
+    },
   },
 }));
+
+vi.mock("~/lesson/marks", () => ({ addLessonMark: mocks.addLessonMark }));
+vi.mock("~/lesson/queries", () => ({ LESSON_SESSION_KIND: "lesson" }));
 
 vi.mock("./hooks", () => ({
   createMeetingFloatLabelContext: vi.fn(() => undefined),
@@ -115,6 +130,8 @@ describe("FloatingMeetingWindowHost", () => {
     vi.clearAllMocks();
     mocks.meetingStop = null;
     mocks.dictationAction = null;
+    mocks.mark = null;
+    mocks.listenerState.live.sessionId = "session-1";
     mocks.enabled = true;
     mocks.listenerState.live.status = "active";
     useDictationStatus.setState(useDictationStatus.getInitialState());
@@ -218,6 +235,54 @@ describe("FloatingMeetingWindowHost", () => {
       useDictationStatus.setState({ phase: "idle" });
     });
     await waitFor(() => expect(mocks.floatingBarHide).toHaveBeenCalledOnce());
+  });
+
+  it("shows lesson marks for a lesson recording and records each press", async () => {
+    mocks.subscribeMeetingFloatData.mockImplementationOnce(
+      async (onData: (data: unknown) => void) => {
+        onData({
+          sessions: {
+            "session-1": {
+              title: "Biology",
+              kind: "lesson",
+              ownerUserId: "",
+              participantHumanIds: [],
+              speakerContext: { intervals: [] },
+              liveStartedAtMs: null,
+            },
+          },
+          humanNames: {},
+        });
+        return vi.fn(async () => undefined);
+      },
+    );
+    render(<FloatingMeetingWindowHost />);
+    await waitFor(() =>
+      expect(mocks.floatingBarUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sessionId: "session-1", marksEnabled: true }),
+      ),
+    );
+
+    await act(async () => {
+      mocks.mark!({ payload: { sessionId: "other", kind: "important" } });
+      mocks.mark!({ payload: { sessionId: "session-1", kind: "starred" } });
+      mocks.mark!({ payload: { sessionId: "session-1", kind: "confused" } });
+    });
+    expect(mocks.addLessonMark).toHaveBeenCalledOnce();
+    expect(mocks.addLessonMark).toHaveBeenCalledWith("session-1", "confused");
+  });
+
+  it("ignores marks for a recording that is not a lesson", async () => {
+    render(<FloatingMeetingWindowHost />);
+    await waitFor(() =>
+      expect(mocks.floatingBarUpdate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ marksEnabled: false }),
+      ),
+    );
+    await act(async () => {
+      mocks.mark!({ payload: { sessionId: "session-1", kind: "important" } });
+    });
+    expect(mocks.addLessonMark).not.toHaveBeenCalled();
   });
 
   it("gives an active meeting ownership of the panel", async () => {

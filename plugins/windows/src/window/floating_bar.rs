@@ -75,6 +75,8 @@ pub struct FloatingBarState {
     pub layout: Option<FloatingBarOverlayLayout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub marks_enabled: bool,
 }
 
 pub const WINDOW_LABEL: &str = "floating-bar";
@@ -91,6 +93,8 @@ pub(crate) mod layout {
     pub const COMPACT_ICON_SIZE: f64 = 30.0;
     pub const COMPACT_GAP: f64 = 0.0;
     pub const COMPACT_HORIZONTAL_PADDING: f64 = 4.0;
+    pub const COMPACT_MARK_COUNT: f64 = 3.0;
+    pub const COMPACT_MARKS_SEPARATOR: f64 = 4.0;
     pub const EXPANDED_WIDTH: f64 = 360.0;
     pub const EXPANDED_HEIGHT: f64 = 430.0;
     pub const HOVER_HANDLE_TOP_PADDING: f64 = 7.0;
@@ -103,23 +107,37 @@ pub(crate) mod layout {
         state.live_caption_toggle_visible && !state.live_caption_minimized
     }
 
-    pub fn compact_controls_width(shows_expand: bool) -> f64 {
-        if shows_expand {
-            COMPACT_STOP_WIDTH + COMPACT_GAP + COMPACT_ICON_SIZE
-        } else {
-            COMPACT_SOLO_STOP_WIDTH
-        }
+    pub fn shows_marks(state: &FloatingBarState) -> bool {
+        state.marks_enabled && state.dictation.is_none()
     }
 
-    pub fn compact_width(shows_expand: bool) -> f64 {
-        compact_controls_width(shows_expand) + COMPACT_HORIZONTAL_PADDING * 2.0
+    pub fn compact_marks_width() -> f64 {
+        COMPACT_MARK_COUNT * (COMPACT_ICON_SIZE + COMPACT_GAP) + COMPACT_MARKS_SEPARATOR
+    }
+
+    pub fn compact_controls_width(shows_expand: bool, shows_marks: bool) -> f64 {
+        let marks = if shows_marks {
+            compact_marks_width()
+        } else {
+            0.0
+        };
+        marks
+            + if shows_expand {
+                COMPACT_STOP_WIDTH + COMPACT_GAP + COMPACT_ICON_SIZE
+            } else {
+                COMPACT_SOLO_STOP_WIDTH
+            }
+    }
+
+    pub fn compact_width(shows_expand: bool, shows_marks: bool) -> f64 {
+        compact_controls_width(shows_expand, shows_marks) + COMPACT_HORIZONTAL_PADDING * 2.0
     }
 
     pub fn dictation_container_size(expanded: bool) -> (f64, f64) {
-        container_size(expanded, true)
+        container_size(expanded, true, false)
     }
 
-    pub fn container_size(is_expanded: bool, shows_expand: bool) -> (f64, f64) {
+    pub fn container_size(is_expanded: bool, shows_expand: bool, shows_marks: bool) -> (f64, f64) {
         if is_expanded {
             (
                 EXPANDED_WIDTH + INSET * 2.0,
@@ -127,7 +145,7 @@ pub(crate) mod layout {
             )
         } else {
             (
-                compact_width(shows_expand) + INSET * 2.0,
+                compact_width(shows_expand, shows_marks) + INSET * 2.0,
                 COMPACT_HEIGHT + HOVER_HANDLE_RESERVED_HEIGHT + INSET * 2.0,
             )
         }
@@ -148,7 +166,7 @@ pub(crate) mod layout {
         expands_upward: bool,
     ) -> (f64, f64, f64, f64) {
         let width = size.0.min(work.2);
-        let min_height = size.1.min(container_size(false, true).1).min(work.3);
+        let min_height = size.1.min(container_size(false, true, false).1).min(work.3);
         let (y, height) = if expands_upward {
             let bottom = (anchor.1 + INSET + COMPACT_HEIGHT / 2.0)
                 .clamp(work.1 + min_height, work.1 + work.3);
@@ -247,6 +265,22 @@ mod platform {
     pub extern "C" fn rust_on_floating_bar_stop() {
         if let Some(app) = APP_HANDLE.get() {
             let _ = crate::events::FloatingBarStop {}.emit(app);
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn rust_on_floating_bar_mark(kind: *const c_char) {
+        if kind.is_null() {
+            return;
+        }
+        let Ok(kind) = (unsafe { CStr::from_ptr(kind) }).to_str() else {
+            return;
+        };
+        if let (Some(app), Some(event)) = (
+            APP_HANDLE.get(),
+            super::mark_event(super::session_id(), kind),
+        ) {
+            let _ = event.emit(app);
         }
     }
 
@@ -411,7 +445,7 @@ mod cross_platform {
             return Ok(window);
         }
 
-        let (width, height) = container_size(false, false);
+        let (width, height) = container_size(false, false, false);
         let builder = WebviewWindowBuilder::new(
             app,
             WINDOW_LABEL,
@@ -449,12 +483,13 @@ mod cross_platform {
     ) -> Result<FloatingBarOverlayLayout, Error> {
         let is_expanded = state.is_some_and(is_expanded);
         let shows_expand = state.is_some_and(|value| value.live_caption_toggle_visible);
+        let shows_marks = state.is_some_and(super::layout::shows_marks);
         let dictation = state.is_some_and(|state| state.dictation.is_some());
         window.set_focusable(!dictation)?;
         let (width, height) = if dictation {
             super::layout::dictation_container_size(is_expanded)
         } else {
-            container_size(is_expanded, shows_expand)
+            container_size(is_expanded, shows_expand, shows_marks)
         };
         let next_size = LogicalSize::new(width, height);
         let scale = window.scale_factor()?;
@@ -575,6 +610,16 @@ pub fn show() -> Result<(), Error> {
 
 static SESSION_ID: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
+/// The native panel reports only the kind; the mark belongs to the session it shows.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn mark_event(session_id: Option<String>, kind: &str) -> Option<crate::events::FloatingBarMark> {
+    let kind = serde_json::from_value(serde_json::Value::String(kind.to_string())).ok()?;
+    Some(crate::events::FloatingBarMark {
+        session_id: session_id?,
+        kind,
+    })
+}
+
 pub fn session_id() -> Option<String> {
     SESSION_ID.lock().ok().and_then(|guard| guard.clone())
 }
@@ -605,7 +650,71 @@ pub fn update_amplitude(amplitude: f64) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::layout;
+    use super::{FloatingBarState, layout, mark_event};
+    use crate::events::FloatingBarMarkKind;
+
+    fn state_json(extra: &str) -> String {
+        format!(
+            r#"{{"amplitude":0,"title":"Lesson","status":"recording","colorScheme":"dark","opacity":0.8,"liveCaptionOpacity":0.3,"liveCaptionWidth":440,"liveCaptionLineCount":1,"liveCaptionPosition":"topCenter","liveCaptionMinimized":true,"liveCaptionToggleVisible":true{extra}}}"#
+        )
+    }
+
+    #[test]
+    fn marks_stay_off_for_payloads_without_the_field() {
+        let state: FloatingBarState = serde_json::from_str(&state_json("")).unwrap();
+        assert!(!state.marks_enabled && !layout::shows_marks(&state));
+        let state: FloatingBarState =
+            serde_json::from_str(&state_json(r#","marksEnabled":true"#)).unwrap();
+        assert!(layout::shows_marks(&state));
+        assert!(
+            serde_json::to_string(&state)
+                .unwrap()
+                .contains(r#""marksEnabled":true"#)
+        );
+    }
+
+    #[test]
+    fn dictation_never_shows_marks() {
+        let state: FloatingBarState = serde_json::from_str(&state_json(
+            r#","marksEnabled":true,"dictation":{"sessionId":"d","phase":"recording","microphone":"Mic","text":"","partial":"","previewEnabled":true,"previewUnavailable":false}"#,
+        ))
+        .unwrap();
+        assert!(!layout::shows_marks(&state));
+    }
+
+    #[test]
+    fn marks_widen_only_the_compact_bar() {
+        for shows_expand in [false, true] {
+            let plain = layout::container_size(false, shows_expand, false);
+            let marked = layout::container_size(false, shows_expand, true);
+            assert_eq!(marked.0, plain.0 + 94.0);
+            assert_eq!(marked.1, plain.1);
+        }
+        assert_eq!(layout::container_size(false, true, false), (108.0, 67.0));
+        assert_eq!(layout::container_size(false, true, true), (202.0, 67.0));
+        assert_eq!(
+            layout::container_size(true, true, true),
+            layout::container_size(true, true, false)
+        );
+        assert!(layout::compact_controls_width(true, true) < layout::EXPANDED_WIDTH);
+    }
+
+    #[test]
+    fn panel_marks_belong_to_the_shown_session() {
+        for (kind, expected) in [
+            ("important", FloatingBarMarkKind::Important),
+            ("confused", FloatingBarMarkKind::Confused),
+            ("homework", FloatingBarMarkKind::Homework),
+        ] {
+            let event = mark_event(Some("lesson".into()), kind).unwrap();
+            assert_eq!(event.session_id, "lesson");
+            assert_eq!(event.kind, expected);
+        }
+        assert!(mark_event(None, "important").is_none());
+        assert!(mark_event(Some("lesson".into()), "starred").is_none());
+        let json = serde_json::to_string(&mark_event(Some("s".into()), "homework")).unwrap();
+        assert_eq!(json, r#"{"sessionId":"s","kind":"homework"}"#);
+    }
 
     #[test]
     fn controls_dragged_near_vertical_edges_keep_the_panel_visible() {
@@ -618,7 +727,7 @@ mod tests {
                     upwards,
                 );
                 assert!(x >= 0.0 && y >= 0.0);
-                assert!(height >= layout::container_size(false, true).1);
+                assert!(height >= layout::container_size(false, true, false).1);
                 assert!(x + width <= 1920.0 && y + height <= 1080.0);
             }
         }

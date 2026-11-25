@@ -83,6 +83,14 @@ export function FloatingBarOverlayScreen() {
             void windowsEvents.floatingBarStop.emit({});
           }
         }}
+        onMark={(kind) => {
+          if (state.sessionId && !state.dictation) {
+            void windowsEvents.floatingBarMark.emit({
+              sessionId: state.sessionId,
+              kind,
+            });
+          }
+        }}
         onToggleExpanded={(expanded) => {
           if (state.dictation) {
             void windowsEvents.floatingBarDictationAction.emit({

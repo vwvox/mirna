@@ -15,6 +15,9 @@ func rustOnFloatingBarSettingsChange(_: UnsafePointer<CChar>) {}
 @_cdecl("rust_on_floating_bar_dictation_action")
 func rustOnFloatingBarDictationAction(_: UnsafePointer<CChar>) {}
 
+@_cdecl("rust_on_floating_bar_mark")
+func rustOnFloatingBarMark(_: UnsafePointer<CChar>) {}
+
 final class FloatingBarCommandCoalescerTests: XCTestCase {
   func testFlushAppliesQueuedPresentationBeforeReturning() {
     let scheduler = ManualScheduler()

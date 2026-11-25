@@ -86,15 +86,48 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * Registers `shortcuts` in place of the previous mark shortcuts. Pressing the shortcut at
+   * position `i` emits `MarkShortcut { index: i }`. An invalid or taken shortcut leaves the
+   * previous set registered; a failure while registering leaves none.
+   */
+  async registerMarkShortcuts(
+    shortcuts: string[],
+  ): Promise<Result<null, string>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("plugin:shortcut|register_mark_shortcuts", {
+          shortcuts,
+        }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  async unregisterMarkShortcuts(): Promise<Result<null, string>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("plugin:shortcut|unregister_mark_shortcuts"),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
 };
 
 /** user-defined events **/
 
 export const events = __makeEvents__<{
   dictationGesture: DictationGesture;
+  markShortcut: MarkShortcut;
   shortcutEvent: ShortcutEvent;
 }>({
   dictationGesture: "plugin:shortcut:dictation-gesture",
+  markShortcut: "plugin:shortcut:mark-shortcut",
   shortcutEvent: "plugin:shortcut:shortcut-event",
 });
 
@@ -136,6 +169,10 @@ export type GestureOptions = {
   spaceLatch?: boolean;
 };
 export type HotKey = { key: number | null; modifiers: Modifier[] };
+/**
+ * A lesson mark shortcut was pressed; `index` is its position in the registered list.
+ */
+export type MarkShortcut = { index: number };
 export type Modifier =
   | "command"
   | "rightcommand"

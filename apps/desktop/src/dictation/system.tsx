@@ -13,6 +13,7 @@ import { commands as transcription } from "@anlg/plugin-transcription";
 import { toast } from "@anlg/ui/components/ui/toast";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
+import { useDictationAccount } from "./account";
 import {
   DictationEngine,
   DictationRetired,
@@ -25,7 +26,6 @@ import { serialDictation } from "./serial";
 import { useDictationStatus } from "./state";
 
 import { trackAnalyticsEvent } from "~/analytics";
-import { useAuth } from "~/auth";
 import { useConfigValue } from "~/shared/config";
 
 // One read of the field this long after an insert tells what the person kept of it.
@@ -82,13 +82,13 @@ export function SystemDictation({
 }) {
   const id = useRef(`system-dictation-${crypto.randomUUID()}`).current;
   const planner = useDictationPlanner(id);
-  const auth = useAuth();
+  const account = useDictationAccount();
   const exclusions = useConfigValue("dictation_context_exclusions");
   const current = useRef({
-    account: auth.session?.user.id ?? null,
+    account,
     exclusions,
   });
-  current.current = { account: auth.session?.user.id ?? null, exclusions };
+  current.current = { account, exclusions };
 
   useMountEffect(() => {
     let disposed = false;

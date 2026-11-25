@@ -57,6 +57,7 @@ describe("FloatingBarOverlay", () => {
           state={state({ status })}
           onStop={onStop}
           onToggleExpanded={vi.fn()}
+          onMark={vi.fn()}
         />,
       );
 
@@ -74,6 +75,7 @@ describe("FloatingBarOverlay", () => {
         state={state()}
         onStop={vi.fn()}
         onToggleExpanded={onToggleExpanded}
+        onMark={vi.fn()}
       />,
     );
 
@@ -88,6 +90,7 @@ describe("FloatingBarOverlay", () => {
         state={state({ liveCaptionMinimized: false })}
         onStop={vi.fn()}
         onToggleExpanded={onToggleExpanded}
+        onMark={vi.fn()}
       />,
     );
 
@@ -98,5 +101,64 @@ describe("FloatingBarOverlay", () => {
       screen.getByRole("button", { name: "Collapse live transcript" }),
     );
     expect(onToggleExpanded).toHaveBeenCalledWith(false);
+  });
+
+  it("shows lesson marks only for lesson recordings", () => {
+    const view = render(
+      <FloatingBarOverlay
+        state={state()}
+        onStop={vi.fn()}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^Mark as/ })).toBeNull();
+
+    view.rerender(
+      <FloatingBarOverlay
+        state={state({
+          marksEnabled: true,
+          dictation: {
+            sessionId: "dictation-1",
+            phase: "recording",
+            microphone: "Mic",
+            text: "",
+            partial: "",
+            previewEnabled: true,
+            previewUnavailable: false,
+          },
+        })}
+        onStop={vi.fn()}
+        onToggleExpanded={vi.fn()}
+        onMark={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^Mark as/ })).toBeNull();
+  });
+
+  it("reports each lesson mark and confirms the press", () => {
+    const onMark = vi.fn();
+    render(
+      <FloatingBarOverlay
+        state={state({ marksEnabled: true })}
+        onStop={vi.fn()}
+        onToggleExpanded={vi.fn()}
+        onMark={onMark}
+      />,
+    );
+
+    for (const [name, title, kind] of [
+      ["Mark as important", "Important (Alt+1)", "important"],
+      ["Mark as didn't get it", "I didn't get this (Alt+2)", "confused"],
+      ["Mark as homework", "Homework (Alt+3)", "homework"],
+    ] as const) {
+      const button = screen.getByRole("button", { name });
+      expect(button.getAttribute("title")).toBe(title);
+      fireEvent.click(button);
+      expect(onMark).toHaveBeenLastCalledWith(kind);
+      expect(button.dataset.confirming).toBe("true");
+    }
+    expect(onMark).toHaveBeenCalledTimes(3);
+    screen.getByRole("button", { name: /stop listening/i });
   });
 });

@@ -128,6 +128,7 @@ vi.mock("./transcript", () => ({
     currentActive,
     captureGeneration,
     editMode,
+    resumed,
   }: {
     liveSegments: unknown[];
     shouldScrollToEnd: boolean;
@@ -135,9 +136,11 @@ vi.mock("./transcript", () => ({
     currentActive: boolean;
     captureGeneration?: number;
     editMode?: boolean;
+    resumed?: boolean;
   }) => (
     <div
       data-testid="render-transcript"
+      data-resumed={String(Boolean(resumed))}
       data-capture-generation={String(captureGeneration ?? 0)}
       data-current-active={String(currentActive)}
       data-live-segment-count={String(liveSegments.length)}
@@ -237,6 +240,24 @@ describe("TranscriptViewer", () => {
       ).toBe(expected);
     },
   );
+
+  it("marks each later capture as resumed instead of drawing a separator", () => {
+    render(
+      <TranscriptViewer
+        transcriptIds={["transcript-1", "transcript-2", "transcript-3"]}
+        liveSegments={[]}
+        currentActive={false}
+        scrollRef={createRef()}
+      />,
+    );
+
+    expect(
+      screen
+        .getAllByTestId("render-transcript")
+        .map((transcript) => transcript.getAttribute("data-resumed")),
+    ).toEqual(["false", "true", "true"]);
+    expect(document.body.textContent).not.toContain("~ ~ ~");
+  });
 
   it("renders live segments before a transcript row exists", () => {
     render(

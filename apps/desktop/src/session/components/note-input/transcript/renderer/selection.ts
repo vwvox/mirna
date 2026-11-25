@@ -1,3 +1,5 @@
+import { joinWordTexts } from "./utils";
+
 import type { Segment, SegmentKey } from "~/stt/live-segment";
 
 type TranscriptWordSelectionGroup = {
@@ -390,14 +392,13 @@ function getSelectedEditableWordIndices(
   }
 
   const indices: number[] = [];
-  let cursor = 0;
+  const { starts } = joinWordTexts(wordTexts);
   for (const [index, wordText] of wordTexts.entries()) {
-    const start = cursor;
+    const start = starts[index]!;
     const end = start + wordText.length;
     if (offsets.start < end && offsets.end > start) {
       indices.push(index);
     }
-    cursor = end + 1;
   }
   return indices;
 }
@@ -570,9 +571,9 @@ export function focusTranscriptSelection(
     const text = editor.firstChild;
     if (text?.nodeType === Node.TEXT_NODE) {
       const range = document.createRange();
-      const startOffset =
-        texts.slice(0, start).join(" ").length + (start > 0 ? 1 : 0);
-      const endOffset = texts.slice(0, end + 1).join(" ").length;
+      const { starts } = joinWordTexts(texts);
+      const startOffset = starts[start] ?? 0;
+      const endOffset = (starts[end] ?? 0) + (texts[end]?.length ?? 0);
       range.setStart(
         text,
         Math.min(startOffset, text.textContent?.length ?? 0),

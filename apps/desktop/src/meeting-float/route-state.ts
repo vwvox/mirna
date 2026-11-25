@@ -48,6 +48,7 @@ export type FloatingRouteState = {
   liveCaptionToggleVisible: boolean;
   transcriptBubbles: FloatingTranscriptBubble[];
   transcriptNotice?: string | null;
+  marksEnabled?: boolean;
 };
 const FLOATING_TRANSCRIPT_OVERLAP_THRESHOLD_MS = 300;
 
@@ -63,6 +64,7 @@ export function getFloatingRouteState(
     speakerLabels,
     transcriptBubbles,
     sttProvider,
+    marksEnabled = false,
   }: {
     sttProvider?: string | null;
     sessionId?: string;
@@ -73,6 +75,7 @@ export function getFloatingRouteState(
     speakerLabelContext?: RenderLabelContext;
     speakerLabels?: FloatingSpeakerLabels;
     transcriptBubbles?: FloatingTranscriptBubble[];
+    marksEnabled?: boolean;
   } = {},
 ): FloatingRouteState | null {
   if (state.live.status !== "active") {
@@ -118,6 +121,7 @@ export function getFloatingRouteState(
             sttProvider,
           })
         : null),
+    marksEnabled,
   };
 }
 
@@ -346,6 +350,7 @@ export function isSameFloatingRouteState(
     left?.liveCaptionToggleVisible === right?.liveCaptionToggleVisible &&
     left?.title === right?.title &&
     (left?.transcriptNotice ?? null) === (right?.transcriptNotice ?? null) &&
+    (left?.marksEnabled ?? false) === (right?.marksEnabled ?? false) &&
     left?.dictation?.sessionId === right?.dictation?.sessionId &&
     left?.dictation?.phase === right?.dictation?.phase &&
     left?.dictation?.microphone === right?.dictation?.microphone &&

@@ -205,6 +205,7 @@ async liveCaptionCurrentState() : Promise<Result<LiveCaptionState | null, string
 
 export const events = __makeEvents__<{
 floatingBarDictationAction: FloatingBarDictationAction,
+floatingBarMark: FloatingBarMark,
 floatingBarOpenMain: FloatingBarOpenMain,
 floatingBarOverlayAmplitude: FloatingBarOverlayAmplitude,
 floatingBarOverlayState: FloatingBarOverlayState,
@@ -218,6 +219,7 @@ webviewHealthCheck: WebviewHealthCheck,
 windowDestroyed: WindowDestroyed
 }>({
 floatingBarDictationAction: "plugin:windows:floating-bar-dictation-action",
+floatingBarMark: "plugin:windows:floating-bar-mark",
 floatingBarOpenMain: "plugin:windows:floating-bar-open-main",
 floatingBarOverlayAmplitude: "plugin:windows:floating-bar-overlay-amplitude",
 floatingBarOverlayState: "plugin:windows:floating-bar-overlay-state",
@@ -243,16 +245,21 @@ export type ChangelogState = { previous: string | null; current: string }
 export type ContactsSelection = { type: "person"; id: string } | { type: "organization"; id: string }
 export type ContactsState = { selected: ContactsSelection | null }
 export type DictationPanelAction = "finish" | "cancel" | "togglePreview"
-export type EditorView = { type: "raw" } | { type: "transcript" } | { type: "enhanced"; id: string } | { type: "attachments" } | { type: "shared"; id: string }
+export type EditorView = { type: "raw" } | { type: "transcript" } | { type: "enhanced"; id: string } | { type: "attachments" } | { type: "shared"; id: string } | { type: "lesson" }
 export type ExtensionsState = { selectedExtension: string | null }
 export type FloatingBarColorScheme = "light" | "dark"
 export type FloatingBarDictationAction = { sessionId: string; action: DictationPanelAction }
+/**
+ * A lesson mark pressed in the floating bar during a lesson recording.
+ */
+export type FloatingBarMark = { sessionId: string; kind: FloatingBarMarkKind }
+export type FloatingBarMarkKind = "important" | "confused" | "homework"
 export type FloatingBarOpenMain = Record<string, never>
 export type FloatingBarOverlayAmplitude = { amplitude: number }
 export type FloatingBarOverlayLayout = { controlsCenterX: number; expandsUpward: boolean }
 export type FloatingBarOverlayState = { state: FloatingBarState }
 export type FloatingBarSettingsChange = { floatingBarOpacity: number | null; liveCaptionOpacity: number | null; liveCaptionWidth: number | null; liveCaptionLineCount: number | null; liveCaptionPosition: LiveCaptionPosition | null; liveCaptionMinimized: boolean | null }
-export type FloatingBarState = { dictation?: FloatingDictationState | null; amplitude: number; title: string; status: FloatingBarStatus; colorScheme: FloatingBarColorScheme; opacity: number; liveCaptionOpacity: number; liveCaptionWidth: number; liveCaptionLineCount: number; liveCaptionPosition: LiveCaptionPosition; liveCaptionMinimized: boolean; liveCaptionToggleVisible: boolean; transcriptBubbles?: FloatingTranscriptBubble[] | null; transcriptNotice?: string | null; layout?: FloatingBarOverlayLayout | null; sessionId?: string | null }
+export type FloatingBarState = { dictation?: FloatingDictationState | null; amplitude: number; title: string; status: FloatingBarStatus; colorScheme: FloatingBarColorScheme; opacity: number; liveCaptionOpacity: number; liveCaptionWidth: number; liveCaptionLineCount: number; liveCaptionPosition: LiveCaptionPosition; liveCaptionMinimized: boolean; liveCaptionToggleVisible: boolean; transcriptBubbles?: FloatingTranscriptBubble[] | null; transcriptNotice?: string | null; layout?: FloatingBarOverlayLayout | null; sessionId?: string | null; marksEnabled?: boolean }
 export type FloatingBarStatus = "recording" | "reconnecting" | "error"
 export type FloatingBarStop = Record<string, never>
 export type FloatingDictationState = { sessionId: string; phase: string; microphone: string; text: string; partial: string; previewEnabled: boolean; previewUnavailable: boolean }

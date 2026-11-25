@@ -33,6 +33,38 @@ struct FloatingDictationPayload: Codable, Equatable {
   let previewUnavailable: Bool
 }
 
+enum FloatingBarMarkKind: String, CaseIterable {
+  case important
+  case confused
+  case homework
+
+  var systemImage: String {
+    switch self {
+    case .important: return "star"
+    case .confused: return "questionmark.circle"
+    case .homework: return "book"
+    }
+  }
+
+  var confirmedSystemImage: String { systemImage + ".fill" }
+
+  var help: String {
+    switch self {
+    case .important: return "Important (⌥1)"
+    case .confused: return "I didn't get this (⌥2)"
+    case .homework: return "Homework (⌥3)"
+    }
+  }
+
+  var accessibilityLabel: String {
+    switch self {
+    case .important: return "Mark as important"
+    case .confused: return "Mark as didn't get it"
+    case .homework: return "Mark as homework"
+    }
+  }
+}
+
 struct FloatingBarStatePayload: Codable {
   let dictation: FloatingDictationPayload?
   let amplitude: Double
@@ -48,4 +80,6 @@ struct FloatingBarStatePayload: Codable {
   let liveCaptionToggleVisible: Bool
   let transcriptBubbles: [FloatingTranscriptBubblePayload]?
   var transcriptNotice: String? = nil
+  // Optional so a payload without the key still decodes; Rust always sends it.
+  var marksEnabled: Bool? = nil
 }

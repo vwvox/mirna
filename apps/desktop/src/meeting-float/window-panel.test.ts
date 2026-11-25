@@ -128,6 +128,26 @@ describe("floating meeting window synchronizer", () => {
     await synchronizer.dispose();
   });
 
+  it("sends the lesson mark flag and never folds its change into an amplitude tick", async () => {
+    const synchronizer = createFloatingMeetingWindowSynchronizer();
+
+    synchronizer.update(routeState(0.1));
+    await vi.waitFor(() => expect(mocks.update).toHaveBeenCalledOnce());
+    expect(mocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ marksEnabled: false }),
+    );
+
+    synchronizer.update({ ...routeState(0.2), marksEnabled: true });
+    await vi.waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(2));
+
+    expect(mocks.updateAmplitude).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ amplitude: 0.2, marksEnabled: true }),
+    );
+
+    await synchronizer.dispose();
+  });
+
   it("orders teardown after a pending amplitude-only update", async () => {
     const pendingAmplitude = deferred<{ status: "ok"; data: null }>();
     const synchronizer = createFloatingMeetingWindowSynchronizer();

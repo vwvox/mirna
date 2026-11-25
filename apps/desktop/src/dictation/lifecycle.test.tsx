@@ -251,12 +251,11 @@ describe("system dictation", () => {
     expect(mocks.native.ops.size).toBe(0);
   });
 
-  it.each(["free", "loading", "signed-out", "disabled", "meeting"])(
+  it.each(["free", "loading", "disabled", "meeting"])(
     "does not register shortcuts when %s",
     async (condition) => {
       if (condition === "free") mocks.billing.isPro = false;
       if (condition === "loading") mocks.billing.isReady = false;
-      if (condition === "signed-out") mocks.session = null;
       if (condition === "disabled") mocks.settings.dictation_enabled = false;
       if (condition === "meeting") mocks.meeting.status = "active";
       render(<DictationLifecycle />);
@@ -265,6 +264,26 @@ describe("system dictation", () => {
       expect(mocks.configure).not.toHaveBeenCalled();
     },
   );
+
+  it("registers shortcuts without an account, as Mirna never has one", async () => {
+    mocks.session = null;
+    render(<DictationLifecycle />);
+    await ready();
+    expect(mocks.configureGestures).toHaveBeenCalled();
+  });
+
+  it("dictates without an account, under the local one", async () => {
+    mocks.session = null;
+    render(<DictationLifecycle />);
+    await ready();
+    await gesture("prime");
+    await gesture("start", false);
+    await phase("recording");
+    await gesture("stop");
+    await phase("idle");
+    expect(mocks.insertDictation).toHaveBeenCalledTimes(1);
+    expect(useDictationStatus.getState().lastTranscript).toBe("Batched words.");
+  });
 
   it("inserts a held dictation into the captured field with guarded fitting", async () => {
     render(<DictationLifecycle />);

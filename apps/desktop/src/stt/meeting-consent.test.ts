@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { interpretChatAsConsentResponse } from "./meeting-consent";
 
-const DISCLOSURE =
-  "I'm using Mirna to record and transcribe this meeting.";
+const DISCLOSURE = "I'm using Mirna to record and transcribe this meeting.";
 
 describe("meeting consent model", () => {
   it("ignores the disclosure text itself when classifying chat replies", () => {

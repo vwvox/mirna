@@ -3,11 +3,11 @@ import { useRef } from "react";
 import { commands as dictation } from "@anlg/plugin-dictation";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
+import { useDictationAccount } from "./account";
 import { waitForDictationSetup } from "./serial";
 import { useDictationStatus } from "./state";
 import { SystemDictation } from "./system";
 
-import { useAuth } from "~/auth";
 import { useBillingAccess } from "~/auth/billing-context";
 import { useSettingsReady } from "~/settings/queries";
 import { useConfigValue } from "~/shared/config";
@@ -18,7 +18,6 @@ export function waitForDictationCleanup() {
 }
 
 export function DictationLifecycle() {
-  const { session } = useAuth();
   const { isPro, isReady } = useBillingAccess();
   const settingsReady = useSettingsReady();
   const enabled = useConfigValue("dictation_enabled");
@@ -31,22 +30,20 @@ export function DictationLifecycle() {
   const meetingActive = useListener(
     (state) => state.live.status !== "inactive" || state.live.loading,
   );
-  const accountId = session?.user.id ?? null;
+  const accountId = useDictationAccount();
   const currentAccount = useRef(accountId);
   currentAccount.current = accountId;
 
   return (
     <>
-      {accountId && (
-        <AccountRetirement
-          key={`account:${accountId}`}
-          accountId={accountId}
-          current={currentAccount}
-        />
-      )}
+      <AccountRetirement
+        key={`account:${accountId}`}
+        accountId={accountId}
+        current={currentAccount}
+      />
       {meetingActive && <MeetingRetirement />}
-      {session && isReady && isPro && settingsReady && enabled && (
-        <TranscriptRetention key={session.user.id}>
+      {isReady && isPro && settingsReady && enabled && (
+        <TranscriptRetention key={accountId}>
           {!meetingActive && !capturingShortcut && (
             <SystemDictation
               key={`${shortcut}:${handsFree}:${retry}`}

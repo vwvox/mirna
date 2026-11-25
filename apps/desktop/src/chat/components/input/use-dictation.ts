@@ -10,7 +10,7 @@ import { toast } from "@anlg/ui/components/ui/toast";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
 import { trackAnalyticsEvent } from "~/analytics";
-import { useAuth } from "~/auth";
+import { useDictationAccount } from "~/dictation/account";
 import {
   DictationEngine,
   DictationRetired,
@@ -44,9 +44,8 @@ export function useDictation({
     `chat-dictation-${crypto.randomUUID()}`,
   ).current;
   const planner = useDictationPlanner(transcriptionSessionId);
-  const auth = useAuth();
   const account = useRef<string | null>(null);
-  account.current = auth.session?.user.id ?? null;
+  account.current = useDictationAccount();
   const [view, setView] = useState<DictationView | null>(null);
   const phaseRef = useRef<EnginePhase>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);

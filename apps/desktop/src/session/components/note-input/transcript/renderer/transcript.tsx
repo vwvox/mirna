@@ -11,10 +11,12 @@ import type { RenderTranscriptRequest } from "@anlg/plugin-transcription";
 import { cn } from "@anlg/utils";
 
 import { useSearch } from "../../search/context";
+import { ChapterHeading } from "./chapter-heading";
 import {
   useRenderedTranscriptData,
   useTranscriptTimelineMetadata,
 } from "./data-hooks";
+import { placeChapters, useTranscriptNote } from "./note-context";
 import {
   EMPTY_TRANSCRIPT_SEARCH,
   SegmentRenderer,
@@ -32,7 +34,13 @@ import {
   type TranscriptWordSelection,
 } from "./selection";
 import { useRegisterTranscriptSelectionSource } from "./selection-context";
-import { useVirtualSegments, VirtualSegmentRow } from "./virtual-segments";
+import { TranscriptSeparator } from "./separator";
+import { findBackchannels, joinWordTexts } from "./utils";
+import {
+  type TranscriptRowLayout,
+  useVirtualSegments,
+  VirtualSegmentRow,
+} from "./virtual-segments";
 
 import {
   applyRenderRequestIdentitiesToSegments,
@@ -44,12 +52,18 @@ import {
   type Segment,
   type SegmentWord,
 } from "~/stt/live-segment";
+import {
+  hasHan,
+  useEffectiveChineseDisplay,
+  usePinyinModule,
+} from "~/stt/pinyin";
 import { SpeakerLabelManager } from "~/stt/segment/shared";
 import { isTranscriptWordSeekable } from "~/stt/timing";
 import { useResolvedSpeakerSegments } from "~/stt/useResolvedSpeakerSegments";
 
 export function RenderTranscript({
   scrollElement,
+  resumed = false,
   isLastTranscript,
   shouldScrollToEnd,
   transcriptId,
@@ -63,6 +77,8 @@ export function RenderTranscript({
   editMode = false,
 }: {
   scrollElement: HTMLDivElement | null;
+  /** A later capture of the same note, which starts with a "Recording resumed" line. */
+  resumed?: boolean;
   isLastTranscript: boolean;
   shouldScrollToEnd: boolean;
   transcriptId: string;
@@ -78,6 +94,7 @@ export function RenderTranscript({
   return (
     <PersistedTranscript
       scrollElement={scrollElement}
+      resumed={resumed}
       transcriptId={transcriptId}
       currentActive={currentActive}
       captureGeneration={captureGeneration}
@@ -94,6 +111,7 @@ export function RenderTranscript({
 
 function PersistedTranscript({
   scrollElement,
+  resumed,
   transcriptId,
   currentActive,
   captureGeneration,
@@ -106,6 +124,7 @@ function PersistedTranscript({
   editMode,
 }: {
   scrollElement: HTMLDivElement | null;
+  resumed: boolean;
   transcriptId: string;
   currentActive: boolean;
   captureGeneration: number;
@@ -141,6 +160,7 @@ function PersistedTranscript({
     <TranscriptSegments
       segments={mergedSegments}
       scrollElement={scrollElement}
+      resumed={resumed}
       transcriptId={transcriptId}
       currentActive={currentActive}
       shouldScrollToEnd={shouldScrollToEnd}
@@ -158,6 +178,7 @@ function PersistedTranscript({
 function TranscriptSegments({
   segments: rawSegments,
   scrollElement,
+  resumed,
   transcriptId,
   currentActive,
   shouldScrollToEnd,
@@ -171,6 +192,7 @@ function TranscriptSegments({
 }: {
   segments: Segment[];
   scrollElement: HTMLDivElement | null;
+  resumed: boolean;
   transcriptId: string;
   currentActive: boolean;
   shouldScrollToEnd: boolean;
@@ -213,21 +235,26 @@ function TranscriptSegments({
   }
 
   return (
-    <SegmentsList
-      segments={segments}
-      scrollElement={scrollElement}
-      transcriptId={transcriptId}
-      sessionId={sessionId}
-      labelContext={labelContext}
-      offsetMs={offsetMs}
-      shouldScrollToEnd={shouldScrollToEnd}
-      currentMs={currentMs}
-      seek={seek}
-      startPlayback={startPlayback}
-      audioExists={audioExists}
-      maxSpeakerNumber={request?.speaker_context ? undefined : maxSpeakerNumber}
-      editMode={editMode}
-    />
+    <>
+      {resumed ? <TranscriptSeparator resumedAtMs={offsetMs} /> : null}
+      <SegmentsList
+        segments={segments}
+        scrollElement={scrollElement}
+        transcriptId={transcriptId}
+        sessionId={sessionId}
+        labelContext={labelContext}
+        offsetMs={offsetMs}
+        shouldScrollToEnd={shouldScrollToEnd}
+        currentMs={currentMs}
+        seek={seek}
+        startPlayback={startPlayback}
+        audioExists={audioExists}
+        maxSpeakerNumber={
+          request?.speaker_context ? undefined : maxSpeakerNumber
+        }
+        editMode={editMode}
+      />
+    </>
   );
 }
 
@@ -320,6 +347,59 @@ const SegmentsList = memo(
         ),
       [segments, transcriptId],
     );
+    const note = useTranscriptNote();
+    const display = useEffectiveChineseDisplay(note.isLesson);
+    const transcriptHasHan = useMemo(
+      () =>
+        segments.some((segment) =>
+          segment.words.some((word) => hasHan(word.text)),
+        ),
+      [segments],
+    );
+    // Loaded up front for Chinese notes, so pinyin search has it when asked.
+    usePinyinModule(transcriptHasHan);
+    const chips = useMemo(
+      () => (editMode ? new Set<number>() : findBackchannels(segments)),
+      [editMode, segments],
+    );
+    const rowStarts = useMemo(
+      () =>
+        segments.map(
+          (segment) =>
+            offsetMs + (segment.words[0]?.start_ms ?? segment.start_ms),
+        ),
+      [offsetMs, segments],
+    );
+    const chapterFloor =
+      note.chapterFloors.get(transcriptId) ?? Number.NEGATIVE_INFINITY;
+    const chaptersByIndex = useMemo(
+      () => placeChapters(note.chapters, rowStarts, chapterFloor),
+      [chapterFloor, note.chapters, rowStarts],
+    );
+    const rowLayout = useMemo<TranscriptRowLayout>(
+      () => ({
+        chips,
+        chapterCounts: new Map(
+          [...chaptersByIndex].map(([index, chapters]) => [
+            index,
+            chapters.length,
+          ]),
+        ),
+        mode: transcriptHasHan ? display.mode : "characters",
+        translations:
+          transcriptHasHan && display.translation ? note.translations : null,
+        meanings: note.vocabulary.size > 0,
+      }),
+      [
+        chaptersByIndex,
+        chips,
+        display.mode,
+        display.translation,
+        note.translations,
+        note.vocabulary.size,
+        transcriptHasHan,
+      ],
+    );
     const virtual = useVirtualSegments({
       segments,
       segmentKeys,
@@ -328,8 +408,11 @@ const SegmentsList = memo(
       searchEnabled: transcriptSearch.query.length > 0,
       currentMs,
       offsetMs,
+      layout: rowLayout,
+      vocabularyTerms: note.vocabularyTerms,
     });
     useRegisterTranscriptSegments(transcriptId, sessionId, offsetMs, segments);
+    useReportTranscriptToNote(transcriptId, rowStarts, segments);
 
     const seekAndPlay = useCallback(
       (word: SegmentWord) => {
@@ -373,8 +456,15 @@ const SegmentsList = memo(
               onFocus={virtual.handleRowFocus}
               onBlur={virtual.handleRowBlur}
             >
-              <div className={cn([index > 0 && "pt-4"])}>
+              <div className={cn([index > 0 && "pt-1"])}>
+                {chaptersByIndex.get(index)?.map((chapter) => (
+                  <ChapterHeading
+                    key={`${chapter.startMs}:${chapter.title}`}
+                    chapter={chapter}
+                  />
+                ))}
                 <SegmentRenderer
+                  variant={chips.has(index) ? "chip" : "row"}
                   segment={segment}
                   offsetMs={offsetMs}
                   transcriptId={transcriptId}
@@ -414,6 +504,40 @@ const SegmentsList = memo(
     );
   },
 );
+
+function useReportTranscriptToNote(
+  transcriptId: string,
+  rowStarts: number[],
+  segments: Segment[],
+) {
+  const { reportLastRowStart, registerText } = useTranscriptNote();
+  const lastRowStart = rowStarts.reduce<number | null>(
+    (latest, start) => (latest === null ? start : Math.max(latest, start)),
+    null,
+  );
+  useEffect(() => {
+    reportLastRowStart(transcriptId, lastRowStart);
+  }, [lastRowStart, reportLastRowStart, transcriptId]);
+  useEffect(
+    () => () => reportLastRowStart(transcriptId, null),
+    [reportLastRowStart, transcriptId],
+  );
+
+  const segmentsRef = useRef(segments);
+  segmentsRef.current = segments;
+  useEffect(
+    () =>
+      registerText(transcriptId, () =>
+        segmentsRef.current
+          .map(
+            (segment) =>
+              joinWordTexts(segment.words.map((word) => word.text.trim())).text,
+          )
+          .join("\n"),
+      ),
+    [registerText, transcriptId],
+  );
+}
 
 function useRegisterTranscriptSegments(
   transcriptId: string,

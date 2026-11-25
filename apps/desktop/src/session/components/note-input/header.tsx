@@ -6,10 +6,12 @@ import { createEditorTabs } from "@anlg/utils/session";
 export { createEditorTabs } from "@anlg/utils/session";
 
 import { HeaderViewEnhanced } from "./header-enhanced";
+import { HeaderViewLesson } from "./header-lesson";
 import { HeaderViewRaw } from "./header-raw";
 import { HeaderViewShared } from "./header-shared-note";
 import { HeaderViewTranscript } from "./header-transcript";
 
+import { useLessonSession } from "~/lesson/queries";
 import { FolderPicker } from "~/session/components/folder-picker";
 import {
   useCanShowTranscript,
@@ -140,6 +142,17 @@ export function SessionViewSwitcher({
           );
         }
 
+        if (view.type === "lesson") {
+          return (
+            <HeaderViewLesson
+              key={view.type}
+              sessionId={sessionId}
+              isActive={currentTab.type === view.type}
+              onClick={() => handleTabChange(view)}
+            />
+          );
+        }
+
         return null;
       })}
     </div>
@@ -162,10 +175,12 @@ export function useEditorTabs({
   );
 
   const sharedNoteIds = useSessionSharedNoteIds(sessionId);
+  const isLesson = useLessonSession(sessionId).isLesson;
 
   return createEditorTabs({
     enhancedNoteIds,
     canShowTranscript,
     sharedNoteIds,
+    hasLesson: isLesson && sessionMode === "inactive",
   });
 }

@@ -11,6 +11,8 @@ crate::common_derives! {
         Attachments,
         #[serde(rename = "shared")]
         Shared { id: String },
+        #[serde(rename = "lesson")]
+        Lesson,
     }
 }
 
@@ -63,5 +65,29 @@ crate::common_derives! {
     #[derive(Default)]
     pub struct SettingsState {
         pub tab: Option<String>,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn editor_views_keep_their_saved_shape() {
+        for (view, json) in [
+            (EditorView::Raw, r#"{"type":"raw"}"#),
+            (EditorView::Lesson, r#"{"type":"lesson"}"#),
+            (
+                EditorView::Enhanced { id: "note".into() },
+                r#"{"type":"enhanced","id":"note"}"#,
+            ),
+        ] {
+            assert_eq!(serde_json::to_string(&view).unwrap(), json);
+            let parsed: EditorView = serde_json::from_str(json).unwrap();
+            assert_eq!(serde_json::to_string(&parsed).unwrap(), json);
+        }
+        let state: SessionsState =
+            serde_json::from_str(r#"{"view":{"type":"lesson"},"autoStart":null}"#).unwrap();
+        assert!(matches!(state.view, Some(EditorView::Lesson)));
     }
 }

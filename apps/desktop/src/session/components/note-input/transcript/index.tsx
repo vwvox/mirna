@@ -113,6 +113,7 @@ function TranscriptContent({
         // sat under the "Ask about this note" bar and couldn't scroll clear.
         <div className="flex min-h-0 flex-1 flex-col">
           <TranscriptViewer
+            sessionId={sessionId}
             transcriptIds={screen.transcriptIds}
             liveSegments={screen.liveSegments}
             currentActive={screen.currentActive}

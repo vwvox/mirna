@@ -84,6 +84,8 @@ interface AudioPlayerContextValue {
   resume: () => void;
   stop: () => void;
   seek: (sec: number) => void;
+  /** Plays from `startSec` and stops on its own at `endSec`. */
+  playRange: (startSec: number, endSec: number) => void;
   audioExists: boolean;
   audioExistsResolved: boolean;
   playbackRate: number;
@@ -290,26 +292,37 @@ export function AudioPlayerProvider({
     };
   }, [container, sessionId, url]);
 
-  const play = useCallback(() => {
-    if (!wavesurfer) {
-      return;
-    }
+  const playBetween = useCallback(
+    (startSec?: number, endSec?: number) => {
+      if (!wavesurfer) {
+        return;
+      }
 
-    const audioContext = audioContextRef.current;
-    if (shouldResumeBeforePlay(audioContext)) {
-      void audioContext
-        .resume()
-        .then(() => {
-          if (audioContextRef.current === audioContext) {
-            return wavesurfer.play();
-          }
-        })
-        .catch(() => {});
-      return;
-    }
+      const audioContext = audioContextRef.current;
+      if (shouldResumeBeforePlay(audioContext)) {
+        void audioContext
+          .resume()
+          .then(() => {
+            if (audioContextRef.current === audioContext) {
+              return wavesurfer.play(startSec, endSec);
+            }
+          })
+          .catch(() => {});
+        return;
+      }
 
-    void wavesurfer.play();
-  }, [wavesurfer]);
+      void wavesurfer.play(startSec, endSec);
+    },
+    [wavesurfer],
+  );
+
+  const play = useCallback(() => playBetween(), [playBetween]);
+
+  const playRange = useCallback(
+    (startSec: number, endSec: number) =>
+      playBetween(Math.max(0, startSec), Math.max(startSec, endSec)),
+    [playBetween],
+  );
 
   const pause = useCallback(() => {
     if (wavesurfer) {
@@ -423,6 +436,7 @@ export function AudioPlayerProvider({
       resume: play,
       stop,
       seek,
+      playRange,
       audioExists: audioExistsValue,
       audioExistsResolved,
       playbackRate,
@@ -438,6 +452,7 @@ export function AudioPlayerProvider({
       pause,
       stop,
       seek,
+      playRange,
       audioExistsValue,
       audioExistsResolved,
       playbackRate,

@@ -249,6 +249,22 @@ pub struct FloatingBarDictationAction {
     pub action: DictationPanelAction,
 }
 
+/// A lesson mark pressed in the floating bar during a lesson recording.
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, specta::Type, tauri_specta::Event)]
+#[serde(rename_all = "camelCase")]
+pub struct FloatingBarMark {
+    pub session_id: String,
+    pub kind: FloatingBarMarkKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum FloatingBarMarkKind {
+    Important,
+    Confused,
+    Homework,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum DictationPanelAction {

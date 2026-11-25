@@ -8,6 +8,7 @@ final class FloatingBarViewModel: ObservableObject {
   @Published var colorScheme: FloatingBarColorScheme = .dark
   @Published var isExpanded: Bool = false
   @Published var liveCaptionToggleVisible: Bool = false
+  @Published var marksEnabled: Bool = false
   @Published var title: String = "Live transcript"
   @Published var transcriptBubbles: [FloatingTranscriptBubblePayload] = []
   @Published var transcriptNotice: String?

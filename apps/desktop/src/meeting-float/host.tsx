@@ -42,6 +42,9 @@ import {
 
 import { getDictationPanelState } from "~/dictation/panel";
 import { useDictationStatus } from "~/dictation/state";
+import { addLessonMark } from "~/lesson/marks";
+import { LESSON_SESSION_KIND } from "~/lesson/queries";
+import { LESSON_MARK_KINDS, type LessonMarkKind } from "~/lesson/types";
 import {
   getStoredSettingValues,
   setSettingValue,
@@ -276,6 +279,27 @@ function FloatingMeetingWindowSync({
         unlisteners.push(unlisten);
       });
 
+    windowsEvents.floatingBarMark
+      .listen(({ payload }) => {
+        const live = listenerStore.getState().live;
+        if (
+          cancelled ||
+          !routeState?.marksEnabled ||
+          routeState.sessionId !== payload.sessionId ||
+          live.status !== "active" ||
+          live.sessionId !== payload.sessionId ||
+          !isLessonMarkKind(payload.kind)
+        )
+          return;
+        void addLessonMark(payload.sessionId, payload.kind).catch((error) => {
+          console.error("Failed to add lesson mark:", error);
+        });
+      })
+      .then((unlisten) => {
+        if (cancelled) unlisten();
+        else unlisteners.push(unlisten);
+      });
+
     windowsEvents.floatingBarOpenMain
       .listen(async () => {
         await windowsCommands.windowShow({ type: "main" });
@@ -402,7 +426,24 @@ function getCurrentFloatingRouteState(
     speakerLabelContext: getFloatingSpeakerLabelContext(state, meetingData),
     speakerLabels,
     transcriptBubbles,
+    marksEnabled: isFloatingLessonSession(state, meetingData),
   });
+}
+
+// Read from the meeting data subscription, so a note that becomes a lesson after the
+// recording starts still gets its mark buttons without a query per update.
+function isFloatingLessonSession(
+  state: ListenerState,
+  meetingData: MeetingFloatData | undefined,
+) {
+  const sessionId = state.live.sessionId;
+  return Boolean(
+    sessionId && meetingData?.sessions[sessionId]?.kind === LESSON_SESSION_KIND,
+  );
+}
+
+function isLessonMarkKind(kind: string): kind is LessonMarkKind {
+  return (LESSON_MARK_KINDS as readonly string[]).includes(kind);
 }
 
 export function haveFloatingRouteInputsChanged(

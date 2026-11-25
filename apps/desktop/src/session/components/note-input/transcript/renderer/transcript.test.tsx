@@ -9,8 +9,10 @@ import type {
   RenderedTranscriptSegment,
 } from "@anlg/plugin-transcription";
 
+import { TranscriptNoteProvider } from "./note-context";
 import { RenderTranscript } from "./transcript";
 
+import type { LessonSheet } from "~/lesson/types";
 import type { Segment } from "~/stt/live-segment";
 
 function render(ui: ReactNode, options?: Parameters<typeof renderUi>[1]) {
@@ -26,6 +28,7 @@ function render(ui: ReactNode, options?: Parameters<typeof renderUi>[1]) {
 }
 
 const mocks = vi.hoisted(() => ({
+  sheet: null as LessonSheet | null,
   assignTranscriptSpeaker: vi.fn(),
   renderTranscriptSegments: vi.fn(),
   search: null as null | {
@@ -46,6 +49,18 @@ vi.mock("@anlg/plugin-transcription", () => ({
   commands: {
     renderTranscriptSegments: mocks.renderTranscriptSegments,
   },
+}));
+
+vi.mock("~/lesson/queries", () => ({
+  useLessonSession: () => ({
+    isLesson: false,
+    settings: null,
+    folderPath: "",
+  }),
+  useLessonSheet: () =>
+    mocks.sheet
+      ? { sheet: mocks.sheet, generatedAt: "", model: "", sourceHash: "" }
+      : null,
 }));
 
 vi.mock("../../search/context", () => ({
@@ -94,6 +109,7 @@ describe("RenderTranscript", () => {
     cleanup();
     vi.clearAllMocks();
     mocks.search = null;
+    mocks.sheet = null;
     mocks.useRenderedTranscriptData.mockReturnValue({
       maxSpeakerNumber: undefined,
       request: createRenderRequest(createSegments(500)),
@@ -402,6 +418,110 @@ describe("RenderTranscript", () => {
     expect(screen.getByRole("button", { name: "Ada" })).toBeTruthy();
   });
 
+  it("shows a short reply between someone else's turns as a chip", () => {
+    const segments = [
+      createTurn("a", 0, 0, ["So", "the", "price", "is", "fine."]),
+      createTurn("b", 1, 4_000, ["Yeah."]),
+      createTurn("c", 0, 5_000, ["And", "the", "size", "too."]),
+    ];
+    mocks.useRenderedTranscriptData.mockReturnValue({
+      maxSpeakerNumber: undefined,
+      request: createRenderRequest(segments),
+      segments,
+    });
+
+    renderTranscript();
+
+    expect(
+      [...document.querySelectorAll("section")].map(
+        (section) => section.dataset.transcriptVariant ?? "row",
+      ),
+    ).toEqual(["row", "chip", "row"]);
+  });
+
+  it("heads the first row of each lesson chapter", () => {
+    mocks.sheet = createSheet([{ title: "Prices", startMs: 4_500 }]);
+    const segments = [
+      createTurn("a", 0, 0, ["How", "much", "is", "it?"]),
+      createTurn("b", 1, 4_000, ["It", "costs", "ten", "yuan."]),
+      createTurn("c", 0, 6_000, ["That", "is", "cheap", "today."]),
+    ];
+    mocks.useRenderedTranscriptData.mockReturnValue({
+      maxSpeakerNumber: undefined,
+      request: createRenderRequest(segments),
+      segments,
+    });
+
+    render(
+      <TranscriptNoteProvider
+        sessionId="session-1"
+        transcriptIds={["transcript-1"]}
+      >
+        <RenderTranscript
+          scrollElement={null}
+          isLastTranscript
+          shouldScrollToEnd={false}
+          transcriptId="transcript-1"
+          currentActive={false}
+          liveSegments={[]}
+          currentMs={0}
+          seek={vi.fn()}
+          startPlayback={vi.fn()}
+          audioExists
+        />
+      </TranscriptNoteProvider>,
+    );
+
+    const headings = document.querySelectorAll("[data-transcript-chapter]");
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.textContent).toBe("00:04Prices");
+    expect(
+      headings[0]?.nextElementSibling?.getAttribute(
+        "data-transcript-segment-id",
+      ),
+    ).toBe("segment-c");
+  });
+
+  it("marks where a later capture of the note resumes", () => {
+    mocks.useTranscriptTimelineMetadata.mockReturnValue({
+      offsetMs: 95_000,
+      sessionId: "session-1",
+    });
+    mocks.useRenderedTranscriptData.mockReturnValue({
+      maxSpeakerNumber: undefined,
+      request: createRenderRequest(createSegments(1)),
+      segments: createSegments(1),
+    });
+
+    try {
+      render(
+        <RenderTranscript
+          scrollElement={null}
+          resumed
+          isLastTranscript
+          shouldScrollToEnd={false}
+          transcriptId="transcript-1"
+          currentActive={false}
+          liveSegments={[]}
+          currentMs={0}
+          seek={vi.fn()}
+          startPlayback={vi.fn()}
+          audioExists
+        />,
+      );
+
+      expect(screen.getByRole("separator").textContent).toBe(
+        "Recording resumed01:35",
+      );
+      expect(document.body.textContent).not.toContain("~ ~ ~");
+    } finally {
+      mocks.useTranscriptTimelineMetadata.mockReturnValue({
+        offsetMs: 0,
+        sessionId: "session-1",
+      });
+    }
+  });
+
   it("keeps the DOM bounded for a multi-hour transcript fixture", () => {
     const segments = createSegments(10_000);
     mocks.useRenderedTranscriptData.mockReturnValue({
@@ -663,5 +783,50 @@ function createRenderRequest(
         ),
       },
     ],
+  };
+}
+
+function createTurn(
+  id: string,
+  speakerIndex: number,
+  startMs: number,
+  texts: string[],
+): Segment {
+  const step = texts.length > 1 ? 700 : 400;
+  return {
+    id: `segment-${id}`,
+    key: {
+      channel: "MixedCapture",
+      speaker_index: speakerIndex,
+      speaker_human_id: null,
+    },
+    start_ms: startMs,
+    end_ms: startMs + texts.length * step,
+    text: texts.join(" "),
+    words: texts.map((text, index) => ({
+      id: `word-${id}-${index}`,
+      text,
+      start_ms: startMs + index * step,
+      end_ms: startMs + (index + 1) * step,
+      channel: "MixedCapture",
+      is_final: true,
+    })),
+  };
+}
+
+function createSheet(chapters: LessonSheet["chapters"]): LessonSheet {
+  return {
+    version: 1,
+    topic: "",
+    summary: "",
+    chapters,
+    vocabulary: [],
+    patterns: [],
+    corrections: [],
+    homework: [],
+    markAnswers: [],
+    openQuestions: [],
+    translations: [],
+    talk: null,
   };
 }

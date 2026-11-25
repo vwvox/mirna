@@ -1,6 +1,13 @@
-import { act, cleanup, render, renderHook } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { getMatchingElements } from "../../search/matching";
 import {
   estimateTranscriptRowHeight,
   useVirtualSegments,
@@ -8,6 +15,7 @@ import {
 } from "./virtual-segments";
 
 import type { Segment } from "~/stt/live-segment";
+import { getLoadedPinyinModule, usePinyinModule } from "~/stt/pinyin";
 
 afterEach(() => {
   cleanup();
@@ -30,6 +38,105 @@ describe("estimateTranscriptRowHeight", () => {
       0,
     );
     expect(long).toBeGreaterThan(short + 80);
+  });
+});
+
+describe("estimateTranscriptRowHeight layout", () => {
+  const chinese = createSegment(
+    "我们 都 很 喜欢 学习 中文 ，你 呢 ？".repeat(4),
+  );
+
+  it("keeps short replies shown as chips compact", () => {
+    const reply = createSegment("Yeah.");
+
+    expect(estimateTranscriptRowHeight(reply, 1, { variant: "chip" })).toBe(32);
+    expect(
+      estimateTranscriptRowHeight(reply, 1, { variant: "chip" }),
+    ).toBeLessThan(estimateTranscriptRowHeight(reply, 1));
+  });
+
+  it("makes room for chapter headings and pause-separated paragraphs", () => {
+    const one = createSegment("So then we left.");
+    const split = createSegment("So then we left.");
+    split.words[2]!.start_ms = 5000;
+    split.words[3]!.start_ms = 5100;
+
+    expect(
+      estimateTranscriptRowHeight(one, 1, { chapters: 1 }) -
+        estimateTranscriptRowHeight(one, 1),
+    ).toBe(56);
+    expect(estimateTranscriptRowHeight(split, 1)).toBeGreaterThan(
+      estimateTranscriptRowHeight(one, 1) + 24,
+    );
+  });
+
+  it("grows Chinese rows with pinyin, word columns and narrow panes", () => {
+    const characters = estimateTranscriptRowHeight(chinese, 1);
+    const ruby = estimateTranscriptRowHeight(chinese, 1, {
+      mode: "pinyin-above",
+    });
+    const columns = estimateTranscriptRowHeight(chinese, 1, {
+      mode: "word-by-word",
+    });
+
+    expect(ruby).toBeGreaterThan(characters);
+    expect(columns).toBeGreaterThan(ruby);
+    expect(
+      estimateTranscriptRowHeight(chinese, 1, { textWidth: 240 }),
+    ).toBeGreaterThan(characters);
+  });
+
+  it("adds the translation under a matching paragraph", () => {
+    const segment = createSegment("你好 世界。");
+    const translations = new Map([["你好世界", "Hello, world."]]);
+
+    expect(
+      estimateTranscriptRowHeight(segment, 1, { translations }),
+    ).toBeGreaterThan(estimateTranscriptRowHeight(segment, 1));
+  });
+});
+
+describe("transcript search", () => {
+  it("also finds Chinese words by toneless pinyin, in transcript order", async () => {
+    const scrollElement = document.createElement("div");
+    document.body.append(scrollElement);
+    const segments = [
+      createSegment("我们 都 来了"),
+      createSegment("Dou is here"),
+    ];
+    segments[1]!.words.forEach((word, index) => {
+      word.id = `latin-${index}`;
+    });
+    function Harness() {
+      usePinyinModule(true);
+      const virtual = useVirtualSegments({
+        segments,
+        segmentKeys: ["first", "second"],
+        scrollElement,
+        activeMatchId: null,
+        searchEnabled: true,
+        currentMs: 0,
+        offsetMs: 0,
+      });
+      return <div ref={virtual.listRef} />;
+    }
+
+    render(<Harness />, { container: scrollElement });
+    await waitFor(() => expect(getLoadedPinyinModule()).not.toBeNull());
+
+    const options = { caseSensitive: false, wholeWord: false };
+    expect(
+      getMatchingElements(scrollElement, "dou", options).map(
+        (match) => match.id,
+      ),
+    ).toEqual(["word-1", "latin-0"]);
+    expect(
+      getMatchingElements(scrollElement, "Dou", {
+        ...options,
+        caseSensitive: true,
+      }).map((match) => match.id),
+    ).toEqual(["latin-0"]);
+    scrollElement.remove();
   });
 });
 
@@ -181,6 +288,62 @@ describe("useVirtualSegments measurements", () => {
       expect(result.current.totalHeight).toBe(estimatedFirstHeight + 120);
     },
   );
+
+  it("re-estimates off-screen rows when the Chinese display changes", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const segments = Array.from({ length: 80 }, () => createSegment("你好"));
+    const segmentKeys = segments.map((_, index) => `row-${index}`);
+    const layout = (mode: "characters" | "word-by-word") => ({
+      chips: new Set<number>(),
+      chapterCounts: new Map<number, number>(),
+      mode,
+      translations: null,
+      meanings: false,
+    });
+    const { result, rerender } = renderHook(
+      ({ mode }) =>
+        useVirtualSegments({
+          segments,
+          segmentKeys,
+          scrollElement: null,
+          activeMatchId: null,
+          searchEnabled: false,
+          currentMs: 0,
+          offsetMs: 0,
+          layout: layout(mode),
+        }),
+      { initialProps: { mode: "characters" as "characters" | "word-by-word" } },
+    );
+    act(() => {
+      result.current.measureRow("row-0", 300);
+      result.current.measureRow("row-79", 300);
+    });
+    act(() => frames.shift()!(0));
+    const rowHeight = (index: number) => {
+      const offsets = result.current.virtualItems;
+      const item = offsets.find((entry) => entry.index === index)!;
+      const next = offsets.find((entry) => entry.index === index + 1);
+      return (next?.top ?? result.current.totalHeight) - item.top;
+    };
+    expect(rowHeight(0)).toBe(300);
+    const before = result.current.totalHeight;
+
+    rerender({ mode: "word-by-word" });
+
+    expect(rowHeight(0)).toBe(300);
+    const characters = estimateTranscriptRowHeight(segments[1]!, 1);
+    const columns = estimateTranscriptRowHeight(segments[1]!, 1, {
+      mode: "word-by-word",
+    });
+    expect(result.current.totalHeight - before).toBe(
+      78 * (columns - characters) + columns - 300,
+    );
+  });
 
   it("batches a resize burst into one frame and uses the latest row sizes", () => {
     const frames: FrameRequestCallback[] = [];

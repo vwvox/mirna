@@ -19,10 +19,12 @@ type MeetingFloatSqlRow = {
   human_name: string;
   speaker_context: string | null;
   live_started_at_ms: number | null;
+  session_kind: string | null;
 };
 
 type MeetingFloatSession = {
   title: string;
+  kind: string;
   ownerUserId: string;
   participantHumanIds: string[];
   speakerContext: SpeakerContext;
@@ -51,7 +53,8 @@ const MEETING_FLOAT_SQL = `
       WHERE transcript.session_id = session.id AND transcript.deleted_at IS NULL
       ORDER BY transcript.started_at_ms DESC, transcript.created_at DESC
       LIMIT 1
-    ) AS live_started_at_ms
+    ) AS live_started_at_ms,
+    session.kind AS session_kind
   FROM sessions AS session
   WHERE session.deleted_at IS NULL
 
@@ -65,7 +68,8 @@ const MEETING_FLOAT_SQL = `
     participant.human_id,
     COALESCE(NULLIF(human.name, ''), participant.display_name) AS human_name,
     NULL AS speaker_context,
-    NULL AS live_started_at_ms
+    NULL AS live_started_at_ms,
+    NULL AS session_kind
   FROM session_participants AS participant
   INNER JOIN sessions AS session
     ON session.id = participant.session_id
@@ -87,7 +91,8 @@ const MEETING_FLOAT_SQL = `
     human.id AS human_id,
     human.name AS human_name,
     NULL AS speaker_context,
-    NULL AS live_started_at_ms
+    NULL AS live_started_at_ms,
+    NULL AS session_kind
   FROM humans AS human
   WHERE human.id <> '' AND human.deleted_at IS NULL
 
@@ -162,6 +167,7 @@ function mapMeetingFloatRows(rows: MeetingFloatSqlRow[]): MeetingFloatData {
     if (row.row_kind === "session") {
       sessions[row.session_id] = {
         title: row.title,
+        kind: row.session_kind ?? "",
         ownerUserId: row.owner_user_id,
         participantHumanIds:
           sessions[row.session_id]?.participantHumanIds ?? [],
@@ -180,6 +186,7 @@ function mapMeetingFloatRows(rows: MeetingFloatSqlRow[]): MeetingFloatData {
 
     const session = sessions[row.session_id] ?? {
       title: "",
+      kind: "",
       ownerUserId: row.owner_user_id,
       participantHumanIds: [],
       speakerContext: EMPTY_SPEAKER_CONTEXT,
