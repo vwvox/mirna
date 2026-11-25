@@ -8,6 +8,8 @@ import {
   ArrowsInSimple,
   ArrowsOutSimple,
   CaretDown,
+  Pause,
+  Play,
   Square,
   WarningCircle,
 } from "@anlg/ui/components/icons";
@@ -35,10 +37,12 @@ import {
 export function FloatingBarOverlay({
   state,
   onStop,
+  onSetPaused,
   onToggleExpanded,
 }: {
   state: FloatingBarState;
   onStop: () => void;
+  onSetPaused: (paused: boolean) => void;
   onToggleExpanded: (expanded: boolean) => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -46,7 +50,10 @@ export function FloatingBarOverlay({
     state.liveCaptionToggleVisible && !state.liveCaptionMinimized;
   const showsHoverHandle = hovered && !isExpanded;
   const colors = barColors(state);
-  const controlsWidth = compactControlsWidth(state.liveCaptionToggleVisible);
+  const controlsWidth = compactControlsWidth(
+    state.liveCaptionToggleVisible,
+    !state.dictation,
+  );
   const expandsUpward = state.layout?.expandsUpward ?? false;
 
   return (
@@ -125,6 +132,7 @@ export function FloatingBarOverlay({
               isExpanded={isExpanded}
               colors={colors}
               onStop={onStop}
+              onSetPaused={onSetPaused}
               onToggleExpanded={onToggleExpanded}
             />
           </div>
@@ -139,20 +147,45 @@ function FloatingControls({
   isExpanded,
   colors,
   onStop,
+  onSetPaused,
   onToggleExpanded,
 }: {
   state: FloatingBarState;
   isExpanded: boolean;
   colors: BarColors;
   onStop: () => void;
+  onSetPaused: (paused: boolean) => void;
   onToggleExpanded: (expanded: boolean) => void;
 }) {
+  const paused = state.paused === true;
+
   return (
     <div
       className="flex items-center"
       style={{ gap: FLOATING_BAR_COMPACT_GAP }}
     >
       <StopControl state={state} colors={colors} onStop={onStop} />
+      {state.dictation ? null : (
+        <button
+          type="button"
+          data-tauri-drag-region="false"
+          aria-label={paused ? "Resume recording" : "Pause recording"}
+          onClick={() => onSetPaused(!paused)}
+          className="flex items-center justify-center"
+          style={{
+            width: FLOATING_BAR_COMPACT_ICON_SIZE,
+            height: FLOATING_BAR_COMPACT_ICON_SIZE,
+            borderRadius: FLOATING_BAR_CONTROL_RADIUS,
+            color: colors.content,
+          }}
+        >
+          {paused ? (
+            <Play size={14} weight="bold" />
+          ) : (
+            <Pause size={14} weight="bold" />
+          )}
+        </button>
+      )}
       {state.liveCaptionToggleVisible ? (
         <button
           type="button"
@@ -203,7 +236,9 @@ function StopControl({
           ? "Finish dictation"
           : state.status === "error"
             ? `${state.transcriptNotice ?? "Recording needs attention"}; stop listening`
-            : "Stop listening"
+            : state.paused
+              ? "Recording paused; stop listening"
+              : "Stop listening"
       }
       title={
         state.status === "error"
@@ -234,6 +269,8 @@ function StopControl({
         </span>
       ) : state.status === "error" ? (
         <WarningCircle size={20} aria-hidden="true" />
+      ) : state.paused ? (
+        <StillSticks color={colors.muted} />
       ) : (
         <DancingSticks
           color={colors.accent}
@@ -245,6 +282,27 @@ function StopControl({
         />
       )}
     </button>
+  );
+}
+
+const STILL_STICK_HEIGHTS = [6, 9, 12, 9, 6];
+
+function StillSticks({ color }: { color: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-testid="paused-indicator"
+      className="flex items-center justify-center gap-[2px]"
+      style={{ width: 26, height: 20 }}
+    >
+      {STILL_STICK_HEIGHTS.map((height, index) => (
+        <span
+          key={index}
+          className="w-[3px] rounded-full"
+          style={{ height, backgroundColor: color }}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -423,6 +481,7 @@ type BarColors = {
   handle: string;
   outerStroke: string;
   controlFill: string;
+  muted: string;
   accent: string;
 };
 
@@ -439,6 +498,7 @@ function barColors(state: FloatingBarState): BarColors {
     handle: dark ? "rgba(255, 255, 255, 0.48)" : "rgba(31, 28, 26, 0.36)",
     outerStroke: dark ? "rgba(255, 255, 255, 0.14)" : "rgba(31, 28, 26, 0.12)",
     controlFill: dark ? "rgba(255, 255, 255, 0.08)" : "rgba(31, 28, 26, 0.07)",
+    muted: dark ? "rgba(255, 255, 255, 0.66)" : "rgba(31, 28, 26, 0.46)",
     accent: "rgb(255, 51, 77)",
   };
 }

@@ -7,6 +7,7 @@ Default permissions for the plugin
 - `allow-list-microphone-devices`
 - `allow-get-current-microphone-device`
 - `allow-start-capture`
+- `allow-set-capture-paused`
 - `allow-retry-audio-capture`
 - `allow-flush-live-transcript`
 - `allow-release-live-transcript`
@@ -1156,6 +1157,32 @@ Enables the save_capture_lifecycle_marker command without any pre-configured sco
 <td>
 
 Denies the save_capture_lifecycle_marker command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:allow-set-capture-paused`
+
+</td>
+<td>
+
+Enables the set_capture_paused command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:deny-set-capture-paused`
+
+</td>
+<td>
+
+Denies the set_capture_paused command without any pre-configured scope.
 
 </td>
 </tr>

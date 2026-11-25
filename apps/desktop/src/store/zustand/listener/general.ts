@@ -55,6 +55,8 @@ export type GeneralActions = {
   beginCaptureRecoveryFinalization: (sessionId: string) => boolean;
   finishCaptureRecoveryFinalization: (sessionId: string) => void;
   setMuted: (value: boolean) => void;
+  /** Pauses or resumes the active recording; false when there's none or it failed. */
+  setPaused: (value: boolean) => Promise<boolean>;
   setBatchTranscriptionPending: (sessionId: string, pending: boolean) => void;
   setTriggerAppIds: (appIds: string[] | null) => void;
   updateCaptureConfig: (update: CaptureConfigUpdate) => Promise<void>;
@@ -169,6 +171,34 @@ export const createGeneralSlice = <
         void listenerCommands.setMicMuted(value);
       }),
     );
+  },
+  setPaused: async (value) => {
+    const { status, sessionId } = get().live;
+    if (status !== "active" || !sessionId) {
+      return false;
+    }
+
+    const result = await listenerCommands
+      .setCapturePaused(sessionId, value)
+      .catch((error: unknown) => ({
+        status: "error" as const,
+        error: String(error),
+      }));
+    if (result.status === "error") {
+      console.error("[listener] failed to change pause", result.error);
+      return false;
+    }
+
+    setLiveState(set, (live) => {
+      if (live.sessionId !== sessionId) {
+        return;
+      }
+      live.paused = value;
+      if (value) {
+        live.amplitude = { mic: 0, speaker: 0 };
+      }
+    });
+    return true;
   },
   setBatchTranscriptionPending: (sessionId, pending) => {
     setLiveState(set, (live) => {

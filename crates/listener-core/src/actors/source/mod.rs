@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 
 use crate::{
-    ListenerRuntime, SessionErrorEvent, SessionProgressEvent,
+    ListenerRuntime, SessionDataEvent, SessionErrorEvent, SessionProgressEvent,
     actors::session::session_span,
     actors::{ChannelMode, ListenerMsg, RecMsg},
 };
@@ -28,6 +28,8 @@ use anlg_device_monitor::{DeviceMonitorHandle, DeviceSwitch, DeviceSwitchMonitor
 pub enum SourceMsg {
     SetMicMute(bool),
     GetMicMute(RpcReplyPort<bool>),
+    SetPaused(bool),
+    GetPaused(RpcReplyPort<bool>),
     GetMicDevice(RpcReplyPort<Option<String>>),
     GetMicIsolated(RpcReplyPort<bool>),
     GetCaptureHealth(RpcReplyPort<CaptureHealth>),
@@ -79,6 +81,7 @@ pub struct SourceArgs {
     pub session_id: String,
     pub listener_routing: ListenerRouting,
     pub recorder: Option<ActorRef<RecMsg>>,
+    pub paused: Arc<AtomicBool>,
 }
 
 pub struct SourceState {
@@ -93,6 +96,7 @@ pub struct SourceState {
     pub(super) onboarding: bool,
     pub(super) capture_mic_isolated: bool,
     pub(super) mic_muted: Arc<AtomicBool>,
+    pub(super) paused: Arc<AtomicBool>,
     pub(super) run_task: Option<tokio::task::JoinHandle<()>>,
     pub(super) stream_cancel_token: Option<CancellationToken>,
     pub(super) capture_frames: Option<tokio::sync::mpsc::Receiver<SourceFrame>>,
@@ -320,6 +324,7 @@ impl Actor for SourceActor {
                 onboarding: args.onboarding,
                 capture_mic_isolated: false,
                 mic_muted: Arc::new(AtomicBool::new(false)),
+                paused: args.paused,
                 run_task: None,
                 stream_cancel_token: None,
                 capture_frames: None,
@@ -365,6 +370,21 @@ impl Actor for SourceActor {
                 SourceMsg::GetMicMute(reply) => {
                     if !reply.is_closed() {
                         let _ = reply.send(st.mic_muted.load(Ordering::Relaxed));
+                    }
+                }
+                SourceMsg::SetPaused(paused) => {
+                    if st.paused.swap(paused, Ordering::AcqRel) != paused {
+                        tracing::info!(paused, "capture_paused_changed");
+                        st.pipeline.set_paused(paused);
+                        st.runtime.emit_data(SessionDataEvent::CapturePaused {
+                            session_id: st.session_id.clone(),
+                            value: paused,
+                        });
+                    }
+                }
+                SourceMsg::GetPaused(reply) => {
+                    if !reply.is_closed() {
+                        let _ = reply.send(st.paused.load(Ordering::Acquire));
                     }
                 }
                 SourceMsg::GetMicDevice(reply) => {
@@ -523,6 +543,10 @@ impl Actor for SourceActor {
                                 }
                                 st.healthy_since = Some(now);
                             }
+                        }
+                        if st.paused.load(Ordering::Acquire) {
+                            st.pipeline.drop_paused_frame();
+                            continue;
                         }
                         st.pipeline
                             .dispatch_frame(
@@ -817,6 +841,7 @@ mod tests {
                 session_id: "test-session".to_string(),
                 listener_routing: ListenerRouting::Dropped,
                 recorder: None,
+                paused: Default::default(),
             },
         )
         .await
@@ -872,6 +897,7 @@ mod tests {
                 session_id: "no-frames".into(),
                 listener_routing: ListenerRouting::Dropped,
                 recorder: None,
+                paused: Default::default(),
             },
         )
         .await
@@ -916,6 +942,7 @@ mod tests {
                 session_id: "paused".into(),
                 listener_routing: ListenerRouting::Dropped,
                 recorder: None,
+                paused: Default::default(),
             },
         )
         .await
@@ -1013,6 +1040,7 @@ mod tests {
                 session_id: "output-change".into(),
                 listener_routing: ListenerRouting::Dropped,
                 recorder: None,
+                paused: Default::default(),
             },
         )
         .await
@@ -1074,6 +1102,7 @@ mod tests {
                 session_id: "finite-stream".to_string(),
                 listener_routing: ListenerRouting::Dropped,
                 recorder: None,
+                paused: Default::default(),
             },
         )
         .await
@@ -1096,6 +1125,75 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn paused_capture_drops_audio_until_resumed() {
+        let (progress_tx, _progress_rx) = mpsc::unbounded_channel();
+        let runtime: Arc<dyn ListenerRuntime> = Arc::new(TestRuntime {
+            progress_tx,
+            error_tx: None,
+        });
+        let (live_tx, mut live_rx) = mpsc::unbounded_channel();
+        let (listener, listener_handle) = Actor::spawn(None, AudioListenerProbe(live_tx), ())
+            .await
+            .unwrap();
+        let (capture_tx, _capture_rx) = mpsc::unbounded_channel();
+        // Already paused, as a source restarted after a device change would find it.
+        let paused = Arc::new(AtomicBool::new(true));
+        let (source, source_handle) = Actor::spawn(
+            None,
+            SourceActor,
+            SourceArgs {
+                mic_device: None,
+                onboarding: false,
+                runtime,
+                audio: Arc::new(TestAudio {
+                    capture_tx,
+                    default_device_name_calls: AtomicUsize::new(0),
+                    end_immediately: false,
+                    emit_frame: false,
+                    partial_audio: false,
+                    gap_only: false,
+                    paused_after_ready: true,
+                    output_tx: None,
+                }),
+                session_id: "paused-capture".into(),
+                listener_routing: ListenerRouting::Attached(listener.clone()),
+                recorder: None,
+                paused: paused.clone(),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(600), live_rx.recv())
+                .await
+                .is_err()
+        );
+        let reported = source
+            .call(SourceMsg::GetPaused, Some(Duration::from_secs(1)))
+            .await
+            .unwrap();
+        assert!(matches!(reported, ractor::rpc::CallResult::Success(true)));
+
+        source.cast(SourceMsg::SetPaused(false)).unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(2), live_rx.recv())
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(!paused.load(Ordering::Acquire));
+
+        source.stop(None);
+        tokio::time::timeout(Duration::from_secs(3), source_handle)
+            .await
+            .unwrap()
+            .unwrap();
+        listener.stop(None);
+        listener_handle.await.unwrap();
     }
 
     #[tokio::test]
@@ -1158,6 +1256,7 @@ mod tests {
                 session_id: "partial-audio".into(),
                 listener_routing: ListenerRouting::Attached(listener.clone()),
                 recorder: Some(recorder.clone()),
+                paused: Default::default(),
             },
         )
         .await
@@ -1346,6 +1445,7 @@ mod tests {
                             session_id: "span-test".to_string(),
                             listener_routing: ListenerRouting::Dropped,
                             recorder: Some(recorder.clone()),
+                            paused: Default::default(),
                         },
                     )
                     .await

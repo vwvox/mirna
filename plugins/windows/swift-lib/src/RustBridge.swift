@@ -3,6 +3,9 @@ import Foundation
 @_silgen_name("rust_on_floating_bar_stop")
 private func rustOnFloatingBarStop()
 
+@_silgen_name("rust_on_floating_bar_pause")
+private func rustOnFloatingBarPause(_ paused: Int32)
+
 @_silgen_name("rust_on_floating_bar_open_main")
 private func rustOnFloatingBarOpenMain()
 
@@ -15,6 +18,10 @@ func rust_on_floating_bar_dictation_action(_ payload: UnsafePointer<CChar>)
 enum RustBridge {
   static func stopListening() {
     rustOnFloatingBarStop()
+  }
+
+  static func setPaused(_ paused: Bool) {
+    rustOnFloatingBarPause(paused ? 1 : 0)
   }
 
   static func openMainWindow() {

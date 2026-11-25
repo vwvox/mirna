@@ -128,6 +128,26 @@ describe("floating meeting window synchronizer", () => {
     await synchronizer.dispose();
   });
 
+  it("sends pausing as a full update even though the amplitude drops too", async () => {
+    const synchronizer = createFloatingMeetingWindowSynchronizer();
+
+    synchronizer.update(routeState(0.4));
+    await vi.waitFor(() => expect(mocks.update).toHaveBeenCalledOnce());
+    expect(mocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ paused: false }),
+    );
+
+    synchronizer.update({ ...routeState(0), paused: true });
+    await vi.waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(2));
+
+    expect(mocks.updateAmplitude).not.toHaveBeenCalled();
+    expect(mocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ amplitude: 0, paused: true }),
+    );
+
+    await synchronizer.dispose();
+  });
+
   it("orders teardown after a pending amplitude-only update", async () => {
     const pendingAmplitude = deferred<{ status: "ok"; data: null }>();
     const synchronizer = createFloatingMeetingWindowSynchronizer();

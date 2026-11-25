@@ -75,6 +75,8 @@ pub struct FloatingBarState {
     pub layout: Option<FloatingBarOverlayLayout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub paused: bool,
 }
 
 pub const WINDOW_LABEL: &str = "floating-bar";
@@ -103,23 +105,32 @@ pub(crate) mod layout {
         state.live_caption_toggle_visible && !state.live_caption_minimized
     }
 
-    pub fn compact_controls_width(shows_expand: bool) -> f64 {
-        if shows_expand {
+    pub fn shows_pause(state: &FloatingBarState) -> bool {
+        state.dictation.is_none()
+    }
+
+    pub fn compact_controls_width(shows_expand: bool, shows_pause: bool) -> f64 {
+        let main = if shows_expand {
             COMPACT_STOP_WIDTH + COMPACT_GAP + COMPACT_ICON_SIZE
         } else {
             COMPACT_SOLO_STOP_WIDTH
+        };
+        if shows_pause {
+            main + COMPACT_GAP + COMPACT_ICON_SIZE
+        } else {
+            main
         }
     }
 
-    pub fn compact_width(shows_expand: bool) -> f64 {
-        compact_controls_width(shows_expand) + COMPACT_HORIZONTAL_PADDING * 2.0
+    pub fn compact_width(shows_expand: bool, shows_pause: bool) -> f64 {
+        compact_controls_width(shows_expand, shows_pause) + COMPACT_HORIZONTAL_PADDING * 2.0
     }
 
     pub fn dictation_container_size(expanded: bool) -> (f64, f64) {
-        container_size(expanded, true)
+        container_size(expanded, true, false)
     }
 
-    pub fn container_size(is_expanded: bool, shows_expand: bool) -> (f64, f64) {
+    pub fn container_size(is_expanded: bool, shows_expand: bool, shows_pause: bool) -> (f64, f64) {
         if is_expanded {
             (
                 EXPANDED_WIDTH + INSET * 2.0,
@@ -127,7 +138,7 @@ pub(crate) mod layout {
             )
         } else {
             (
-                compact_width(shows_expand) + INSET * 2.0,
+                compact_width(shows_expand, shows_pause) + INSET * 2.0,
                 COMPACT_HEIGHT + HOVER_HANDLE_RESERVED_HEIGHT + INSET * 2.0,
             )
         }
@@ -148,7 +159,7 @@ pub(crate) mod layout {
         expands_upward: bool,
     ) -> (f64, f64, f64, f64) {
         let width = size.0.min(work.2);
-        let min_height = size.1.min(container_size(false, true).1).min(work.3);
+        let min_height = size.1.min(container_size(false, true, false).1).min(work.3);
         let (y, height) = if expands_upward {
             let bottom = (anchor.1 + INSET + COMPACT_HEIGHT / 2.0)
                 .clamp(work.1 + min_height, work.1 + work.3);
@@ -247,6 +258,18 @@ mod platform {
     pub extern "C" fn rust_on_floating_bar_stop() {
         if let Some(app) = APP_HANDLE.get() {
             let _ = crate::events::FloatingBarStop {}.emit(app);
+        }
+    }
+
+    // An i32 keeps the Swift call ABI-safe; a C bool would depend on how
+    // Swift extends its 1-bit Bool across `@_silgen_name`.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn rust_on_floating_bar_pause(paused: i32) {
+        if let Some(app) = APP_HANDLE.get() {
+            let _ = crate::events::FloatingBarPause {
+                paused: paused != 0,
+            }
+            .emit(app);
         }
     }
 
@@ -411,7 +434,7 @@ mod cross_platform {
             return Ok(window);
         }
 
-        let (width, height) = container_size(false, false);
+        let (width, height) = container_size(false, false, false);
         let builder = WebviewWindowBuilder::new(
             app,
             WINDOW_LABEL,
@@ -449,12 +472,13 @@ mod cross_platform {
     ) -> Result<FloatingBarOverlayLayout, Error> {
         let is_expanded = state.is_some_and(is_expanded);
         let shows_expand = state.is_some_and(|value| value.live_caption_toggle_visible);
+        let shows_pause = state.is_some_and(super::layout::shows_pause);
         let dictation = state.is_some_and(|state| state.dictation.is_some());
         window.set_focusable(!dictation)?;
         let (width, height) = if dictation {
             super::layout::dictation_container_size(is_expanded)
         } else {
-            container_size(is_expanded, shows_expand)
+            container_size(is_expanded, shows_expand, shows_pause)
         };
         let next_size = LogicalSize::new(width, height);
         let scale = window.scale_factor()?;
@@ -618,7 +642,7 @@ mod tests {
                     upwards,
                 );
                 assert!(x >= 0.0 && y >= 0.0);
-                assert!(height >= layout::container_size(false, true).1);
+                assert!(height >= layout::container_size(false, true, false).1);
                 assert!(x + width <= 1920.0 && y + height <= 1080.0);
             }
         }
@@ -632,7 +656,12 @@ mod tests {
             ((-960.0, 92.0), false),
             ((-64.0, 1049.0), true),
         ] {
-            for size in [(111.0, 67.0), (368.0, 459.0), (111.0, 67.0)] {
+            for size in [
+                (111.0, 67.0),
+                (368.0, 459.0),
+                layout::container_size(false, true, true),
+                (111.0, 67.0),
+            ] {
                 let frame = layout::frame_at_controls(anchor, size, work, upwards);
                 assert_eq!(
                     frame.1 + layout::controls_center_y(frame.3, upwards),
@@ -665,6 +694,65 @@ mod tests {
         let moved_anchor = (expanded.0 - 100.0 + controls_x, 1049.0);
         let collapsed = layout::frame_at_controls(moved_anchor, (144.0, 67.0), work, true);
         assert_eq!(collapsed.0 + collapsed.2 / 2.0, 1756.0);
+    }
+
+    #[test]
+    fn pause_button_widens_the_compact_controls_by_one_icon() {
+        for shows_expand in [false, true] {
+            assert_eq!(
+                layout::compact_controls_width(shows_expand, true),
+                layout::compact_controls_width(shows_expand, false) + layout::COMPACT_ICON_SIZE
+            );
+        }
+        assert_eq!(layout::container_size(false, true, true), (138.0, 67.0));
+        assert_eq!(layout::container_size(false, false, true), (114.0, 67.0));
+        assert_eq!(layout::container_size(true, true, true), (368.0, 459.0));
+        assert_eq!(layout::dictation_container_size(false), (108.0, 67.0));
+    }
+
+    #[test]
+    fn pause_button_shows_for_meetings_but_not_dictation() {
+        let mut state = state_json(serde_json::json!({}));
+        assert!(layout::shows_pause(&state));
+        state.dictation = Some(super::FloatingDictationState {
+            session_id: "dictation".into(),
+            phase: "recording".into(),
+            microphone: "Mic".into(),
+            text: String::new(),
+            partial: String::new(),
+            preview_enabled: true,
+            preview_unavailable: false,
+        });
+        assert!(!layout::shows_pause(&state));
+    }
+
+    #[test]
+    fn paused_defaults_to_false_and_reaches_the_native_payload() {
+        assert!(!state_json(serde_json::json!({})).paused);
+        let paused = state_json(serde_json::json!({ "paused": true }));
+        assert!(paused.paused);
+        assert_eq!(serde_json::to_value(&paused).unwrap()["paused"], true);
+    }
+
+    fn state_json(extra: serde_json::Value) -> super::FloatingBarState {
+        let mut value = serde_json::json!({
+            "amplitude": 0.0,
+            "title": "Meeting",
+            "status": "recording",
+            "colorScheme": "dark",
+            "opacity": 1.0,
+            "liveCaptionOpacity": 1.0,
+            "liveCaptionWidth": 360.0,
+            "liveCaptionLineCount": 2,
+            "liveCaptionPosition": "topCenter",
+            "liveCaptionMinimized": true,
+            "liveCaptionToggleVisible": true,
+        });
+        value
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        serde_json::from_value(value).unwrap()
     }
 
     #[test]

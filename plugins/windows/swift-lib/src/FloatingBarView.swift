@@ -31,22 +31,23 @@ enum FloatingBarLayout {
   static let hoverHandleHorizontalPadding: CGFloat = 8
   static let dragClickThreshold: CGFloat = 4
 
-  static func compactControlsWidth(showsExpand: Bool) -> CGFloat {
-    showsExpand ? compactStopWidth + compactGap + compactIconSize : compactSoloStopWidth
+  static func compactControlsWidth(showsExpand: Bool, showsPause: Bool) -> CGFloat {
+    let main = showsExpand ? compactStopWidth + compactGap + compactIconSize : compactSoloStopWidth
+    return showsPause ? main + compactGap + compactIconSize : main
   }
 
-  static func compactWidth(showsExpand: Bool) -> CGFloat {
-    compactControlsWidth(showsExpand: showsExpand)
+  static func compactWidth(showsExpand: Bool, showsPause: Bool) -> CGFloat {
+    compactControlsWidth(showsExpand: showsExpand, showsPause: showsPause)
       + compactHorizontalPadding * 2
   }
 
-  static func containerSize(isExpanded: Bool, showsExpand: Bool)
+  static func containerSize(isExpanded: Bool, showsExpand: Bool, showsPause: Bool)
     -> NSSize
   {
     NSSize(
       width: (isExpanded
-        ? expandedWidth : compactWidth(showsExpand: showsExpand)) + inset
-        * 2,
+        ? expandedWidth : compactWidth(showsExpand: showsExpand, showsPause: showsPause))
+        + inset * 2,
       height: (isExpanded ? expandedHeight : compactHeight) + hoverHandleReservedHeight + inset * 2)
   }
 
@@ -95,7 +96,7 @@ struct FloatingBarView: View {
         floatingControls(isExpanded: model.isExpanded)
           .frame(
             width: FloatingBarLayout.compactControlsWidth(
-              showsExpand: model.liveCaptionToggleVisible),
+              showsExpand: model.liveCaptionToggleVisible, showsPause: model.showsPause),
             height: FloatingBarLayout.compactHeight
           )
           .position(
@@ -215,6 +216,17 @@ struct FloatingBarView: View {
         height: FloatingBarLayout.compactIconSize
       )
 
+      if model.showsPause {
+        FloatingIconButton(
+          systemName: model.paused ? "play.fill" : "pause.fill",
+          accessibilityLabel: model.paused ? "Resume recording" : "Pause recording",
+          color: primaryContentColor,
+          hoverFill: controlHoverFill,
+          size: FloatingBarLayout.compactIconSize,
+          action: { performClick { RustBridge.setPaused(!model.paused) } }
+        )
+      }
+
       if model.liveCaptionToggleVisible {
         FloatingIconButton(
           systemName: isExpanded
@@ -260,6 +272,13 @@ struct FloatingBarView: View {
               width: FloatingBarLayout.waveformWidth,
               height: FloatingBarLayout.waveformHeight
             )
+        } else if model.paused {
+          StillBars(color: secondaryContentColor)
+            .frame(
+              width: FloatingBarLayout.waveformWidth,
+              height: FloatingBarLayout.waveformHeight
+            )
+            .accessibilityHidden(true)
         } else {
           DancingBars(color: accentColor, amplitude: model.amplitude)
             .frame(
@@ -284,7 +303,9 @@ struct FloatingBarView: View {
           ? "Reconnecting live transcription; stop listening"
           : model.status == .error
             ? "\(model.transcriptNotice ?? "Recording needs attention"); stop listening"
-            : "Stop listening"
+            : model.paused
+              ? "Recording paused; stop listening"
+              : "Stop listening"
     )
     .help(
       model.status == .error
@@ -298,7 +319,8 @@ struct FloatingBarView: View {
     model.placement?.frame.size
       ?? FloatingBarLayout.containerSize(
         isExpanded: model.isExpanded,
-        showsExpand: model.liveCaptionToggleVisible
+        showsExpand: model.liveCaptionToggleVisible,
+        showsPause: model.showsPause
       )
   }
 
@@ -751,6 +773,25 @@ private struct ErrorMark: View {
         .fill(color)
         .frame(width: 3.2, height: 3.2)
     }
+  }
+}
+
+private struct StillBars: View {
+  let color: Color
+
+  private let heights: [CGFloat] = [6, 9, 12, 9, 6]
+  private let barWidth: CGFloat = 3
+  private let barSpacing: CGFloat = 2
+
+  var body: some View {
+    HStack(spacing: barSpacing) {
+      ForEach(heights.indices, id: \.self) { index in
+        Capsule(style: .continuous)
+          .fill(color)
+          .frame(width: barWidth, height: heights[index])
+      }
+    }
+    .frame(maxHeight: .infinity, alignment: .center)
   }
 }
 

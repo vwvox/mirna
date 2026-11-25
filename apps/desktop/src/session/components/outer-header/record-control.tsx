@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   Laptop,
   Microphone,
+  Pause,
+  Play,
   UploadSimple,
   Warning,
 } from "@anlg/ui/components/icons";
@@ -44,14 +46,23 @@ export function liveInputProblem({
   return null;
 }
 
-/** Timer, level, input health and Stop: the only control in Mirna that moves. */
-export function LiveRecordingPill({ onStop }: { onStop: () => void }) {
+/** Timer, level, input health, Pause and Stop: the only control in Mirna that moves. */
+export function LiveRecordingPill({
+  onStop,
+  onTogglePause,
+}: {
+  onStop: () => void;
+  onTogglePause: () => void;
+}) {
   const { t } = useLingui();
-  const { seconds, amplitude, captureHealth } = useListener((state) => ({
-    seconds: state.live.seconds,
-    amplitude: state.live.amplitude,
-    captureHealth: state.live.captureHealth,
-  }));
+  const { seconds, amplitude, captureHealth, paused } = useListener(
+    (state) => ({
+      seconds: state.live.seconds,
+      amplitude: state.live.amplitude,
+      captureHealth: state.live.captureHealth,
+      paused: state.live.paused,
+    }),
+  );
   const micPermission = usePermission("microphone");
   const systemAudioPermission = usePermission("systemAudio");
   const problem = liveInputProblem({
@@ -61,8 +72,9 @@ export function LiveRecordingPill({ onStop }: { onStop: () => void }) {
     speaker: captureHealth.speaker,
     unavailable: captureHealth.unavailable,
   });
-  const problemLabel =
-    problem === "nothing"
+  const problemLabel = paused
+    ? null
+    : problem === "nothing"
       ? t`No audio is being captured`
       : problem === "mic"
         ? t`Microphone is silent`
@@ -96,29 +108,58 @@ export function LiveRecordingPill({ onStop }: { onStop: () => void }) {
           </button>
         </div>
       ) : null}
-      <div className="border-mirna-terra/30 bg-mirna-terra/10 flex h-9 items-center gap-2.5 rounded-xl border pr-1 pl-3">
+      <div
+        className={cn([
+          "flex h-9 items-center gap-2.5 rounded-xl border pr-1 pl-3",
+          paused
+            ? "border-border bg-muted/60"
+            : "border-mirna-terra/30 bg-mirna-terra/10",
+        ])}
+      >
         <span
           aria-hidden
-          className="bg-mirna-terra animate-live-pulse size-[9px] rounded-full motion-reduce:animate-none"
+          className={cn([
+            "size-[9px] rounded-full",
+            paused
+              ? "bg-muted-foreground/50"
+              : "bg-mirna-terra animate-live-pulse motion-reduce:animate-none",
+          ])}
         />
         <span
           aria-label={t`Recording time`}
-          className="font-mono text-sm font-medium text-[#8A3A1E] tabular-nums dark:text-[#E9A285]"
+          className={cn([
+            "font-mono text-sm font-medium tabular-nums",
+            paused
+              ? "text-muted-foreground"
+              : "text-[#8A3A1E] dark:text-[#E9A285]",
+          ])}
         >
           {formatRecordingLength(seconds * 1000)}
         </span>
-        <span aria-hidden className="text-mirna-terra flex items-center">
-          <DancingSticks
-            amplitude={level}
-            color="currentColor"
-            height={16}
-            width={22}
-            stickWidth={3}
-            gap={2}
-          />
-        </span>
+        {paused ? (
+          <span
+            role="status"
+            className="text-muted-foreground text-[13px] font-semibold"
+          >
+            {t`Paused`}
+          </span>
+        ) : (
+          <span aria-hidden className="text-mirna-terra flex items-center">
+            <DancingSticks
+              amplitude={level}
+              color="currentColor"
+              height={16}
+              width={22}
+              stickWidth={3}
+              gap={2}
+            />
+          </span>
+        )}
         <span
-          className="flex items-center gap-1 px-1 text-[#6B4232] dark:text-[#E9A285]"
+          className={cn([
+            "flex items-center gap-1 px-1 text-[#6B4232] dark:text-[#E9A285]",
+            paused && "hidden",
+          ])}
           title={t`Inputs being recorded`}
         >
           <Microphone
@@ -132,6 +173,28 @@ export function LiveRecordingPill({ onStop }: { onStop: () => void }) {
             className={cn([!macAudioOk && "opacity-40"])}
           />
         </span>
+        <button
+          type="button"
+          onClick={onTogglePause}
+          aria-label={paused ? t`Resume recording` : t`Pause recording`}
+          title={paused ? t`Resume recording` : t`Pause recording`}
+          className={cn([
+            "flex h-7 items-center justify-center rounded-lg text-[13px] font-semibold transition-colors",
+            "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-hidden",
+            paused
+              ? "bg-mirna-terra hover:bg-mirna-terra/85 gap-1.5 pr-2.5 pl-2 text-white"
+              : "hover:bg-mirna-terra/15 w-7 text-[#8A3A1E] dark:text-[#E9A285]",
+          ])}
+        >
+          {paused ? (
+            <>
+              <Play size={13} weight="bold" aria-hidden />
+              {t`Resume`}
+            </>
+          ) : (
+            <Pause size={15} weight="bold" aria-hidden />
+          )}
+        </button>
         <button
           type="button"
           onClick={onStop}

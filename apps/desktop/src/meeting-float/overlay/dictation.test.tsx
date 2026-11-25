@@ -31,6 +31,7 @@ describe("dictation floating panel", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={() => onAction("finish")}
+        onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
       />,
     );
@@ -38,6 +39,9 @@ describe("dictation floating panel", () => {
       screen.getByRole("button", { name: "Expand live transcript" }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Finish dictation" }));
+    expect(
+      screen.queryByRole("button", { name: "Pause recording" }),
+    ).toBeNull();
     expect(onAction.mock.calls.map(([action]) => action)).toEqual([
       "togglePreview",
       "finish",
@@ -59,6 +63,7 @@ describe("dictation floating panel", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={() => onAction("finish")}
+        onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
       />,
     );
@@ -75,6 +80,7 @@ describe("dictation floating panel", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={() => onAction("finish")}
+        onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
       />,
     );
@@ -110,6 +116,7 @@ describe("dictation floating panel", () => {
     };
     const callbacks = {
       onStop: vi.fn(),
+      onSetPaused: vi.fn(),
       onToggleExpanded: vi.fn(),
     };
     const view = render(

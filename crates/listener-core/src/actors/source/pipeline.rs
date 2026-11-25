@@ -34,6 +34,9 @@ const RECORDER_BACKPRESSURE_TIMEOUT: Duration = Duration::from_secs(2);
 const RECORDER_BACKPRESSURE_RETRY_DELAY: Duration = Duration::from_millis(25);
 const DROPOUT_WINDOW_SAMPLES: usize = SAMPLE_RATE as usize * 5;
 const DROPOUT_RATIO_THRESHOLD: f32 = 0.15;
+const SPEECH_WINDOW_SAMPLES: usize = SAMPLE_RATE as usize * 5;
+const SPEECH_MIN_SAMPLES: usize = SAMPLE_RATE as usize * 3 / 2;
+const SPEECH_EMIT_INTERVAL: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 struct BufferedAudio {
@@ -59,6 +62,8 @@ pub(super) enum DispatchFrameResult {
 
 pub(in crate::actors) struct Pipeline {
     vad_mask: VadMask,
+    speaker_vad: VadMask,
+    speech: SpeechMonitor,
     amplitude: AmplitudeEmitter,
     dropouts: DropoutMonitor,
     audio_buffer: AudioBuffer,
@@ -71,23 +76,42 @@ impl Pipeline {
     pub(super) fn new(runtime: Arc<dyn ListenerRuntime>, session_id: String) -> Self {
         Self {
             amplitude: AmplitudeEmitter::new(runtime.clone(), session_id.clone()),
+            speech: SpeechMonitor::new(runtime.clone(), session_id.clone()),
             dropouts: DropoutMonitor::new(runtime, session_id),
             audio_buffer: AudioBuffer::new(MAX_BUFFER_CHUNKS),
             replay_history: ReplayHistory::new(SAMPLE_RATE as usize * REPLAY_HISTORY_SECS),
             listener_dispatcher: ListenerDispatcher::new(),
             recorder_dispatcher: RecorderDispatcher::new(),
             vad_mask: VadMask::default(),
+            speaker_vad: VadMask::default(),
         }
     }
 
     pub(super) fn reset(&mut self) {
         self.amplitude.reset();
+        self.speech.reset();
         self.dropouts.reset();
         self.audio_buffer.clear();
         self.replay_history.clear();
         self.listener_dispatcher.reset();
         self.recorder_dispatcher = RecorderDispatcher::new();
         self.vad_mask = VadMask::default();
+        self.speaker_vad = VadMask::default();
+    }
+
+    /// Pausing drops audio, so speech heard before the pause must not count after it.
+    pub(super) fn set_paused(&mut self, paused: bool) {
+        self.speech.reset();
+        if !paused {
+            self.vad_mask = VadMask::default();
+            self.speaker_vad = VadMask::default();
+        }
+    }
+
+    /// A paused frame is neither recorded nor transcribed; the level meter falls to silence.
+    pub(super) fn drop_paused_frame(&mut self) {
+        self.amplitude.observe_mic(&[]);
+        self.amplitude.observe_spk(&[]);
     }
 
     pub(super) async fn dispatch_frame(
@@ -146,6 +170,9 @@ impl Pipeline {
 
         let (mut processed_mic, processed_spk) = Self::select_tracks(frame, mode);
         self.vad_mask.process(&mut processed_mic);
+        let speech_samples =
+            voiced_samples(&processed_mic).max(self.speaker_speech(&processed_spk, mode));
+        self.speech.observe(processed_mic.len(), speech_samples);
         let processed_mic = Arc::<[f32]>::from(processed_mic);
         let item = BufferedAudio::new(processed_mic, processed_spk, mode);
 
@@ -154,6 +181,15 @@ impl Pipeline {
             self.recorder_dispatcher.try_send(actor.clone(), item);
         }
         Ok(DispatchFrameResult::Complete)
+    }
+
+    fn speaker_speech(&mut self, speaker: &[f32], mode: ChannelMode) -> usize {
+        if mode == ChannelMode::MicOnly || speaker.is_empty() {
+            return 0;
+        }
+        let mut speaker = speaker.to_vec();
+        self.speaker_vad.process(&mut speaker);
+        voiced_samples(&speaker)
     }
 
     fn complete_item(&mut self, item: BufferedAudio, listener_routing: &ListenerRouting) {
@@ -643,6 +679,76 @@ impl DropoutMonitor {
     }
 }
 
+/// The voice detector zeroes what it doesn't hear as speech, so what's left is speech.
+fn voiced_samples(masked: &[f32]) -> usize {
+    masked.iter().filter(|sample| **sample != 0.0).count()
+}
+
+/// Tells the app someone is talking, so it can notice a recording nobody is using any more.
+/// Speech counts once it adds up to a second and a half within five seconds, so a cough, a door
+/// or a burst of keyboard clicks doesn't keep a forgotten recording going.
+struct SpeechMonitor {
+    runtime: Arc<dyn ListenerRuntime>,
+    session_id: String,
+    window: VecDeque<(usize, usize)>,
+    window_samples: usize,
+    window_speech: usize,
+    last_emit: Option<Instant>,
+}
+
+impl SpeechMonitor {
+    fn new(runtime: Arc<dyn ListenerRuntime>, session_id: String) -> Self {
+        Self {
+            runtime,
+            session_id,
+            window: VecDeque::new(),
+            window_samples: 0,
+            window_speech: 0,
+            last_emit: None,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.window.clear();
+        self.window_samples = 0;
+        self.window_speech = 0;
+        self.last_emit = None;
+    }
+
+    fn observe(&mut self, samples: usize, speech: usize) {
+        self.observe_at(samples, speech, Instant::now());
+    }
+
+    fn observe_at(&mut self, samples: usize, speech: usize, now: Instant) {
+        if samples == 0 {
+            return;
+        }
+        let speech = speech.min(samples);
+        self.window.push_back((samples, speech));
+        self.window_samples += samples;
+        self.window_speech += speech;
+        while self.window_samples > SPEECH_WINDOW_SAMPLES {
+            let Some((old_samples, old_speech)) = self.window.pop_front() else {
+                break;
+            };
+            self.window_samples -= old_samples;
+            self.window_speech -= old_speech;
+        }
+
+        if self.window_speech < SPEECH_MIN_SAMPLES
+            || self
+                .last_emit
+                .is_some_and(|last| now.duration_since(last) < SPEECH_EMIT_INTERVAL)
+        {
+            return;
+        }
+        self.last_emit = Some(now);
+        self.runtime.emit_data(SessionDataEvent::SpeechHeard {
+            session_id: self.session_id.clone(),
+        });
+    }
+}
+
 struct AmplitudeEmitter {
     runtime: Arc<dyn ListenerRuntime>,
     session_id: String,
@@ -787,6 +893,104 @@ mod tests {
                 self.0.lock().unwrap().push(ratio);
             }
         }
+    }
+
+    #[derive(Default)]
+    struct SpeechRuntime(std::sync::Mutex<usize>);
+
+    impl anlg_storage::StorageRuntime for SpeechRuntime {
+        fn global_base(&self) -> Result<PathBuf, anlg_storage::Error> {
+            Ok(std::env::temp_dir())
+        }
+
+        fn vault_base(&self) -> Result<PathBuf, anlg_storage::Error> {
+            Ok(std::env::temp_dir())
+        }
+    }
+
+    impl ListenerRuntime for SpeechRuntime {
+        fn emit_lifecycle(&self, _event: SessionLifecycleEvent) {}
+
+        fn emit_progress(&self, _event: SessionProgressEvent) {}
+
+        fn emit_error(&self, _event: SessionErrorEvent) {}
+
+        fn emit_data(&self, event: SessionDataEvent) {
+            if let SessionDataEvent::SpeechHeard { .. } = event {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+    }
+
+    const TENTH: usize = SAMPLE_RATE as usize / 10;
+
+    fn feed(
+        monitor: &mut SpeechMonitor,
+        start: Instant,
+        tenths: std::ops::Range<u64>,
+        speech: impl Fn(u64) -> bool,
+    ) {
+        for tenth in tenths {
+            monitor.observe_at(
+                TENTH,
+                if speech(tenth) { TENTH } else { 0 },
+                start + Duration::from_millis(tenth * 100),
+            );
+        }
+    }
+
+    #[test]
+    fn speech_is_reported_once_it_adds_up_and_at_most_every_ten_seconds() {
+        let runtime = Arc::new(SpeechRuntime::default());
+        let mut monitor = SpeechMonitor::new(runtime.clone(), "s".into());
+        let start = Instant::now();
+        let heard = || *runtime.0.lock().unwrap();
+
+        // A cough in a quiet room.
+        feed(&mut monitor, start, 0..50, |tenth| tenth < 5);
+        assert_eq!(heard(), 0);
+
+        // Someone talks for two seconds.
+        feed(&mut monitor, start, 50..70, |_| true);
+        assert_eq!(heard(), 1);
+
+        // They keep talking: reported again only ten seconds after the first time.
+        feed(&mut monitor, start, 70..160, |_| true);
+        assert_eq!(heard(), 1);
+        feed(&mut monitor, start, 160..170, |_| true);
+        assert_eq!(heard(), 2);
+    }
+
+    #[test]
+    fn speech_spread_thin_over_minutes_never_counts() {
+        let runtime = Arc::new(SpeechRuntime::default());
+        let mut monitor = SpeechMonitor::new(runtime.clone(), "s".into());
+
+        // A second of something voice-like every eight seconds, for two minutes.
+        feed(&mut monitor, Instant::now(), 0..1_200, |tenth| {
+            tenth % 80 < 10
+        });
+        assert_eq!(*runtime.0.lock().unwrap(), 0);
+    }
+
+    #[test]
+    fn resetting_forgets_speech_heard_before_a_pause() {
+        let runtime = Arc::new(SpeechRuntime::default());
+        let mut monitor = SpeechMonitor::new(runtime.clone(), "s".into());
+        let start = Instant::now();
+
+        feed(&mut monitor, start, 0..10, |_| true);
+        monitor.reset();
+        feed(&mut monitor, start, 10..18, |_| true);
+        assert_eq!(*runtime.0.lock().unwrap(), 0);
+        feed(&mut monitor, start, 18..30, |_| true);
+        assert_eq!(*runtime.0.lock().unwrap(), 1);
+    }
+
+    #[test]
+    fn only_samples_the_voice_detector_kept_count_as_speech() {
+        assert_eq!(voiced_samples(&[0.0, 0.2, 0.0, -0.1]), 2);
+        assert_eq!(voiced_samples(&[]), 0);
     }
 
     enum ProbeEvent {

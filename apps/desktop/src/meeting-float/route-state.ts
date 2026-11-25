@@ -48,6 +48,7 @@ export type FloatingRouteState = {
   liveCaptionToggleVisible: boolean;
   transcriptBubbles: FloatingTranscriptBubble[];
   transcriptNotice?: string | null;
+  paused?: boolean;
 };
 const FLOATING_TRANSCRIPT_OVERLAP_THRESHOLD_MS = 300;
 
@@ -95,6 +96,7 @@ export function getFloatingRouteState(
       1,
     ),
     status: getCaptureWarning(state.live) ? "error" : "recording",
+    paused: state.live.paused,
     colorScheme,
     opacity: settings.floatingBarOpacity,
     liveCaptionOpacity: settings.liveCaptionOpacity,
@@ -346,6 +348,7 @@ export function isSameFloatingRouteState(
     left?.liveCaptionToggleVisible === right?.liveCaptionToggleVisible &&
     left?.title === right?.title &&
     (left?.transcriptNotice ?? null) === (right?.transcriptNotice ?? null) &&
+    (left?.paused ?? false) === (right?.paused ?? false) &&
     left?.dictation?.sessionId === right?.dictation?.sessionId &&
     left?.dictation?.phase === right?.dictation?.phase &&
     left?.dictation?.microphone === right?.dictation?.microphone &&

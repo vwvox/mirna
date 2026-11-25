@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, atomic::AtomicBool};
 use std::time::{Instant, SystemTime};
 
 use anlg_audio::AudioProvider;
@@ -154,6 +154,9 @@ pub struct SessionContext {
     /// The live transcript outlives any one listener: a reconnecting listener resumes it so the
     /// audio it replays cannot finalize words twice and segments continue across the gap.
     pub live_transcript: SharedLiveTranscript,
+    /// Set while the user has paused: the source drops audio instead of recording it. Lives here,
+    /// not in the source, so a source restarted after a device change stays paused.
+    pub paused: Arc<AtomicBool>,
 }
 
 pub type SharedLiveTranscript = Arc<Mutex<Option<LiveTranscriptEngine>>>;

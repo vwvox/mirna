@@ -13,6 +13,7 @@ final class FloatingControlPlacementTests: XCTestCase {
       for size in [
         NSSize(width: 108, height: 67), NSSize(width: 368, height: 459),
         NSSize(width: 220, height: 240),
+        FloatingBarLayout.containerSize(isExpanded: false, showsExpand: true, showsPause: true),
       ] {
         let layout = FloatingControlPlacement.layout(
           anchor: anchor, size: size, workArea: work, expandsUpward: upwards)

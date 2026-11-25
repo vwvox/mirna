@@ -1,6 +1,10 @@
 import { useStore } from "zustand";
 
-import { commands as trayCommands } from "@anlg/plugin-tray";
+import {
+  commands as trayCommands,
+  events as trayEvents,
+  type TrayRecordingActionKind,
+} from "@anlg/plugin-tray";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
 import { useSession } from "~/session/queries";
@@ -27,7 +31,48 @@ const publishTrayRecordingTitle = createTrayRecordingTitlePublisher(
   },
 );
 
+type TrayListener = Pick<
+  ReturnType<typeof listenerStore.getState>,
+  "live" | "stop" | "setPaused"
+>;
+
+/** Pause, Resume and Stop from the menu bar act on the recording this window owns. */
+export async function handleTrayRecordingAction(
+  action: TrayRecordingActionKind,
+  listener: TrayListener = listenerStore.getState(),
+) {
+  if (listener.live.status !== "active") {
+    return;
+  }
+  if (action === "stop") {
+    listener.stop();
+    return;
+  }
+  if (!(await listener.setPaused(action === "pause"))) {
+    console.error(`[tray] could not ${action} the recording`);
+  }
+}
+
 export function TrayRecordingSync() {
+  useMountEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void trayEvents.trayRecordingAction
+      .listen(({ payload }) => {
+        void handleTrayRecordingAction(payload.action);
+      })
+      .then((fn) => {
+        if (active) {
+          unlisten = fn;
+        } else {
+          fn();
+        }
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  });
   const activeSessionId = useStore(listenerStore, (state) =>
     getTrayRecordingSessionId(state.live.status, state.live.sessionId),
   );

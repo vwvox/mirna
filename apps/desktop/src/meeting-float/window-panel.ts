@@ -184,6 +184,7 @@ export async function showFloatingMeetingWindow(
           ? routeState.transcriptBubbles
           : null,
         transcriptNotice: routeState.transcriptNotice ?? null,
+        paused: routeState.paused ?? false,
       });
   if (!shouldContinue()) {
     await hideFloatingMeetingPanel();
@@ -239,7 +240,8 @@ function isAmplitudeOnlyFloatingRouteUpdate(
     previousState.liveCaptionToggleVisible ===
       nextState.liveCaptionToggleVisible &&
     previousState.transcriptBubbles === nextState.transcriptBubbles &&
-    previousState.transcriptNotice === nextState.transcriptNotice
+    previousState.transcriptNotice === nextState.transcriptNotice &&
+    (previousState.paused ?? false) === (nextState.paused ?? false)
   );
 }
 

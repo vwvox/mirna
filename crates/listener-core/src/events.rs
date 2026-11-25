@@ -71,6 +71,14 @@ pub enum SessionDataEvent {
     },
     #[serde(rename = "mic_muted")]
     MicMuted { session_id: String, value: bool },
+    /// The user paused (or resumed) the recording: while paused, audio is dropped before it is
+    /// recorded or transcribed, so the saved recording leaves the paused time out.
+    #[serde(rename = "capture_paused")]
+    CapturePaused { session_id: String, value: bool },
+    /// Someone is talking, on the mic or in the Mac's audio. Sent at most every few seconds while
+    /// speech goes on, so the app can tell a forgotten recording from a quiet stretch.
+    #[serde(rename = "speech_heard")]
+    SpeechHeard { session_id: String },
     /// Whether the microphone can only hear the local user: true when the default output is a
     /// headphone, so no far-end audio reaches the mic. Emitted each time capture (re)starts.
     #[serde(rename = "mic_isolated")]

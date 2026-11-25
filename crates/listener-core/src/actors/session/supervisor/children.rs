@@ -89,6 +89,7 @@ pub(super) async fn spawn_source(
             session_id: ctx.params.session_id.clone(),
             listener_routing,
             recorder,
+            paused: ctx.paused.clone(),
         },
         supervisor_cell,
     )

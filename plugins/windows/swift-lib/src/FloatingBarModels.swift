@@ -48,4 +48,7 @@ struct FloatingBarStatePayload: Codable {
   let liveCaptionToggleVisible: Bool
   let transcriptBubbles: [FloatingTranscriptBubblePayload]?
   var transcriptNotice: String? = nil
+  var paused: Bool? = nil
+
+  var isPaused: Bool { paused ?? false }
 }
