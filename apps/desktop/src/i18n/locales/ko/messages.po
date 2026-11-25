@@ -1960,6 +1960,10 @@ msgstr "초대 링크를 복사하지 못했어요. 다시 시도해 주세요."
 msgid "Couldn't download Qwen3-ASR"
 msgstr ""
 
+#: src/settings/general/logs.tsx
+msgid "Couldn't export the logs"
+msgstr ""
+
 #: src/settings/stats/badge-collection.tsx
 msgid "Couldn't load your badges. Reopen this page to try again."
 msgstr ""
@@ -2631,12 +2635,20 @@ msgstr ""
 msgid "Export location"
 msgstr ""
 
+#: src/settings/general/logs.tsx
+msgid "Export logs"
+msgstr ""
+
 #: src/settings/automations/workflow-builder.tsx
 msgid "Export the meeting as Markdown"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/export-modal.tsx
 msgid "Exporting..."
+msgstr ""
+
+#: src/settings/general/logs.tsx
+msgid "Exporting…"
 msgstr ""
 
 #: src/settings/referrals.tsx
@@ -2985,6 +2997,7 @@ msgid "Hello, Mirna"
 msgstr ""
 
 #: src/main/windows-title-bar.tsx
+#: src/settings/general/logs.tsx
 msgid "Help"
 msgstr ""
 
@@ -3283,6 +3296,14 @@ msgstr "남은 초대 횟수"
 
 #: src/session/components/note-input/transcript/engine-note.tsx
 msgid "It heard {language}, which {engine} doesn't know. Qwen3-ASR does."
+msgstr ""
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "It sounded like more than one language ({heard}). Qwen3-ASR handles mixed languages."
+msgstr ""
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "It wasn't sure of the language ({heard}). Qwen3-ASR handles mixed languages."
 msgstr ""
 
 #: src/crm/enrich-contact.tsx
@@ -3625,6 +3646,10 @@ msgstr ""
 
 #: src/sidebar/timeline/item.tsx
 msgid "Locked note"
+msgstr ""
+
+#: src/settings/general/logs.tsx
+msgid "Logs saved to Downloads"
 msgstr ""
 
 #: src/settings/ai/llm/select.tsx
@@ -4527,6 +4552,10 @@ msgstr ""
 
 #: src/settings/dictation-engine.tsx
 msgid "One domain per line, like bank.example"
+msgstr ""
+
+#: src/settings/general/logs.tsx
+msgid "One file with what Mirna did and any errors, from this Mac and your paired phones. It doesn't include your notes, transcripts or recordings."
 msgstr ""
 
 #: src/folders/folder-editor.tsx
@@ -5767,6 +5796,10 @@ msgstr ""
 msgid "Send sanitized crash and error reports to help improve Mirna."
 msgstr ""
 
+#: src/settings/general/logs.tsx
+msgid "Send that file to whoever is helping you."
+msgstr ""
+
 #: src/automations/starters.tsx
 msgid "Send the recap to the selected Slack channel."
 msgstr ""
@@ -6832,6 +6865,10 @@ msgstr ""
 
 #: src/session/components/outer-header/overflow/transcribe-again.tsx
 msgid "Transcribe again"
+msgstr ""
+
+#: src/session/components/note-input/transcript/engine-note.tsx
+msgid "Transcribe again with Qwen3-ASR"
 msgstr ""
 
 #: src/session/components/note-input/transcript/engine-note.tsx
