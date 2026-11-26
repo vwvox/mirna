@@ -1,10 +1,15 @@
 import { z } from "zod";
 
-import type {
-  LessonMarksDocument,
-  LessonPracticeDocument,
-  LessonSettings,
-  LessonSheetDocument,
+import {
+  LESSON_SUBJECTS,
+  type LessonFixesDocument,
+  type LessonMarksDocument,
+  type LessonPracticeDocument,
+  type LessonSettings,
+  type LessonSheetDocument,
+  type LessonSubject,
+  SOURCE_KINDS,
+  SUBJECT_SECTIONS,
 } from "./types";
 
 const markSchema = z.object({
@@ -41,8 +46,11 @@ export function emptyLessonMarks(): LessonMarksDocument {
 const msSchema = z.number().nullable().catch(null);
 const text = z.string().catch("");
 
+const stepSchema = z.object({ text: z.string(), atMs: msSchema });
+
 export const lessonSheetSchema = z.object({
   version: z.literal(1).catch(1),
+  kind: z.enum(["language", "subject"]).catch("language"),
   topic: text,
   summary: text,
   chapters: z
@@ -54,8 +62,87 @@ export const lessonSheetSchema = z.object({
         term: z.string(),
         reading: text,
         meaning: text,
+        note: text,
         heardAtMs: msSchema,
         isNew: z.boolean().catch(true),
+      }),
+    )
+    .catch([]),
+  keyTerms: z
+    .array(
+      z.object({
+        term: z.string(),
+        definition: text,
+        heardAtMs: msSchema,
+        isNew: z.boolean().catch(true),
+      }),
+    )
+    .catch([]),
+  ideas: z
+    .array(
+      z.object({
+        title: z.string(),
+        explanation: text,
+        example: text,
+        exampleAtMs: msSchema,
+        terms: z.array(z.string()).catch([]),
+      }),
+    )
+    .catch([]),
+  sources: z
+    .array(
+      z.object({
+        name: z.string(),
+        kind: z.enum(SOURCE_KINDS).catch("other"),
+        year: text,
+        note: text,
+        atMs: msSchema,
+      }),
+    )
+    .catch([]),
+  methods: z
+    .array(
+      z.object({
+        title: z.string(),
+        atMs: msSchema,
+        steps: z.array(stepSchema).catch([]),
+      }),
+    )
+    .catch([]),
+  checkYourself: z
+    .array(z.object({ question: z.string(), answer: text, atMs: msSchema }))
+    .catch([]),
+  formulas: z
+    .array(
+      z.object({
+        name: z.string(),
+        latex: z.string(),
+        symbols: z
+          .array(z.object({ symbol: z.string(), meaning: text }))
+          .catch([]),
+        whenToUse: text,
+        atMs: msSchema,
+        from: z.enum(["speech", "notes"]).catch("speech"),
+      }),
+    )
+    .catch([]),
+  workedExamples: z
+    .array(
+      z.object({
+        problem: z.string(),
+        atMs: msSchema,
+        steps: z.array(stepSchema).catch([]),
+        answer: text,
+      }),
+    )
+    .catch([]),
+  problems: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: text,
+        steps: z.array(z.string()).catch([]),
+        atMs: msSchema,
       }),
     )
     .catch([]),
@@ -149,13 +236,46 @@ export function emptyLessonPractice(): LessonPracticeDocument {
 const settingsSchema = z.object({
   learning: z.string().min(1),
   explainIn: z.string().min(1),
+  subject: z.enum(LESSON_SUBJECTS).optional().catch(undefined),
+  subjectName: z.string().optional().catch(undefined),
+  leaveOut: z.array(z.enum(SUBJECT_SECTIONS)).optional().catch(undefined),
 });
 
 export function parseLessonSettings(raw: unknown): LessonSettings | null {
   const parsed = settingsSchema.safeParse(
     typeof raw === "string" ? safeJson(raw) : raw,
   );
+  if (!parsed.success) return null;
+  const { subject, subjectName, leaveOut, ...rest } = parsed.data;
+  return {
+    ...rest,
+    ...(subject ? { subject } : {}),
+    ...(subjectName ? { subjectName } : {}),
+    ...(leaveOut?.length ? { leaveOut } : {}),
+  };
+}
+
+/** A lesson's kind of class; lessons from before subjects are language lessons. */
+export function lessonSubject(
+  settings: LessonSettings | null | undefined,
+): LessonSubject {
+  return settings?.subject ?? "language";
+}
+
+const fixesSchema = z.object({
+  version: z.literal(1).catch(1),
+  formulas: z
+    .record(z.string(), z.object({ latex: z.string(), at: text }))
+    .catch({}),
+});
+
+export function parseLessonFixes(raw: unknown): LessonFixesDocument | null {
+  const parsed = fixesSchema.safeParse(raw);
   return parsed.success ? parsed.data : null;
+}
+
+export function emptyLessonFixes(): LessonFixesDocument {
+  return { version: 1, formulas: {} };
 }
 
 function safeJson(value: string): unknown {

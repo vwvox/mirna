@@ -8,7 +8,7 @@ import type { LessonSheet, LessonVocabularyItem } from "./types";
 const now = new Date("2026-11-25T12:00:00Z");
 
 function word(term: string): LessonVocabularyItem {
-  return { term, reading: "", meaning: "", heardAtMs: null, isNew: true };
+  return { term, reading: "", meaning: "", note: "", heardAtMs: null, isNew: true };
 }
 
 function lesson(
@@ -20,6 +20,8 @@ function lesson(
     sessionId,
     title: sessionId,
     started: sessionId,
+    settings: null,
+    fixes: null,
     sheet: {
       sheet: { vocabulary: terms.map(word) } as LessonSheet,
       generatedAt: "",

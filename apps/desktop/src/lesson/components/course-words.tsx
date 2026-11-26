@@ -22,6 +22,8 @@ import {
   type WordFilter,
   type WordSort,
 } from "../course-data";
+import { useLessonLanguage } from "../language-context";
+import { usesPinyin } from "../languages";
 import { markWordKnown, type WordState } from "../practice";
 import { formatClock } from "../time";
 import { LessonPracticeDialog } from "./practice-dialog";
@@ -99,11 +101,15 @@ function LessonStrip({ word }: { word: CourseWord }) {
 export function CourseWords({
   words,
   lessons,
+  glossary = false,
 }: {
   words: CourseWord[];
   lessons: CourseLesson[];
+  /** A topic or maths course: key terms with their definitions. */
+  glossary?: boolean;
 }) {
   const { t } = useLingui();
+  const language = useLessonLanguage();
   const [sort, setSort] = useState<WordSort>("said");
   const [filter, setFilter] = useState<WordFilter>("all");
   const [query, setQuery] = useState("");
@@ -141,7 +147,7 @@ export function CourseWords({
           id="course-words"
           className="font-brand flex items-baseline gap-2 text-lg font-medium"
         >
-          <Trans>All words</Trans>
+          {glossary ? <Trans>Glossary</Trans> : <Trans>All words</Trans>}
           <span className="text-muted-foreground font-sans text-sm font-normal">
             {words.length}
           </span>
@@ -169,7 +175,9 @@ export function CourseWords({
             </button>
           ))}
         </div>
-        <ToneLegend className="ml-auto" />
+        {!glossary && usesPinyin(language) ? (
+          <ToneLegend className="ml-auto" />
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -178,7 +186,13 @@ export function CourseWords({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={t`Search characters, pinyin or meaning`}
+            placeholder={
+              glossary
+                ? t`Search terms or definitions`
+                : usesPinyin(language)
+                  ? t`Search characters, pinyin or meaning`
+                  : t`Search words or meanings`
+            }
             aria-label={t`Search words`}
             className="min-w-0 flex-1 bg-transparent outline-hidden"
           />
@@ -210,10 +224,10 @@ export function CourseWords({
           <thead className="bg-muted/50 text-muted-foreground text-left text-xs">
             <tr>
               <th scope="col" className="px-4 py-2 font-medium">
-                <Trans>Word</Trans>
+                {glossary ? <Trans>Term</Trans> : <Trans>Word</Trans>}
               </th>
               <th scope="col" className="px-3 py-2 font-medium">
-                <Trans>Meaning</Trans>
+                {glossary ? <Trans>Definition</Trans> : <Trans>Meaning</Trans>}
               </th>
               <th scope="col" className="px-3 py-2 font-medium">
                 <Trans>Times said</Trans>
@@ -233,7 +247,13 @@ export function CourseWords({
                 className="hover:bg-accent/60 cursor-pointer border-t"
                 onClick={() => setSelected(word.term)}
               >
-                <td className="px-4 py-2 text-2xl">
+                <td
+                  className={
+                    glossary || !usesPinyin(language)
+                      ? "text-mirna-serra dark:text-mirna-moss px-4 py-2 text-base font-semibold"
+                      : "px-4 py-2 text-2xl"
+                  }
+                >
                   <button
                     type="button"
                     className="text-left"

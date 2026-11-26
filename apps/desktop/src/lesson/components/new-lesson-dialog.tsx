@@ -13,15 +13,21 @@ import {
   DialogTitle,
 } from "@anlg/ui/components/ui/dialog";
 import { toast } from "@anlg/ui/components/ui/toast";
+import { cn } from "@anlg/utils";
 
 import { requestLessonSheet } from "../auto";
+import { baseLanguageCode, LESSON_LANGUAGES } from "../languages";
 import {
   loadCourseLessons,
+  loadCourseSettings,
   loadLessonSession,
   markSessionAsLesson,
 } from "../queries";
+import { lessonSubject } from "../schema";
 import { useMarkShortcutLabels } from "../shortcut-labels";
 import { defaultLessonTitle } from "../title";
+import type { LessonSettings, LessonSubject, SubjectSection } from "../types";
+import { TranscriptionLine } from "./transcription-line";
 
 import { useLanguageModel } from "~/ai/hooks";
 import { liveQueryClient } from "~/db";
@@ -63,22 +69,6 @@ export function openMakeLessonDialog(sessionId: string, folderPath: string) {
   });
 }
 
-const LANGUAGES = [
-  "zh",
-  "en",
-  "pt",
-  "es",
-  "fr",
-  "de",
-  "it",
-  "ja",
-  "ko",
-  "ar",
-  "ru",
-  "nl",
-  "ga",
-] as const;
-
 function languageLabel(code: string, locale: string) {
   try {
     return (
@@ -91,7 +81,7 @@ function languageLabel(code: string, locale: string) {
 
 const NEW_COURSE = "\u0000new";
 
-type Defaults = { folderPath: string; learning: string; explainIn: string };
+type Defaults = { folderPath: string; settings: LessonSettings | null };
 
 async function loadDefaults(): Promise<Defaults> {
   const rows = await liveQueryClient.execute<{
@@ -106,14 +96,25 @@ async function loadDefaults(): Promise<Defaults> {
     `,
   );
   const last = rows[0];
-  if (!last) return { folderPath: "", learning: "zh", explainIn: "en" };
+  if (!last) return { folderPath: "", settings: null };
   const lesson = await loadLessonSession(last.id);
-  return {
-    folderPath: last.folder_path,
-    learning: lesson.settings?.learning ?? "zh",
-    explainIn: lesson.settings?.explainIn ?? "en",
-  };
+  return { folderPath: last.folder_path, settings: lesson.settings };
 }
+
+/** The app's language when it's one lessons offer, else English. */
+function appLanguage(locale: string): string {
+  const base = baseLanguageCode(locale);
+  return (LESSON_LANGUAGES as readonly string[]).includes(base) ? base : "en";
+}
+
+/** The ticks under "Write up after class" for each kind of class. */
+const SECTIONS_FOR: Record<
+  Exclude<LessonSubject, "language">,
+  SubjectSection[]
+> = {
+  topic: ["keyTerms", "ideas", "sources", "methods", "checkYourself"],
+  maths: ["formulas", "workedExamples", "slips", "problems", "keyTerms"],
+};
 
 const MIRNA_BUNDLE_PREFIX = "app.mirna";
 
@@ -160,8 +161,11 @@ function NewLessonDialog() {
 
   const [course, setCourse] = useState<string | null>(null);
   const [newCourse, setNewCourse] = useState("");
+  const [subject, setSubject] = useState<LessonSubject | null>(null);
+  const [subjectName, setSubjectName] = useState<string | null>(null);
   const [learning, setLearning] = useState<string | null>(null);
   const [explainIn, setExplainIn] = useState<string | null>(null);
+  const [leaveOut, setLeaveOut] = useState<SubjectSection[] | null>(null);
   const [title, setTitle] = useState<string | null>(null);
   const [chineseMode, setChineseMode] = useState<ChineseDisplayMode | null>(
     null,
@@ -186,6 +190,12 @@ function NewLessonDialog() {
     enabled: Boolean(folderPath),
     queryFn: async () => (await loadCourseLessons(folderPath)).length,
   });
+  // A course keeps its kind of class and languages from one lesson to the next.
+  const courseSettings = useQuery({
+    queryKey: ["lesson-course-settings", folderPath],
+    enabled: Boolean(folderPath) && chosenCourse !== NEW_COURSE,
+    queryFn: () => loadCourseSettings(folderPath),
+  });
   const suggestedTitle = defaultLessonTitle((lessonCount.data ?? 0) + 1);
 
   const close = () =>
@@ -194,21 +204,51 @@ function NewLessonDialog() {
       folderPath: null,
       convertSessionId: null,
     });
-  const settings = {
-    learning:
-      learning ??
-      existing.data?.settings?.learning ??
-      defaults.data?.learning ??
-      "zh",
-    explainIn:
-      explainIn ??
-      existing.data?.settings?.explainIn ??
-      defaults.data?.explainIn ??
-      "en",
-  };
+  const known =
+    existing.data?.settings ??
+    (chosenCourse === NEW_COURSE ? null : courseSettings.data) ??
+    defaults.data?.settings ??
+    null;
+  const locale = i18n.locale || "en";
+  const kind = subject ?? known?.subject ?? "language";
+  const isLanguage = kind === "language";
+  const chosenLearning =
+    learning ??
+    (isLanguage
+      ? (known && lessonSubject(known) === "language" ? known.learning : "")
+      : (known && lessonSubject(known) !== "language"
+          ? known.learning
+          : (known?.explainIn ?? appLanguage(locale))));
+  const chosenExplainIn = isLanguage
+    ? (explainIn ?? known?.explainIn ?? appLanguage(locale))
+    : chosenLearning;
+  const chosenSubjectName = (
+    subjectName ??
+    (known && lessonSubject(known) === kind ? known.subjectName : "") ??
+    ""
+  ).trim();
+  const sectionsOff =
+    leaveOut ??
+    (known && lessonSubject(known) === kind ? (known.leaveOut ?? []) : []);
+
+  const settings: LessonSettings = isLanguage
+    ? { learning: chosenLearning, explainIn: chosenExplainIn }
+    : {
+        learning: chosenLearning,
+        explainIn: chosenLearning,
+        subject: kind,
+        ...(chosenSubjectName ? { subjectName: chosenSubjectName } : {}),
+        ...(sectionsOff.length
+          ? {
+              leaveOut: sectionsOff.filter((section) =>
+                SECTIONS_FOR[kind].includes(section),
+              ),
+            }
+          : {}),
+      };
 
   const saveChineseDisplay = () => {
-    if (settings.learning !== "zh" || !chineseMode) return;
+    if (!isLanguage || settings.learning !== "zh" || !chineseMode) return;
     if (chineseMode === lessonDisplay.mode) return;
     useChineseDisplay
       .getState()
@@ -218,6 +258,7 @@ function NewLessonDialog() {
   const start = useMutation({
     mutationFn: async () => {
       if (!folderPath) throw new Error("course");
+      if (!settings.learning) throw new Error("language");
       saveChineseDisplay();
       if (chosenCourse === NEW_COURSE) await createNamedFolder(folderPath);
       if (convertId) {
@@ -256,9 +297,11 @@ function NewLessonDialog() {
       toast.error(
         error instanceof Error && error.message === "course"
           ? t`Give the course a name first.`
-          : converting
-            ? t`Couldn't make it a lesson.`
-            : t`Couldn't start the lesson.`,
+          : error instanceof Error && error.message === "language"
+            ? t`Pick the language first.`
+            : converting
+              ? t`Couldn't make it a lesson.`
+              : t`Couldn't start the lesson.`,
       ),
   });
 
@@ -268,15 +311,48 @@ function NewLessonDialog() {
     "word-by-word": t`Word by word`,
     "pinyin-only": t`Pinyin only`,
   };
+  const kinds: { value: LessonSubject; name: string; what: string; for: string }[] = [
+    {
+      value: "language",
+      name: t`Language`,
+      what: t`Words, patterns, corrections`,
+      for: t`Spanish, Japanese, Mandarin…`,
+    },
+    {
+      value: "topic",
+      name: t`Topic`,
+      what: t`Key terms, ideas, people and cases`,
+      for: t`Sociology, law, cooking…`,
+    },
+    {
+      value: "maths",
+      name: t`Maths & science`,
+      what: t`Formulas, worked examples, problems`,
+      for: t`Statistics, physics…`,
+    },
+  ];
+  const sectionLabels: Record<SubjectSection, [string, string]> = {
+    keyTerms: [t`Key terms`, t`Each in the teacher's words`],
+    ideas: [t`Main ideas`, t`With the example used in class`],
+    sources: [t`People, cases and sources`, t`Who and what was cited, and why`],
+    methods: [t`Steps and methods`, t`When the class walks through one`],
+    checkYourself: [t`Check-yourself questions`, t`Answered from the class`],
+    formulas: [t`Formulas`, t`With what each symbol means`],
+    workedExamples: [t`Worked examples`, t`Step by step, as done in class`],
+    slips: [t`Common slips`, t`Where you or the class went wrong`],
+    problems: [t`Practice problems`, t`From class and the homework`],
+  };
   const apps = callApps.data ?? [];
   const appNames = apps
-    .map((app) => app.name.replace(/^\u200e/, ""))
+    .map((app) => app.name.replace(/^‎/, ""))
     .join(", ");
-  const locale = i18n.locale || "en";
+  const field = "flex flex-col gap-1.5 text-sm font-medium";
+  const select =
+    "bg-background h-10 rounded-lg border px-3 text-sm font-normal";
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
         <div className="flex flex-col gap-1">
           <DialogTitle className="font-brand text-2xl font-medium">
             {converting ? (
@@ -292,13 +368,13 @@ function NewLessonDialog() {
           <DialogDescription>
             {converting ? (
               <Trans>
-                Mirna writes a study sheet from this recording: words, patterns,
-                corrections and homework.
+                Mirna writes a study sheet from this recording, shaped by the
+                kind of class.
               </Trans>
             ) : (
               <Trans>
-                Record a class and get a study sheet afterwards: words,
-                patterns, corrections and homework.
+                Record a class and get a study sheet afterwards, shaped by the
+                kind of class.
               </Trans>
             )}
           </DialogDescription>
@@ -311,11 +387,51 @@ function NewLessonDialog() {
             start.mutate();
           }}
         >
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+              <Trans>What kind of class?</Trans>
+            </legend>
+            <div
+              role="radiogroup"
+              aria-label={t`Kind of class`}
+              className="grid gap-2 sm:grid-cols-3"
+            >
+              {kinds.map((option) => {
+                const on = kind === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => {
+                      setSubject(option.value);
+                      setLearning(null);
+                      setLeaveOut(null);
+                    }}
+                    className={cn([
+                      "flex flex-col items-start gap-1 rounded-xl border px-3.5 py-3 text-left",
+                      on
+                        ? "border-mirna-serra bg-mirna-moss/40 dark:bg-mirna-serra/20 ring-mirna-serra ring-1"
+                        : "hover:bg-accent",
+                    ])}
+                  >
+                    <b className="text-sm">{option.name}</b>
+                    <span className="text-xs leading-snug">{option.what}</span>
+                    <span className="text-muted-foreground text-[11px]">
+                      {option.for}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
+            <label className={field}>
               <Trans>Course</Trans>
               <select
-                className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
+                className={select}
                 value={chosenCourse}
                 onChange={(event) => setCourse(event.target.value)}
               >
@@ -328,75 +444,170 @@ function NewLessonDialog() {
               </select>
             </label>
             {chosenCourse === NEW_COURSE ? (
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
+              <label className={field}>
                 <Trans>Course name</Trans>
                 <input
                   autoFocus
                   value={newCourse}
                   onChange={(event) => setNewCourse(event.target.value)}
                   placeholder={t`Mandarin with my teacher`}
-                  className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
+                  className={select}
                 />
               </label>
             ) : converting ? (
               <span />
             ) : (
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
+              <label className={field}>
                 <Trans>Title</Trans>
                 <input
                   value={title ?? suggestedTitle}
                   onChange={(event) => setTitle(event.target.value)}
-                  className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
+                  className={select}
                 />
               </label>
             )}
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              <Trans>I'm learning</Trans>
-              <select
-                className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
-                value={settings.learning}
-                onChange={(event) => setLearning(event.target.value)}
-              >
-                {LANGUAGES.map((code) => (
-                  <option key={code} value={code}>
-                    {languageLabel(code, locale)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium">
-              <Trans>Explain in</Trans>
-              <select
-                className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
-                value={settings.explainIn}
-                onChange={(event) => setExplainIn(event.target.value)}
-              >
-                {LANGUAGES.map((code) => (
-                  <option key={code} value={code}>
-                    {languageLabel(code, locale)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {settings.learning === "zh" ? (
-              <label className="flex flex-col gap-1.5 text-sm font-medium">
-                <Trans>Show Chinese as</Trans>
-                <select
-                  className="bg-background h-10 rounded-lg border px-3 text-sm font-normal"
-                  value={chineseMode ?? lessonDisplay.mode}
-                  onChange={(event) =>
-                    setChineseMode(event.target.value as ChineseDisplayMode)
-                  }
-                >
-                  {CHINESE_DISPLAY_MODES.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {chineseModeLabels[mode]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            {isLanguage ? (
+              <>
+                <label className={field}>
+                  <Trans>I'm learning</Trans>
+                  <select
+                    className={select}
+                    value={settings.learning}
+                    onChange={(event) => setLearning(event.target.value)}
+                  >
+                    {settings.learning ? null : (
+                      <option value="" disabled>
+                        {t`Pick a language`}
+                      </option>
+                    )}
+                    {LESSON_LANGUAGES.map((code) => (
+                      <option key={code} value={code}>
+                        {languageLabel(code, locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={field}>
+                  <Trans>Explain in</Trans>
+                  <select
+                    className={select}
+                    value={settings.explainIn}
+                    onChange={(event) => setExplainIn(event.target.value)}
+                  >
+                    {LESSON_LANGUAGES.map((code) => (
+                      <option key={code} value={code}>
+                        {languageLabel(code, locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {settings.learning === "zh" ? (
+                  <label className={field}>
+                    <Trans>Show Chinese as</Trans>
+                    <select
+                      className={select}
+                      value={chineseMode ?? lessonDisplay.mode}
+                      onChange={(event) =>
+                        setChineseMode(event.target.value as ChineseDisplayMode)
+                      }
+                    >
+                      {CHINESE_DISPLAY_MODES.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {chineseModeLabels[mode]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <label className={field}>
+                    <Trans>Subject</Trans>
+                    <input
+                      value={subjectName ?? chosenSubjectName}
+                      onChange={(event) => setSubjectName(event.target.value)}
+                      placeholder={
+                        kind === "maths" ? t`Statistics` : t`Contract law`
+                      }
+                      className={select}
+                    />
+                  </label>
+                  <span className="text-muted-foreground text-xs">
+                    <Trans>Tells the AI what to look for.</Trans>
+                  </span>
+                </div>
+                <label className={field}>
+                  <Trans>Class is in</Trans>
+                  <select
+                    className={select}
+                    value={settings.learning}
+                    onChange={(event) => setLearning(event.target.value)}
+                  >
+                    {LESSON_LANGUAGES.map((code) => (
+                      <option key={code} value={code}>
+                        {languageLabel(code, locale)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
           </div>
+
+          {converting || !settings.learning ? null : (
+            <TranscriptionLine
+              languages={[settings.learning, settings.explainIn]}
+            />
+          )}
+
+          {isLanguage ? null : (
+            <fieldset className="flex flex-col gap-2">
+              <legend className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                <Trans>Write up after class</Trans>
+              </legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SECTIONS_FOR[kind].map((section) => {
+                  const [name, hint] = sectionLabels[section];
+                  return (
+                    <label
+                      key={section}
+                      className="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm font-semibold"
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-mirna-serra mt-0.5 size-4"
+                        checked={!sectionsOff.includes(section)}
+                        onChange={(event) =>
+                          setLeaveOut(
+                            event.target.checked
+                              ? sectionsOff.filter((item) => item !== section)
+                              : [...sectionsOff, section],
+                          )
+                        }
+                      />
+                      <span>
+                        {name}
+                        <small className="text-muted-foreground block text-xs font-normal">
+                          {hint}
+                        </small>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {kind === "maths" ? (
+                <p className="bg-muted/60 rounded-lg px-3 py-2 text-xs leading-relaxed">
+                  <Trans>
+                    Formulas are mostly written, not said, so the ones rebuilt
+                    from speech are marked for you to check. Type $…$ in your
+                    notes during class to write one yourself.
+                  </Trans>
+                </p>
+              ) : null}
+            </fieldset>
+          )}
 
           {converting ? null : (
             <>
@@ -462,7 +673,10 @@ function NewLessonDialog() {
             <Button type="button" variant="outline" onClick={close}>
               <Trans>Cancel</Trans>
             </Button>
-            <Button type="submit" disabled={start.isPending || !folderPath}>
+            <Button
+              type="submit"
+              disabled={start.isPending || !folderPath || !settings.learning}
+            >
               {converting ? (
                 <Trans>Write the study sheet</Trans>
               ) : (

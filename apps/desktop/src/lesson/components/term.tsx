@@ -2,6 +2,8 @@ import { useMemo } from "react";
 
 import { cn } from "@anlg/utils";
 
+import { useLessonLanguage } from "../language-context";
+import { languageFacts, usesPinyin } from "../languages";
 import { type ReadPart, readTerm } from "../tones";
 
 import {
@@ -35,7 +37,9 @@ export function LessonTerm({
   pinyin?: boolean;
 }) {
   const display = useEffectiveChineseDisplay(true);
-  const han = hasHan(term);
+  const language = useLessonLanguage();
+  // Japanese kanji are Han characters too, but pinyin belongs to Mandarin.
+  const han = hasHan(term) && usesPinyin(language);
   const mode =
     pinyin === undefined
       ? display.mode
@@ -68,6 +72,18 @@ export function LessonTerm({
             </span>
           ),
         )}
+      </span>
+    );
+  }
+
+  if (!han && language) {
+    return (
+      <span
+        lang={language}
+        dir={languageFacts(language).rtl ? "rtl" : "auto"}
+        className={cn([className])}
+      >
+        {term}
       </span>
     );
   }

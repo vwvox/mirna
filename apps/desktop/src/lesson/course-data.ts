@@ -1,10 +1,11 @@
 import type { RenderedTranscriptSegment } from "@anlg/plugin-transcription";
 
 import { computeTalkStats } from "./generate";
-import { chineseShare, computeChineseStats } from "./language";
+import { computeLanguageStats, languageShare } from "./language";
 import { type PracticeCard, type WordState, wordState } from "./practice";
 import { practiceCardsOf, type PracticeLesson } from "./practice-data";
 import type { LessonRoleOf } from "./roles";
+import { lessonSubject } from "./schema";
 import type { LessonMarksDocument } from "./types";
 
 /** A course's lesson with everything the course page shows about it, oldest first. */
@@ -68,13 +69,21 @@ export type CourseWord = {
  */
 export function buildCourseWords(lessons: CourseLesson[]): CourseWord[] {
   const newestFirst = [...lessons].reverse();
-  const cards = practiceCardsOf(newestFirst, { includeSkipped: true });
+  // Words and key terms; formulas and questions have their own places.
+  const cards = practiceCardsOf(newestFirst, { includeSkipped: true }).filter(
+    (card) => card.kind === "word" || card.kind === "term",
+  );
   const texts = lessons.map((lesson) =>
     transcriptText(lesson.transcript?.segments),
   );
   const listed = lessons.map(
     (lesson) =>
-      new Set((lesson.sheet?.sheet.vocabulary ?? []).map((item) => item.term)),
+      new Set(
+        [
+          ...(lesson.sheet?.sheet.vocabulary ?? []),
+          ...(lesson.sheet?.sheet.keyTerms ?? []),
+        ].map((item) => item.term),
+      ),
   );
 
   return cards.map((card) => {
@@ -165,8 +174,8 @@ export type LessonProgress = {
   number: number;
   wordsCollected: number;
   newWords: number;
-  /** Share of the lesson in Chinese, 0–100, or null without Chinese or a transcript. */
-  chinese: number | null;
+  /** Share of the lesson in the language learned, 0–100, or null when it can't be told. */
+  inLanguage: number | null;
   /** The student's share of speaking time, 0–100, or null when voices weren't told apart. */
   spoke: number | null;
   openQuestions: number;
@@ -176,27 +185,41 @@ export type LessonProgress = {
 export function courseProgress(lessons: CourseLesson[]): LessonProgress[] {
   const collected = new Set<string>();
   return lessons.map((lesson) => {
-    const vocabulary = lesson.sheet?.sheet.vocabulary ?? [];
+    const sheet = lesson.sheet?.sheet;
+    const collectedHere = [
+      ...(sheet?.vocabulary ?? []).map((item) => item.term),
+      ...(sheet?.keyTerms ?? []).map((item) => item.term),
+      ...(sheet?.formulas ?? []).map((item) => `formula:${item.name}`),
+    ];
     let fresh = 0;
-    for (const item of vocabulary) {
-      if (!collected.has(item.term)) fresh++;
-      collected.add(item.term);
+    for (const term of collectedHere) {
+      if (!collected.has(term)) fresh++;
+      collected.add(term);
     }
     const talk = lesson.transcript
       ? computeTalkStats(lesson.transcript.segments, lesson.transcript.roleOf)
       : (lesson.sheet?.sheet.talk ?? null);
-    const chinese = lesson.transcript
-      ? computeChineseStats(
-          lesson.transcript.segments,
-          lesson.transcript.roleOf,
-        )
-      : null;
+    const settings = lesson.settings;
+    // Lessons from before languages were set were all Chinese.
+    const languages = settings
+      ? lessonSubject(settings) === "language"
+        ? { learning: settings.learning, explainIn: settings.explainIn }
+        : null
+      : { learning: "zh", explainIn: "en" };
+    const stats =
+      lesson.transcript && languages
+        ? computeLanguageStats(
+            lesson.transcript.segments,
+            lesson.transcript.roleOf,
+            languages,
+          )
+        : null;
     return {
       sessionId: lesson.sessionId,
       number: lesson.number,
       wordsCollected: collected.size,
       newWords: fresh,
-      chinese: chinese ? chineseShare(chinese) : null,
+      inLanguage: stats ? languageShare(stats) : null,
       spoke: talk
         ? Math.round((talk.studentMs / (talk.studentMs + talk.teacherMs)) * 100)
         : null,

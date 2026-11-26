@@ -49,7 +49,7 @@ function word(
   reading: string,
   meaning: string,
 ): LessonVocabularyItem {
-  return { term, reading, meaning, heardAtMs: null, isNew: true };
+  return { term, reading, meaning, note: "", heardAtMs: null, isNew: true };
 }
 
 function lesson(
@@ -67,6 +67,8 @@ function lesson(
     started: `2026-11-2${number}`,
     number,
     audioMs: 60_000,
+    settings: null,
+    fixes: null,
     sheet: {
       sheet: {
         vocabulary,

@@ -7,14 +7,31 @@ import {
 } from "@anlg/plugin-transcription";
 
 import { loadLessonDocument, writeLessonDocument } from "./documents";
+import {
+  baseLanguageCode,
+  languageFacts,
+  languageName,
+  readingRule,
+} from "./languages";
 import { renameLessonWithTopic } from "./queries";
 import { type LessonRoleOf, lessonRoles } from "./roles";
-import { parseLessonMarks, parseLessonSheetDocument } from "./schema";
+import {
+  lessonSubject,
+  parseLessonMarks,
+  parseLessonSheetDocument,
+} from "./schema";
+import {
+  aiSubjectSheetSchema,
+  NO_SUBJECT_PARTS,
+  subjectSheetSystemPrompt,
+  toSubjectSheet,
+} from "./subject-sheet";
 import { formatClock, parseClock } from "./time";
 import type {
   LessonMarksDocument,
   LessonSettings,
   LessonSheet,
+  LessonSubject,
   LessonTalkStats,
 } from "./types";
 
@@ -23,7 +40,8 @@ import { sha256Hex } from "~/session/attachments";
 import { loadSessionContentSnapshot } from "~/session/content-queries";
 
 const MAX_TRANSCRIPT_CHARS = 160_000;
-const PROMPT_VERSION = "lesson-sheet-v3";
+const PROMPT_VERSION = "lesson-sheet-v4";
+const SUBJECT_PROMPT_VERSION = "subject-sheet-v1";
 
 const clock = z
   .string()
@@ -54,10 +72,12 @@ export const aiSheetSchema = z.object({
         reading: z
           .string()
           .default("")
-          .describe(
-            "Pinyin with tone marks for Chinese, a romanisation for other non-Latin scripts, else empty",
-          ),
+          .describe("The reading a learner needs, as the rules say, or empty"),
         meaning: z.string().default("").describe("Short meaning"),
+        note: z
+          .string()
+          .default("")
+          .describe('The word\'s type, short: "noun, f", "verb, irregular"'),
         heardAt: clock.describe("When the teacher first says it clearly"),
       }),
     )
@@ -138,6 +158,8 @@ Write every explanation, meaning and translation in EXPLAIN_IN. Keep terms and e
 Only include what actually happened in this lesson. Never invent vocabulary, corrections or homework.
 - topic: what the lesson covered in a few words, with key terms in LEARNING.
 - vocabulary: words and phrases the lesson taught or practised, most important first, at most 40.
+  - reading: READING_RULE
+  - note: the word's type in EXPLAIN_IN, in two or three words ("noun, f", "verb, irregular", "adjective", "phrase").ARTICLE_RULE
 - patterns: grammar points the teacher explained, with examples taken from the lesson.
 - corrections: times the teacher corrected what the student said (pronunciation, tones, word order, a missing word).
 - homework: only tasks the teacher actually set.
@@ -149,21 +171,37 @@ Only include what actually happened in this lesson. Never invent vocabulary, cor
 const OUTPUT_INSTRUCTIONS = `Reply with one JSON object and nothing else, matching this JSON schema:
 ${JSON.stringify(z.toJSONSchema(aiSheetSchema))}`;
 
-export function lessonSheetSystemPrompt(learning: string, explainIn: string) {
-  const instructions = SYSTEM_PROMPT.replace(/LEARNING/g, learning).replace(
-    /EXPLAIN_IN/g,
-    explainIn,
-  );
+/** The language sheet's instructions, for language codes ("es", "en"). */
+export function lessonSheetSystemPrompt(
+  learningCode: string,
+  explainInCode: string,
+) {
+  const learning = languageName(learningCode);
+  const explainIn = languageName(explainInCode);
+  const articleRule = languageFacts(learningCode).articles
+    ? `\n  - Give nouns with their article, as a learner should learn them (${ARTICLE_EXAMPLES[baseLanguageCode(learningCode)] ?? "la cocina, der Tisch"}).`
+    : "";
+  const instructions = SYSTEM_PROMPT.replace(
+    /READING_RULE/g,
+    readingRule(learningCode, learning),
+  )
+    .replace(/ARTICLE_RULE/g, articleRule)
+    .replace(/LEARNING/g, learning)
+    .replace(/EXPLAIN_IN/g, explainIn);
   return `${instructions}\n\n${OUTPUT_INSTRUCTIONS}`;
 }
 
-function languageName(code: string) {
-  try {
-    return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
+const ARTICLE_EXAMPLES: Record<string, string> = {
+  es: "la cocina, el mercado",
+  pt: "a cozinha, o mercado",
+  fr: "la cuisine, le marché",
+  it: "la cucina, il mercato",
+  de: "die Küche, der Markt",
+  nl: "de keuken, het brood",
+  sv: "ett kök, en marknad",
+  ga: "an chistin, an margadh",
+  el: "η κουζίνα, η αγορά",
+};
 
 function speakerName(segment: RenderedTranscriptSegment, roleOf: LessonRoleOf) {
   const role = roleOf(segment);
@@ -222,6 +260,8 @@ export function toLessonSheet(
   const seen = new Set<string>();
   return {
     version: 1,
+    kind: "language",
+    ...NO_SUBJECT_PARTS,
     topic: ai.topic.trim().slice(0, 80),
     summary: ai.summary.trim(),
     chapters: ai.chapters
@@ -239,6 +279,7 @@ export function toLessonSheet(
         term: item.term.trim(),
         reading: item.reading.trim(),
         meaning: item.meaning.trim(),
+        note: item.note.trim(),
         heardAtMs: parseClock(item.heardAt),
         isNew: !knownTerms.has(item.term.trim()),
       }))
@@ -314,6 +355,7 @@ async function loadKnownTerms(sessionId: string, folderPath: string) {
     try {
       const parsed = parseLessonSheetDocument(JSON.parse(row.body));
       for (const item of parsed?.sheet.vocabulary ?? []) terms.add(item.term);
+      for (const item of parsed?.sheet.keyTerms ?? []) terms.add(item.term);
     } catch {
       // Skip a sheet that can't be read.
     }
@@ -334,6 +376,7 @@ export type PreparedLessonSheet = {
   segments: RenderedTranscriptSegment[];
   studentHumanId: string | null;
   marks: LessonMarksDocument;
+  subject?: LessonSubject;
 };
 
 export async function prepareLessonSheet({
@@ -360,12 +403,14 @@ export async function prepareLessonSheet({
     segments,
     lessonRoles(segments, studentHumanId),
   );
+  const subject = lessonSubject(settings);
   const learning = languageName(settings.learning);
   const explainIn = languageName(settings.explainIn);
   const context = {
     lesson: snapshot?.title ?? "",
-    learning,
-    explainIn,
+    ...(subject === "language"
+      ? { learning, explainIn }
+      : { subject: settings.subjectName ?? "", classLanguage: learning }),
     studentNotes: snapshot?.rawMarkdown ?? "",
     marks: marks.marks.map((mark) => ({
       id: mark.id,
@@ -380,12 +425,30 @@ export async function prepareLessonSheet({
     questionsForLater: marks.questions.map((question) => question.text),
   };
   const prompt = `${JSON.stringify(context, null, 2)}\n\nTranscript:\n${transcript}`;
-  const system = lessonSheetSystemPrompt(learning, explainIn);
+  const system =
+    subject === "language"
+      ? lessonSheetSystemPrompt(settings.learning, settings.explainIn)
+      : subjectSheetSystemPrompt({
+          subject,
+          subjectName: settings.subjectName ?? "",
+          classLanguage: learning,
+          leaveOut: settings.leaveOut,
+        });
+  const version =
+    subject === "language" ? PROMPT_VERSION : SUBJECT_PROMPT_VERSION;
   const sourceHash = await sha256Hex(
-    new TextEncoder().encode(`${PROMPT_VERSION}\n${system}\n${prompt}`)
+    new TextEncoder().encode(`${version}\n${system}\n${prompt}`)
       .buffer as ArrayBuffer,
   );
-  return { sourceHash, prompt, system, segments, studentHumanId, marks };
+  return {
+    sourceHash,
+    prompt,
+    system,
+    segments,
+    studentHumanId,
+    marks,
+    subject,
+  };
 }
 
 // Thinking models spend their reasoning from the same budget, so a cap cuts
@@ -395,6 +458,46 @@ export function sheetMaxOutputTokens(model: LanguageModel): number | undefined {
   return typeof model !== "string" && model.provider.startsWith("anthropic")
     ? 64_000
     : undefined;
+}
+
+// Streamed, so a long answer keeps the connection busy instead of idling for
+// minutes behind one response.
+async function streamSheet<T>(
+  {
+    model,
+    system,
+    prompt,
+    signal,
+  }: {
+    model: LanguageModel;
+    system: string;
+    prompt: string;
+    signal?: AbortSignal;
+  },
+  schema: z.ZodType<T>,
+): Promise<T> {
+  let streamError: unknown;
+  const result = streamText({
+    model,
+    system,
+    prompt,
+    output: Output.object({ schema }),
+    maxRetries: 2,
+    maxOutputTokens: sheetMaxOutputTokens(model),
+    timeout: { totalMs: 240_000 },
+    abortSignal: signal,
+    onError: ({ error }) => {
+      streamError ??= error;
+    },
+  });
+  let output: T | undefined;
+  try {
+    output = (await result.output) as T;
+  } catch (error) {
+    throw streamError ?? error;
+  }
+  if (!output) throw new Error("The model returned no study sheet.");
+  return output;
 }
 
 export async function generateLessonSheet({
@@ -411,37 +514,27 @@ export async function generateLessonSheet({
   signal?: AbortSignal;
 }): Promise<LessonSheet> {
   const knownTerms = await loadKnownTerms(input.sessionId, input.folderPath);
-  // Streamed, so a long answer keeps the connection busy instead of idling
-  // for minutes behind one response.
-  let streamError: unknown;
-  const result = streamText({
-    model,
-    system: prepared.system,
-    prompt: prepared.prompt,
-    output: Output.object({ schema: aiSheetSchema }),
-    maxRetries: 2,
-    maxOutputTokens: sheetMaxOutputTokens(model),
-    timeout: { totalMs: 240_000 },
-    abortSignal: signal,
-    onError: ({ error }) => {
-      streamError ??= error;
-    },
-  });
-  let output: AiSheet | undefined;
-  try {
-    output = await result.output;
-  } catch (error) {
-    throw streamError ?? error;
-  }
-  if (!output) throw new Error("The model returned no study sheet.");
-  const sheet = toLessonSheet(output, {
+  const context = {
     knownTerms,
     talk: computeTalkStats(
       prepared.segments,
       lessonRoles(prepared.segments, prepared.studentHumanId),
     ),
     marks: prepared.marks,
-  });
+  };
+  const options = {
+    model,
+    system: prepared.system,
+    prompt: prepared.prompt,
+    signal,
+  };
+  const sheet =
+    (prepared.subject ?? "language") === "language"
+      ? toLessonSheet(await streamSheet(options, aiSheetSchema), context)
+      : toSubjectSheet(
+          await streamSheet(options, aiSubjectSheetSchema),
+          context,
+        );
   await writeLessonDocument(
     input.sessionId,
     "lesson_sheet",

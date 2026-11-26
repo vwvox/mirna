@@ -2,7 +2,9 @@ import { updateLessonDocument } from "./documents";
 import { emptyLessonPractice, parseLessonPractice } from "./schema";
 import type {
   LessonCardState,
+  LessonFixesDocument,
   LessonPracticeDocument,
+  LessonSheet,
   LessonVocabularyItem,
 } from "./types";
 
@@ -78,12 +80,91 @@ export function describeNext(
   return `${Math.round(ms / DAY)} d`;
 }
 
-export type PracticeCard = {
+/**
+ * What a card asks: a word (language lessons), or from a topic or maths sheet a
+ * key term to explain, a question to answer, a formula to write out or a
+ * problem to solve.
+ */
+export type PracticeKind = "word" | "term" | "question" | "formula" | "problem";
+
+const ID_PREFIX: Record<Exclude<PracticeKind, "word">, string> = {
+  term: "term:",
+  question: "q:",
+  formula: "formula:",
+  problem: "problem:",
+};
+
+/** Words keep their bare term as id, as practice progress was saved before kinds. */
+export function practiceCardId(kind: PracticeKind, key: string): string {
+  return kind === "word" ? key : `${ID_PREFIX[kind]}${key}`;
+}
+
+/**
+ * One thing to practise. `item.term` is the front of the card and
+ * `item.meaning` the back, whatever the kind.
+ */
+export type PracticeItem = {
   id: string;
-  sessionId: string;
+  kind: PracticeKind;
   item: LessonVocabularyItem;
+  /** Formulas: the LaTeX, with the student's fix laid over. */
+  latex?: string;
+  /** Problems: the steps to reveal one at a time. */
+  steps?: string[];
+};
+
+export type PracticeCard = PracticeItem & {
+  sessionId: string;
   state: LessonCardState | undefined;
 };
+
+function back(
+  term: string,
+  meaning: string,
+  heardAtMs: number | null,
+  isNew = true,
+): LessonVocabularyItem {
+  return { term, reading: "", meaning, note: "", heardAtMs, isNew };
+}
+
+/** Everything a sheet offers to practise, words first or by section for subject sheets. */
+export function practiceItemsOf(
+  sheet: LessonSheet | null | undefined,
+  fixes?: LessonFixesDocument | null,
+): PracticeItem[] {
+  if (!sheet) return [];
+  return [
+    ...(sheet.vocabulary ?? []).map((item) => ({
+      id: practiceCardId("word", item.term),
+      kind: "word" as const,
+      item,
+    })),
+    ...(sheet.keyTerms ?? []).map((item) => ({
+      id: practiceCardId("term", item.term),
+      kind: "term" as const,
+      item: back(item.term, item.definition, item.heardAtMs, item.isNew),
+    })),
+    ...(sheet.formulas ?? []).map((formula) => ({
+      id: practiceCardId("formula", formula.name),
+      kind: "formula" as const,
+      item: back(formula.name, formula.whenToUse, formula.atMs),
+      latex: fixes?.formulas[formula.name]?.latex || formula.latex,
+    })),
+    ...(sheet.checkYourself ?? []).map((item) => ({
+      id: practiceCardId("question", item.question),
+      kind: "question" as const,
+      item: back(item.question, item.answer, item.atMs),
+    })),
+    ...(sheet.problems ?? [])
+      .filter((problem) => problem.answer || problem.steps.length > 0)
+      .map((problem) => ({
+        id: practiceCardId("problem", problem.question),
+        kind: "problem" as const,
+        item: back(problem.question, problem.answer, problem.atMs),
+        steps: problem.steps,
+      })),
+  ];
+}
 
 export function isCardDue(card: PracticeCard, now: Date) {
   return !card.state || new Date(card.state.due).getTime() <= now.getTime();
@@ -92,7 +173,9 @@ export function isCardDue(card: PracticeCard, now: Date) {
 export function buildPracticeCards(
   lessons: Array<{
     sessionId: string;
-    vocabulary: LessonVocabularyItem[];
+    /** A language sheet's words; or give `items` for every kind of card. */
+    vocabulary?: LessonVocabularyItem[];
+    items?: PracticeItem[];
     practice: LessonPracticeDocument | null;
   }>,
   { includeSkipped = false }: { includeSkipped?: boolean } = {},
@@ -101,15 +184,21 @@ export function buildPracticeCards(
   const cards: PracticeCard[] = [];
   for (const lesson of lessons) {
     const skipped = new Set(lesson.practice?.skipped ?? []);
-    for (const item of lesson.vocabulary) {
-      if (seen.has(item.term)) continue;
-      if (!includeSkipped && skipped.has(item.term)) continue;
-      seen.add(item.term);
-      cards.push({
+    const items =
+      lesson.items ??
+      (lesson.vocabulary ?? []).map((item) => ({
         id: item.term,
-        sessionId: lesson.sessionId,
+        kind: "word" as const,
         item,
-        state: lesson.practice?.cards[item.term],
+      }));
+    for (const entry of items) {
+      if (seen.has(entry.id)) continue;
+      if (!includeSkipped && skipped.has(entry.id)) continue;
+      seen.add(entry.id);
+      cards.push({
+        ...entry,
+        sessionId: lesson.sessionId,
+        state: lesson.practice?.cards[entry.id],
       });
     }
   }

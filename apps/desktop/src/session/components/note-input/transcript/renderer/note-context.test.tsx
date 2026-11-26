@@ -159,6 +159,15 @@ describe("TranscriptNoteProvider", () => {
 function createSheet(): LessonSheet {
   return {
     version: 1,
+    kind: "language",
+    keyTerms: [],
+    ideas: [],
+    sources: [],
+    methods: [],
+    checkYourself: [],
+    formulas: [],
+    workedExamples: [],
+    problems: [],
     topic: "",
     summary: "",
     chapters: [
@@ -170,6 +179,7 @@ function createSheet(): LessonSheet {
         term: "我们",
         reading: "wǒmen",
         meaning: "we",
+        note: "",
         heardAtMs: null,
         isNew: true,
       },
@@ -177,6 +187,7 @@ function createSheet(): LessonSheet {
         term: "to be",
         reading: "",
         meaning: "ser",
+        note: "",
         heardAtMs: null,
         isNew: false,
       },

@@ -24,19 +24,129 @@ export type LessonMarksDocument = {
   questions: LessonQuestion[];
 };
 
-/** Language codes, as used by the transcription settings ("zh", "en", "pt"). */
+export const LESSON_SUBJECTS = ["language", "topic", "maths"] as const;
+/** The kind of class: a language, a topic (key terms and ideas) or maths and science (formulas). */
+export type LessonSubject = (typeof LESSON_SUBJECTS)[number];
+
+export const SUBJECT_SECTIONS = [
+  "keyTerms",
+  "ideas",
+  "sources",
+  "methods",
+  "checkYourself",
+  "formulas",
+  "workedExamples",
+  "slips",
+  "problems",
+] as const;
+export type SubjectSection = (typeof SUBJECT_SECTIONS)[number];
+
+/**
+ * Language codes, as used by the transcription settings ("zh", "en", "pt"). For
+ * topics and maths, `learning` and `explainIn` are both the class's language.
+ */
 export type LessonSettings = {
   learning: string;
   explainIn: string;
+  /** Missing on lessons set up before subjects, which are all language lessons. */
+  subject?: LessonSubject;
+  /** What a topic or maths class is about ("Contract law"), to steer the sheet. */
+  subjectName?: string;
+  /** Sections unticked when the lesson was set up. */
+  leaveOut?: SubjectSection[];
 };
 
 export type LessonVocabularyItem = {
   term: string;
-  /** Pinyin for Chinese, a romanisation for other scripts, empty when none applies. */
+  /** Pinyin for Chinese, kana for Japanese, a transliteration for other scripts, empty for Latin letters. */
   reading: string;
   meaning: string;
+  /** The word's type, short: "noun, f", "verb, irregular", "phrase". */
+  note: string;
   heardAtMs: number | null;
   isNew: boolean;
+};
+
+export type LessonKeyTerm = {
+  term: string;
+  /** In the teacher's words. */
+  definition: string;
+  heardAtMs: number | null;
+  isNew: boolean;
+};
+
+export type LessonIdea = {
+  title: string;
+  explanation: string;
+  /** The example used in class, if any. */
+  example: string;
+  exampleAtMs: number | null;
+  /** Key terms the idea uses. */
+  terms: string[];
+};
+
+export const SOURCE_KINDS = [
+  "person",
+  "book",
+  "case",
+  "law",
+  "study",
+  "other",
+] as const;
+export type LessonSourceKind = (typeof SOURCE_KINDS)[number];
+
+export type LessonSource = {
+  name: string;
+  kind: LessonSourceKind;
+  /** As said: "1893", "1858 to 1917", or empty. */
+  year: string;
+  /** Why it came up. */
+  note: string;
+  atMs: number | null;
+};
+
+export type LessonStep = { text: string; atMs: number | null };
+
+/** A method, procedure or recipe the class walked through. */
+export type LessonMethod = {
+  title: string;
+  atMs: number | null;
+  steps: LessonStep[];
+};
+
+export type LessonQuestionItem = {
+  question: string;
+  answer: string;
+  atMs: number | null;
+};
+
+export type LessonFormulaSymbol = { symbol: string; meaning: string };
+
+export type LessonFormula = {
+  name: string;
+  /** LaTeX, without $ signs. */
+  latex: string;
+  symbols: LessonFormulaSymbol[];
+  whenToUse: string;
+  atMs: number | null;
+  /** Rebuilt from what was said, or taken from the student's notes. */
+  from: "speech" | "notes";
+};
+
+export type LessonWorkedExample = {
+  problem: string;
+  atMs: number | null;
+  /** Each step's text may hold $…$ maths. */
+  steps: LessonStep[];
+  answer: string;
+};
+
+export type LessonProblem = {
+  question: string;
+  answer: string;
+  /** Steps to show one at a time; may hold $…$ maths. */
+  steps: string[];
+  atMs: number | null;
 };
 
 export type LessonExample = {
@@ -82,18 +192,36 @@ export type LessonTalkStats = {
 
 export type LessonSheet = {
   version: 1;
+  /** Language sheets have words and patterns; subject sheets (topics, maths) the rest. */
+  kind: "language" | "subject";
   /** A few words on what the lesson covered; empty on sheets written before topics. */
   topic: string;
   summary: string;
   chapters: LessonChapter[];
   vocabulary: LessonVocabularyItem[];
   patterns: LessonPattern[];
+  /** On subject sheets: common slips, by the student or the class. */
   corrections: LessonCorrection[];
   homework: LessonHomework[];
   markAnswers: { markId: string; answer: string }[];
   openQuestions: string[];
   translations: LessonTranslation[];
   talk: LessonTalkStats | null;
+  keyTerms: LessonKeyTerm[];
+  ideas: LessonIdea[];
+  sources: LessonSource[];
+  methods: LessonMethod[];
+  checkYourself: LessonQuestionItem[];
+  formulas: LessonFormula[];
+  workedExamples: LessonWorkedExample[];
+  problems: LessonProblem[];
+};
+
+/** The student's own fixes to formulas the AI rebuilt, kept apart so writing the sheet again never undoes them. */
+export type LessonFixesDocument = {
+  version: 1;
+  /** By formula name. `latex` is what the student checked or typed. */
+  formulas: Record<string, { latex: string; at: string }>;
 };
 
 export type LessonSheetDocument = {

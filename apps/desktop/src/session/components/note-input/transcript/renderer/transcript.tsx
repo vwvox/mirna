@@ -351,10 +351,11 @@ const SegmentsList = memo(
     const display = useEffectiveChineseDisplay(note.isLesson);
     const transcriptHasHan = useMemo(
       () =>
+        note.chineseReadings &&
         segments.some((segment) =>
           segment.words.some((word) => hasHan(word.text)),
         ),
-      [segments],
+      [note.chineseReadings, segments],
     );
     // Loaded up front for Chinese notes, so pinyin search has it when asked.
     usePinyinModule(transcriptHasHan);

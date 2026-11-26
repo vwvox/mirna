@@ -13,6 +13,7 @@ import type { LessonSheet } from "../types";
 
 const mocks = vi.hoisted(() => ({
   sheet: null as LessonSheet | null,
+  settings: { learning: "zh", explainIn: "en" } as Record<string, unknown>,
   addLessonMark: vi.fn(async () => null),
   addLessonQuestion: vi.fn(async () => null),
   addHomeworkTodo: vi.fn(async () => {}),
@@ -33,7 +34,7 @@ vi.mock("../queries", () => ({
   useCourseSheets: () => new Map(),
   useLessonSession: () => ({
     isLesson: true,
-    settings: { learning: "zh", explainIn: "en" },
+    settings: mocks.settings,
     folderPath: "Mandarin",
   }),
   useLessonSheet: () =>
@@ -125,6 +126,15 @@ function wrap(children: ReactNode) {
 
 const SHEET: LessonSheet = {
   version: 1,
+  kind: "language",
+  keyTerms: [],
+  ideas: [],
+  sources: [],
+  methods: [],
+  checkYourself: [],
+  formulas: [],
+  workedExamples: [],
+  problems: [],
   topic: "",
   summary: "You practised 都.",
   chapters: [],
@@ -133,6 +143,7 @@ const SHEET: LessonSheet = {
       term: "饺子",
       reading: "jiǎozi",
       meaning: "dumplings",
+      note: "",
       heardAtMs: 769_000,
       isNew: true,
     },
@@ -166,6 +177,7 @@ describe("lesson screens", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.sheet = SHEET;
+    mocks.settings = { learning: "zh", explainIn: "en" };
   });
   afterEach(cleanup);
 
@@ -218,6 +230,73 @@ describe("lesson screens", () => {
     expect(mocks.requestLessonSheet).toHaveBeenCalledWith("s1", "model", {
       force: true,
     });
+  });
+
+  it("shows a topic sheet's own sections and hides the empty ones", () => {
+    mocks.settings = {
+      learning: "en",
+      explainIn: "en",
+      subject: "topic",
+      subjectName: "Contract law",
+    };
+    mocks.sheet = {
+      ...SHEET,
+      kind: "subject",
+      summary: "Offer and acceptance.",
+      vocabulary: [],
+      patterns: [],
+      keyTerms: [
+        {
+          term: "Offer",
+          definition: "A clear promise to be bound",
+          heardAtMs: 290_000,
+          isNew: true,
+        },
+      ],
+      sources: [
+        {
+          name: "Hyde v Wrench",
+          kind: "case",
+          year: "1840",
+          note: "A counter-offer kills the offer.",
+          atMs: null,
+        },
+      ],
+      methods: [
+        {
+          title: "Is there a contract?",
+          atMs: 2_290_000,
+          steps: [{ text: "An offer, or an invitation to treat?", atMs: null }],
+        },
+      ],
+      formulas: [
+        {
+          name: "Damages",
+          latex: "D = L - M",
+          symbols: [],
+          whenToUse: "",
+          atMs: null,
+          from: "speech",
+        },
+      ],
+      corrections: [
+        { said: "an advert", corrected: "an invitation", why: "", atMs: null },
+      ],
+    };
+    render(wrap(<LessonStudySheet sessionId="s1" />));
+    expect(screen.getByText("Topic lesson · Contract law")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Key terms/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Cases and laws/ })).toBeTruthy();
+    expect(screen.getByText("Is there a contract?")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Common slips/ })).toBeTruthy();
+    expect(
+      screen.getByText("Rebuilt from what was said · check it"),
+    ).toBeTruthy();
+    expect(screen.getByText("Check 1 formula")).toBeTruthy();
+    expect(screen.getByLabelText("Make a card for Offer")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: /Main ideas/ })).toBeNull();
+    expect(screen.queryByRole("heading", { name: /^Words/ })).toBeNull();
+    expect(screen.queryByText("Pleco flashcards")).toBeNull();
   });
 
   it("offers to write the sheet when there is none yet", () => {

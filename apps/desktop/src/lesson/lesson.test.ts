@@ -110,12 +110,26 @@ describe("study sheet", () => {
   });
 
   it("asks for JSON and spells out the sheet's shape for models without structured output", () => {
-    const system = lessonSheetSystemPrompt("Chinese", "English");
+    const system = lessonSheetSystemPrompt("zh", "en");
     expect(system).toMatch(/\bJSON\b/);
     expect(system).toContain('"vocabulary"');
     expect(system).toContain('"markAnswers"');
     expect(system).toContain("Keep terms and examples in Chinese");
-    expect(system).not.toMatch(/LEARNING|EXPLAIN_IN/);
+    expect(system).toContain("reading: Pinyin with tone marks.");
+    expect(system).not.toMatch(/LEARNING|EXPLAIN_IN|READING_RULE|ARTICLE_RULE/);
+  });
+
+  it("asks for the reading each script needs, and articles where nouns have them", () => {
+    const spanish = lessonSheetSystemPrompt("es", "en");
+    expect(spanish).toContain("Leave it empty: Spanish is written in Latin letters.");
+    expect(spanish).toContain("with their article");
+    expect(spanish).toContain("la cocina, el mercado");
+    const japanese = lessonSheetSystemPrompt("ja", "en");
+    expect(japanese).toContain("hiragana");
+    expect(japanese).not.toContain("with their article");
+    expect(lessonSheetSystemPrompt("ru", "en")).toContain(
+      "acute accent on the stressed vowel",
+    );
   });
 
   it("leaves the answer length to the model except where Anthropic needs a cap", () => {
@@ -150,10 +164,11 @@ describe("study sheet", () => {
             term: "饺子",
             reading: "jiǎozi",
             meaning: "dumplings",
+            note: "",
             heardAt: "12:49",
           },
-          { term: "饺子", reading: "jiǎozi", meaning: "dup", heardAt: "" },
-          { term: "也", reading: "yě", meaning: "also", heardAt: "" },
+          { term: "饺子", reading: "jiǎozi", meaning: "dup", note: "", heardAt: "" },
+          { term: "也", reading: "yě", meaning: "also", note: "", heardAt: "" },
         ],
         patterns: [],
         corrections: [
@@ -261,6 +276,7 @@ describe("practice", () => {
             term: "新",
             reading: "",
             meaning: "",
+            note: "",
             heardAtMs: null,
             isNew: true,
           },
@@ -268,6 +284,7 @@ describe("practice", () => {
             term: "旧",
             reading: "",
             meaning: "",
+            note: "",
             heardAtMs: null,
             isNew: true,
           },
@@ -293,6 +310,7 @@ describe("practice", () => {
             term: "新",
             reading: "",
             meaning: "",
+            note: "",
             heardAtMs: null,
             isNew: true,
           },
@@ -314,6 +332,7 @@ describe("exports", () => {
       term: "饺子",
       reading: "jiǎozi",
       meaning: "dumplings\tsteamed",
+      note: "",
       heardAtMs: null,
       isNew: true,
       lesson: "Lesson 14",

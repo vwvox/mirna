@@ -8,7 +8,8 @@ import { enqueueDatabaseWrite } from "~/db/write-queue";
 export type LessonDocumentKind =
   | "lesson_marks"
   | "lesson_sheet"
-  | "lesson_practice";
+  | "lesson_practice"
+  | "lesson_fixes";
 
 type BodyRow = { body: string; source_hash: string };
 

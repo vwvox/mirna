@@ -143,15 +143,20 @@ export const SegmentRenderer = memo(
       getTranscriptSectionKey(transcriptId, segmentId),
     );
     const colorVars = useSegmentColorVars(segment.key);
-    const { isLesson, vocabulary, vocabularyTerms, translations } =
-      useTranscriptNote();
+    const {
+      isLesson,
+      chineseReadings,
+      vocabulary,
+      vocabularyTerms,
+      translations,
+    } = useTranscriptNote();
     const display = useEffectiveChineseDisplay(isLesson);
     const isChip = variant === "chip" && !editMode;
     const mode: ChineseDisplayMode =
       isChip && display.mode === "word-by-word" ? "pinyin-above" : display.mode;
     const segmentHasHan = useMemo(
-      () => segment.words.some((word) => hasHan(word.text)),
-      [segment.words],
+      () => chineseReadings && segment.words.some((word) => hasHan(word.text)),
+      [chineseReadings, segment.words],
     );
     const pinyinQuery = search.query
       ? toPinyinQuery(

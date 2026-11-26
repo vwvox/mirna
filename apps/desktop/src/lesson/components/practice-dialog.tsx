@@ -19,6 +19,8 @@ import {
   usePlayingClip,
 } from "../clip-player";
 import { findTermOccurrences, pickTermClip } from "../clips";
+import { LessonLanguageProvider } from "../language-context";
+import { looksLikeLanguage, usesPinyin } from "../languages";
 import {
   samplePlayedClip,
   smoothPitch,
@@ -46,14 +48,28 @@ import {
   toneSyllables,
 } from "../tones";
 import { useLessonTranscript } from "../use-lesson-segments";
+import { Formula, MathText } from "./math";
 import { PitchChart } from "./pitch-chart";
 import { LessonTerm } from "./term";
 
 import { hasHan, usePinyinModule } from "~/stt/pinyin";
 
 const GRADES: PracticeGrade[] = ["again", "hard", "good", "easy"];
-const MODES = ["listen", "read", "shadow"] as const;
+const WORD_MODES = ["listen", "read", "shadow"] as const;
+/** Topic and maths cards are practised one kind at a time. */
+const SUBJECT_MODES = ["term", "question", "formula", "problem"] as const;
+const MODES = [...WORD_MODES, ...SUBJECT_MODES] as const;
 type Mode = (typeof MODES)[number];
+type SubjectMode = (typeof SUBJECT_MODES)[number];
+
+function isSubjectMode(mode: Mode): mode is SubjectMode {
+  return (SUBJECT_MODES as readonly string[]).includes(mode);
+}
+
+/** Whether a card belongs in a mode: words in the word modes, the rest by kind. */
+function inMode(card: Pick<PracticeCard, "kind">, mode: Mode) {
+  return isSubjectMode(mode) ? card.kind === mode : card.kind === "word";
+}
 const MODE_KEY = "mirna:practice-mode";
 const MAX_SENTENCE_SYLLABLES = 16;
 
@@ -95,8 +111,7 @@ export function sentenceAround(
     .map((piece) => piece.trim())
     .filter(Boolean);
   const piece =
-    pieces.find((item) => item.includes(term) && hasHan(item)) ??
-    segment.text.trim();
+    pieces.find((item) => item.includes(term)) ?? segment.text.trim();
   const found = findTermOccurrences([segment], piece, roleOf)[0];
   const range = found
     ? { startMs: found.startMs, endMs: found.endMs }
@@ -170,10 +185,27 @@ export function LessonPracticeDialog({
   const [total, setTotal] = useState(0);
   const [startedWith, setStartedWith] = useState({ fresh: 0, review: 0 });
   const [revealed, setRevealed] = useState(false);
-  const [mode, setModeState] = useState<Mode>(storedMode);
+  const [chosenMode, setModeState] = useState<Mode>(storedMode);
   const [shadowPick, setShadowPick] = useState<ShadowPick | null>(null);
+  const modes = useMemo(() => {
+    const kinds = new Set(cards.map((card) => card.kind));
+    // Maths classes start with their formulas, as their sheets do.
+    const order: readonly SubjectMode[] =
+      kinds.has("formula") || kinds.has("problem")
+        ? ["formula", "problem", "term", "question"]
+        : SUBJECT_MODES;
+    return [
+      ...(kinds.has("word") ? WORD_MODES : []),
+      ...order.filter((kind) => kinds.has(kind)),
+    ] as Mode[];
+  }, [cards]);
+  const mode: Mode = modes.includes(chosenMode)
+    ? chosenMode
+    : (modes[0] ?? "listen");
 
   const setMode = (next: Mode) => {
+    // Words share one queue across their modes; each other kind has its own.
+    if (isSubjectMode(next) || isSubjectMode(mode)) setQueue(null);
     setModeState(next);
     setRevealed(false);
     if (next !== "shadow") setShadowPick(null);
@@ -196,14 +228,15 @@ export function LessonPracticeDialog({
 
   useEffect(() => {
     if (queue !== null || lessons.length === 0) return;
-    const chosen = everyCard ? cards : dueCards(cards, new Date());
+    const ofMode = cards.filter((card) => inMode(card, mode));
+    const chosen = everyCard ? ofMode : dueCards(ofMode, new Date());
     setQueue(chosen.map(cardKey));
     setTotal(chosen.length);
     setStartedWith({
       fresh: chosen.filter((card) => !card.state).length,
       review: chosen.filter((card) => card.state).length,
     });
-  }, [cards, everyCard, lessons.length, queue]);
+  }, [cards, everyCard, lessons.length, mode, queue]);
 
   useEffect(() => () => stopClip(), []);
 
@@ -212,7 +245,16 @@ export function LessonPracticeDialog({
     () => new Map(lessons.map((lesson) => [lesson.sessionId, lesson])),
     [lessons],
   );
-  const showAnswer = mode !== "read" || revealed;
+  const showAnswer = mode === "listen" || mode === "shadow" || revealed;
+  const languageOf = (sessionId: string) =>
+    lessonOf.get(sessionId)?.settings?.learning ?? null;
+  const practisesChinese =
+    modes.includes("listen") &&
+    lessons.some(
+      (lesson) =>
+        usesPinyin(lesson.settings?.learning) &&
+        (lesson.sheet?.sheet.vocabulary.length ?? 0) > 0,
+    );
 
   const grade = (value: PracticeGrade) => {
     if (!current || !queue) return;
@@ -226,7 +268,11 @@ export function LessonPracticeDialog({
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.target instanceof HTMLInputElement) return;
+    if (
+      event.target instanceof HTMLInputElement ||
+      event.target instanceof HTMLTextAreaElement
+    )
+      return;
     if (event.key === " " && !showAnswer && current) {
       event.preventDefault();
       setRevealed(true);
@@ -277,7 +323,11 @@ export function LessonPracticeDialog({
           (lesson.sheet?.sheet.patterns ?? []).flatMap((pattern) =>
             pattern.examples
               .filter(
-                (example) => example.atMs !== null && hasHan(example.text),
+                (example) =>
+                  example.atMs !== null &&
+                  (lesson.settings
+                    ? looksLikeLanguage(example.text, lesson.settings.learning)
+                    : hasHan(example.text)),
               )
               .map((example) => ({
                 sessionId: lesson.sessionId,
@@ -296,6 +346,10 @@ export function LessonPracticeDialog({
     listen: t`Listen and say`,
     read: t`Read`,
     shadow: t`Shadow a sentence`,
+    term: t`Key terms`,
+    question: t`Check yourself`,
+    formula: t`Formulas`,
+    problem: t`Problems`,
   };
 
   return (
@@ -326,7 +380,7 @@ export function LessonPracticeDialog({
                 aria-label={t`Practice mode`}
                 className="bg-muted ml-auto inline-flex rounded-xl p-[3px]"
               >
-                {MODES.map((value) => (
+                {modes.map((value) => (
                   <button
                     key={value}
                     type="button"
@@ -383,34 +437,60 @@ export function LessonPracticeDialog({
                   <Trans>Close</Trans>
                 </Button>
               </div>
-            ) : (
-              <PracticeCardView
-                key={`${cardKey(current)}:${mode}:${shadowPick?.text ?? ""}`}
+            ) : isSubjectMode(mode) ? (
+              <RecallCardView
+                key={cardKey(current)}
                 card={current}
                 lessonTitle={lessonOf.get(current.sessionId)?.title ?? ""}
-                mode={mode}
                 showAnswer={showAnswer}
                 onReveal={() => setRevealed(true)}
-                shadowPick={shadowPick}
-                tools={tools}
               />
+            ) : (
+              <LessonLanguageProvider language={languageOf(current.sessionId)}>
+                <PracticeCardView
+                  key={`${cardKey(current)}:${mode}:${shadowPick?.text ?? ""}`}
+                  card={current}
+                  lessonTitle={lessonOf.get(current.sessionId)?.title ?? ""}
+                  language={languageOf(current.sessionId)}
+                  mode={mode}
+                  showAnswer={showAnswer}
+                  onReveal={() => setRevealed(true)}
+                  shadowPick={shadowPick}
+                  tools={tools}
+                />
+              </LessonLanguageProvider>
             )}
 
             {current && !showAnswer ? (
               <p className="text-muted-foreground text-center text-xs">
-                <Trans>
-                  Say it out loud, then show the answer. Rating yourself takes
-                  you to the next word.
-                </Trans>
+                {isSubjectMode(mode) ? (
+                  <Trans>
+                    Answer it in your head, out loud or on paper, then show the
+                    answer. You judge how close you were.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    Say it out loud, then show the answer. Rating yourself
+                    takes you to the next word.
+                  </Trans>
+                )}
               </p>
             ) : null}
 
             {current && showAnswer ? (
               <div className="bg-background sticky bottom-0 flex flex-col gap-2 pt-2">
                 <p className="text-muted-foreground text-xs">
-                  <Trans>
-                    How well did you know it? Pick one to go to the next word.
-                  </Trans>
+                  {isSubjectMode(mode) ? (
+                    <Trans>
+                      How well did you know it? Pick one to go to the next
+                      card.
+                    </Trans>
+                  ) : (
+                    <Trans>
+                      How well did you know it? Pick one to go to the next
+                      word.
+                    </Trans>
+                  )}
                 </p>
                 <div
                   className="grid grid-cols-4 gap-2"
@@ -452,7 +532,11 @@ export function LessonPracticeDialog({
                 {total}
               </span>
               <div className="flex justify-between text-sm">
-                <Trans>New words</Trans>
+                {isSubjectMode(mode) ? (
+                  <Trans>New cards</Trans>
+                ) : (
+                  <Trans>New words</Trans>
+                )}
                 <span className="text-muted-foreground">
                   {startedWith.fresh}
                 </span>
@@ -465,6 +549,7 @@ export function LessonPracticeDialog({
               </div>
             </RailPanel>
 
+            {practisesChinese ? (
             <RailPanel title={t`Tones you miss most`}>
               {missed.length > 0 ? (
                 <>
@@ -499,8 +584,9 @@ export function LessonPracticeDialog({
                 </p>
               )}
             </RailPanel>
+            ) : null}
 
-            {sentences.length > 0 ? (
+            {sentences.length > 0 && !isSubjectMode(mode) ? (
               <RailPanel title={t`Shadow a sentence`}>
                 {sentences.map((sentence) => (
                   <button
@@ -588,6 +674,7 @@ function ClipButton({
 function PracticeCardView({
   card,
   lessonTitle,
+  language,
   mode,
   showAnswer,
   onReveal,
@@ -596,6 +683,7 @@ function PracticeCardView({
 }: {
   card: PracticeCard;
   lessonTitle: string;
+  language: string | null;
   mode: Mode;
   showAnswer: boolean;
   onReveal: () => void;
@@ -782,7 +870,7 @@ function PracticeCardView({
         </div>
       )}
 
-      {showAnswer && spoken && hasHan(spoken) ? (
+      {showAnswer && spoken && usesPinyin(language) && hasHan(spoken) ? (
         <YourTurn
           key={spoken}
           sessionId={card.sessionId}
@@ -1020,6 +1108,179 @@ function YourTurn({
       {problem ? (
         <p className="text-muted-foreground text-xs">{problem}</p>
       ) : null}
+    </div>
+  );
+}
+
+/** A clip of the teacher explaining it: from just before the moment, for 15 seconds. */
+function explanationClip(atMs: number | null): Range | null {
+  return atMs === null
+    ? null
+    : { startMs: Math.max(0, atMs - 500), endMs: atMs + 15_000 };
+}
+
+/**
+ * A topic or maths card: explain the key term, answer the question, write out
+ * the formula or solve the problem, then compare with what the class said.
+ * Nothing is marked; the student grades themselves.
+ */
+function RecallCardView({
+  card,
+  lessonTitle,
+  showAnswer,
+  onReveal,
+}: {
+  card: PracticeCard;
+  lessonTitle: string;
+  showAnswer: boolean;
+  onReveal: () => void;
+}) {
+  const { t } = useLingui();
+  const [answer, setAnswer] = useState("");
+  const [stepsShown, setStepsShown] = useState(0);
+  const clip = explanationClip(card.item.heardAtMs);
+  const steps = card.steps ?? [];
+  const writes = card.kind === "term" || card.kind === "question";
+
+  return (
+    <div className="flex flex-col gap-5 rounded-2xl border p-7">
+      {lessonTitle ? (
+        <span className="text-muted-foreground text-xs">{lessonTitle}</span>
+      ) : null}
+      {card.kind === "term" ? (
+        <div className="font-brand text-mirna-serra dark:text-mirna-moss text-5xl leading-none font-medium">
+          {card.item.term}
+        </div>
+      ) : card.kind === "formula" ? (
+        <div className="font-brand text-mirna-serra dark:text-mirna-moss text-4xl leading-tight font-medium">
+          {card.item.term}
+        </div>
+      ) : (
+        <MathText
+          text={card.item.term}
+          className="text-xl leading-relaxed font-medium"
+        />
+      )}
+
+      {writes ? (
+        <label className="text-muted-foreground flex flex-col gap-1.5 text-xs font-semibold">
+          {card.kind === "term" ? (
+            <Trans>Say or type what it means, then check.</Trans>
+          ) : (
+            <Trans>Say or type your answer, then check.</Trans>
+          )}
+          <textarea
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            aria-label={t`Your answer`}
+            className="bg-background text-foreground min-h-20 rounded-xl border px-3 py-2 text-base font-normal"
+          />
+        </label>
+      ) : card.kind === "formula" ? (
+        <p className="bg-muted/60 rounded-lg px-3 py-2 text-sm">
+          <Trans>Write it out on paper, then check.</Trans>
+        </p>
+      ) : null}
+
+      {card.kind === "problem" && !showAnswer && stepsShown > 0 ? (
+        <ol className="flex flex-col gap-2">
+          {steps.slice(0, stepsShown).map((step, index) => (
+            <li key={index} className="flex items-start gap-2.5 text-sm">
+              <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss flex size-6 shrink-0 items-center justify-center rounded-pill text-xs font-bold">
+                {index + 1}
+              </span>
+              <MathText text={step} className="pt-0.5" />
+            </li>
+          ))}
+        </ol>
+      ) : null}
+
+      {showAnswer ? (
+        <div className="flex flex-col gap-3 border-t pt-4">
+          {card.kind === "formula" ? (
+            <>
+              <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                <Trans>The formula</Trans>
+              </h3>
+              <div className="bg-mirna-mist/50 dark:bg-muted flex min-h-24 items-center justify-center overflow-x-auto rounded-xl px-3 py-4 text-xl">
+                <Formula latex={card.latex ?? ""} display />
+              </div>
+              {card.item.meaning ? (
+                <p className="bg-mirna-mist/70 dark:bg-muted rounded-lg px-3 py-2 text-sm leading-relaxed">
+                  {card.item.meaning}
+                </p>
+              ) : null}
+            </>
+          ) : card.kind === "problem" ? (
+            <>
+              {steps.length > 0 ? (
+                <ol className="flex flex-col gap-2">
+                  {steps.map((step, index) => (
+                    <li key={index} className="flex items-start gap-2.5 text-sm">
+                      <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss flex size-6 shrink-0 items-center justify-center rounded-pill text-xs font-bold">
+                        {index + 1}
+                      </span>
+                      <MathText text={step} className="pt-0.5" />
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+              {card.item.meaning ? (
+                <div className="bg-mirna-moss/50 dark:bg-mirna-serra/30 flex items-center gap-3 rounded-lg border px-3 py-2 text-sm font-semibold">
+                  <Trans>Answer</Trans>
+                  <MathText text={card.item.meaning} className="font-medium" />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                {card.kind === "term" ? (
+                  <Trans>In the teacher's words</Trans>
+                ) : (
+                  <Trans>The class's answer</Trans>
+                )}
+              </h3>
+              <MathText
+                text={card.item.meaning}
+                className="text-base leading-relaxed"
+              />
+            </>
+          )}
+          {clip ? (
+            <div className="flex flex-wrap gap-2">
+              <ClipButton
+                id="explained"
+                sessionId={card.sessionId}
+                clip={clip}
+                dark
+              >
+                <Trans>Hear it explained</Trans>
+                <span className="font-mono text-xs opacity-80">
+                  {formatClock(card.item.heardAtMs ?? clip.startMs)}
+                </span>
+              </ClipButton>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex flex-wrap justify-end gap-2">
+          {card.kind === "problem" && stepsShown < steps.length ? (
+            <Button
+              variant="outline"
+              onClick={() => setStepsShown((count) => count + 1)}
+            >
+              <Trans>Show next step</Trans>
+            </Button>
+          ) : null}
+          <Button onClick={onReveal}>
+            <Trans>Show answer</Trans>
+            <span className="text-primary-foreground/70 font-mono text-[11px]">
+              Space
+            </span>
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -373,6 +373,15 @@ function createSegment(words: [string, number, number][]): Segment {
 function createSheet(): LessonSheet {
   return {
     version: 1,
+    kind: "language",
+    keyTerms: [],
+    ideas: [],
+    sources: [],
+    methods: [],
+    checkYourself: [],
+    formulas: [],
+    workedExamples: [],
+    problems: [],
     topic: "",
     summary: "",
     chapters: [],
@@ -381,6 +390,7 @@ function createSheet(): LessonSheet {
         term: "我们",
         reading: "wǒmen",
         meaning: "we",
+        note: "",
         heardAtMs: null,
         isNew: true,
       },

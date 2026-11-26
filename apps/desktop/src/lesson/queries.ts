@@ -67,6 +67,24 @@ export async function loadLessonSession(
   return toLessonInfo(rows[0]);
 }
 
+/** The settings of a course's latest lesson, for the next one in it. */
+export async function loadCourseSettings(
+  folderPath: string,
+): Promise<LessonSettings | null> {
+  if (!folderPath) return null;
+  const rows = await liveQueryClient.execute<{ lesson: string | null }>(
+    `
+      SELECT json_extract(metadata_json, '$.lesson') AS lesson
+      FROM sessions
+      WHERE folder_path = ? AND kind = 'lesson' AND deleted_at IS NULL
+      ORDER BY COALESCE(NULLIF(started_at, ''), created_at) DESC
+      LIMIT 1
+    `,
+    [folderPath],
+  );
+  return parseLessonSettings(rows[0]?.lesson ?? null);
+}
+
 export function markSessionAsLesson(
   sessionId: string,
   settings: LessonSettings,

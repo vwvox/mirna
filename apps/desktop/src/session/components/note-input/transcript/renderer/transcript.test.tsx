@@ -817,6 +817,15 @@ function createTurn(
 function createSheet(chapters: LessonSheet["chapters"]): LessonSheet {
   return {
     version: 1,
+    kind: "language",
+    keyTerms: [],
+    ideas: [],
+    sources: [],
+    methods: [],
+    checkYourself: [],
+    formulas: [],
+    workedExamples: [],
+    problems: [],
     topic: "",
     summary: "",
     chapters,

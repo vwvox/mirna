@@ -18,7 +18,15 @@ import {
   courseProgress,
   practiceMinutes,
 } from "../course-data";
-import { exportVocabulary, type VocabularyExportFormat } from "../export";
+import {
+  exportCards,
+  exportVocabulary,
+  subjectCardItems,
+  type VocabularyExportFormat,
+} from "../export";
+import { applyFormulaFixes } from "../fixes";
+import { LessonLanguageProvider } from "../language-context";
+import { languageName, usesPinyin } from "../languages";
 import {
   courseHomework,
   setHomeworkDone,
@@ -26,11 +34,13 @@ import {
 } from "../homework";
 import { setLessonQuestionAsked, useCourseMarks } from "../marks";
 import { dueCards } from "../practice";
-import { usePracticeLessons } from "../practice-data";
+import { practiceCardsOf, usePracticeLessons } from "../practice-data";
 import { useCourseLessons } from "../queries";
+import { lessonSubject } from "../schema";
 import { formatClock } from "../time";
 import { useLessonTranscripts } from "../use-lesson-segments";
 import { ProgressCard } from "./course-charts";
+import { CourseFormulaSheet, CourseSources } from "./course-subject";
 import { CourseWords } from "./course-words";
 import { openNewLessonDialog } from "./new-lesson-dialog";
 import { LessonPracticeDialog } from "./practice-dialog";
@@ -50,7 +60,7 @@ function formatHours(ms: number) {
 
 /** The course view on a folder that holds lessons: what to do next, then progress. */
 export function CoursePanel({ folderPath }: { folderPath: string }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const rows = useCourseLessons(folderPath);
   const ids = useMemo(() => rows.map((lesson) => lesson.id), [rows]);
   const practiceLessons = usePracticeLessons(ids);
@@ -76,8 +86,10 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
         sessionId: row.id,
         title: row.title,
         started: row.started_at || row.created_at,
+        settings: documents?.settings ?? null,
         sheet: documents?.sheet ?? null,
         practice: documents?.practice ?? null,
+        fixes: documents?.fixes ?? null,
         number: index + 1,
         audioMs: Number(row.audio_ms ?? 0),
         transcript: transcripts.get(row.id) ?? null,
@@ -86,20 +98,24 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
     });
   }, [marks, practiceLessons, rows, transcripts]);
 
+  // The course is what its latest lesson is: its kind of class and language.
+  const courseSettings =
+    [...lessons].reverse().find((lesson) => lesson.settings)?.settings ?? null;
+  const subject = lessonSubject(courseSettings);
+  const isLanguage = subject === "language";
+  const language = courseSettings?.learning ?? null;
+  const languageLabel = language ? languageName(language, i18n.locale) : "";
   const words = useMemo(() => buildCourseWords(lessons), [lessons]);
   const progress = useMemo(() => courseProgress(lessons), [lessons]);
-  const due = useMemo(
-    () =>
-      dueCards(
-        words.map((word) => word.card),
-        new Date(),
-      ),
-    [words],
+  const allCards = useMemo(
+    () => practiceCardsOf([...lessons].reverse()),
+    [lessons],
   );
+  const due = useMemo(() => dueCards(allCards, new Date()), [allCards]);
   const hard = due.filter((card) => (card.state?.lapses ?? 0) >= 2);
-  const meaningOf = useMemo(
-    () => new Map(words.map((word) => [word.term, word.meaning])),
-    [words],
+  const heroCards = due.filter(
+    (card) =>
+      card.kind === "word" || card.kind === "term" || card.kind === "formula",
   );
 
   const homework = useMemo(
@@ -154,6 +170,26 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
     onError: () => toast.error(t`Couldn't update the homework.`),
   });
 
+  const exportCourseCards = useMutation({
+    mutationFn: () =>
+      exportCards(
+        lessons.flatMap((lesson) =>
+          lesson.sheet
+            ? subjectCardItems(
+                lesson.sheet.sheet,
+                applyFormulaFixes(lesson.sheet.sheet.formulas, lesson.fixes),
+                lesson.sheet.sheet.topic || lesson.title,
+              )
+            : [],
+        ),
+        courseName,
+      ),
+    onSuccess: (path) => {
+      if (path) toast.success(t`Saved ${path}`);
+    },
+    onError: () => toast.error(t`Couldn't save the file.`),
+  });
+
   const exportWords = useMutation({
     mutationFn: (format: VocabularyExportFormat) =>
       exportVocabulary(
@@ -175,7 +211,7 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
   if (rows.length === 0) return null;
 
   const latest = progress[progress.length - 1];
-  const firstWithChinese = progress.find((item) => item.chinese !== null);
+  const firstWithShare = progress.find((item) => item.inLanguage !== null);
   const totalMs = lessons.reduce((sum, lesson) => sum + lesson.audioMs, 0);
   const since = new Date(lessons[0]!.started).toLocaleDateString(undefined, {
     day: "numeric",
@@ -199,6 +235,7 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
     });
 
   return (
+    <LessonLanguageProvider language={language}>
     <section aria-label={t`Course`} className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-0 flex-[1_1_380px] flex-col gap-1">
@@ -222,12 +259,24 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ChineseDisplayMenu
-            lesson
-            label={t`Pinyin and tones`}
-            triggerClassName="h-8 px-3 text-sm"
-          />
-          {words.length > 0 ? (
+          {isLanguage && usesPinyin(language) ? (
+            <ChineseDisplayMenu
+              lesson
+              label={t`Pinyin and tones`}
+              triggerClassName="h-8 px-3 text-sm"
+            />
+          ) : null}
+          {!isLanguage && allCards.length > 0 ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportCourseCards.mutate()}
+            >
+              <DownloadSimple className="size-3.5" />
+              <Trans>Export for Anki</Trans>
+            </Button>
+          ) : null}
+          {isLanguage && words.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -239,9 +288,13 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                 <DropdownMenuItem onSelect={() => exportWords.mutate("anki")}>
                   <Trans>For Anki (text file)</Trans>
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => exportWords.mutate("pleco")}>
-                  <Trans>For Pleco (text file)</Trans>
-                </DropdownMenuItem>
+                {usesPinyin(language) ? (
+                  <DropdownMenuItem
+                    onSelect={() => exportWords.mutate("pleco")}
+                  >
+                    <Trans>For Pleco (text file)</Trans>
+                  </DropdownMenuItem>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
@@ -261,11 +314,17 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
           </span>
           <p className="font-brand text-3xl leading-tight font-medium">
             {due.length > 0 ? (
-              <Trans>{due.length} words due</Trans>
-            ) : words.length > 0 ? (
+              isLanguage ? (
+                <Trans>{due.length} words due</Trans>
+              ) : (
+                <Trans>{due.length} cards due</Trans>
+              )
+            ) : allCards.length > 0 ? (
               <Trans>All caught up</Trans>
-            ) : (
+            ) : isLanguage ? (
               <Trans>No words yet</Trans>
+            ) : (
+              <Trans>No cards yet</Trans>
             )}
           </p>
           <p className="text-mirna-moss text-sm">
@@ -274,14 +333,19 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                 <Trans>About {practiceMinutes(due.length)} minutes.</Trans>{" "}
                 {hard.length > 0 ? (
                   <Trans>
-                    {hard.length} of them are words you keep missing.
+                    {hard.length} of them are ones you keep missing.
                   </Trans>
                 ) : null}
               </>
-            ) : words.length > 0 ? (
-              <Trans>Words come back here when they're due again.</Trans>
-            ) : (
+            ) : allCards.length > 0 ? (
+              <Trans>Cards come back here when they're due again.</Trans>
+            ) : isLanguage ? (
               <Trans>Words arrive with each lesson's study sheet.</Trans>
+            ) : (
+              <Trans>
+                Key terms, formulas and questions arrive with each lesson's
+                study sheet.
+              </Trans>
             )}
           </p>
           {due.length > 0 ? (
@@ -289,9 +353,9 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
               aria-label={t`Some of the words due now`}
               className="flex flex-wrap gap-2"
             >
-              {due.slice(0, HERO_WORDS).map((card) => (
+              {heroCards.slice(0, HERO_WORDS).map((card) => (
                 <li
-                  key={card.id}
+                  key={`${card.sessionId}:${card.id}`}
                   className="flex items-end gap-2 rounded-lg bg-white/10 px-2.5 py-1.5"
                 >
                   <LessonTerm
@@ -299,14 +363,18 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                     reading={card.item.reading}
                     className="text-lg leading-none"
                   />
-                  <span className="text-mirna-moss pb-0.5 text-xs">
-                    {meaningOf.get(card.id)}
-                  </span>
+                  {card.kind === "word" ? (
+                    <span className="text-mirna-moss line-clamp-1 max-w-48 pb-0.5 text-xs">
+                      {card.item.meaning}
+                    </span>
+                  ) : null}
                 </li>
               ))}
-              {due.length > HERO_WORDS ? (
+              {due.length > Math.min(HERO_WORDS, heroCards.length) ? (
                 <li className="text-mirna-moss flex items-center rounded-lg border border-white/20 px-2.5 py-1.5 text-xs">
-                  <Trans>+{due.length - HERO_WORDS} more</Trans>
+                  <Trans>
+                    +{due.length - Math.min(HERO_WORDS, heroCards.length)} more
+                  </Trans>
                 </li>
               ) : null}
             </ul>
@@ -318,7 +386,11 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                 className="bg-mirna-ipe hover:bg-mirna-ipe/90 text-mirna-soapstone"
                 onClick={() => setPractising({ title: courseName })}
               >
-                <Trans>Practise {due.length} words</Trans>
+                {isLanguage ? (
+                  <Trans>Practise {due.length} words</Trans>
+                ) : (
+                  <Trans>Practise {due.length} cards</Trans>
+                )}
               </Button>
               {hard.length > 0 ? (
                 <Button
@@ -328,7 +400,9 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                   onClick={() =>
                     setPractising({
                       terms: hard.map((card) => card.id),
-                      title: t`Words you keep missing`,
+                      title: isLanguage
+                        ? t`Words you keep missing`
+                        : t`Ones you keep missing`,
                     })
                   }
                 >
@@ -425,9 +499,13 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
         </section>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div
+        className={
+          isLanguage ? "grid gap-3 sm:grid-cols-3" : "grid gap-3 sm:grid-cols-2"
+        }
+      >
         <ProgressCard
-          title={t`Words collected`}
+          title={isLanguage ? t`Words collected` : t`Terms and formulas`}
           value={String(latest?.wordsCollected ?? 0)}
           detail={
             latest && latest.newWords > 0
@@ -437,26 +515,30 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
           chart={{
             kind: "line",
             values: progress.map((item) => item.wordsCollected),
-            label: t`Words collected after each lesson`,
+            label: isLanguage
+              ? t`Words collected after each lesson`
+              : t`Key terms and formulas collected after each lesson`,
           }}
         />
-        <ProgressCard
-          title={t`Lesson in Chinese`}
-          value={latest?.chinese != null ? `${latest.chinese}%` : "–"}
-          detail={
-            firstWithChinese &&
-            latest?.chinese != null &&
-            firstWithChinese !== latest
-              ? t`from ${firstWithChinese.chinese}% in lesson ${firstWithChinese.number}`
-              : undefined
-          }
-          chart={{
-            kind: "bars",
-            tone: "terra",
-            values: progress.map((item) => item.chinese),
-            label: t`Share of each lesson in Chinese`,
-          }}
-        />
+        {isLanguage ? (
+          <ProgressCard
+            title={t`Lesson in ${languageLabel}`}
+            value={latest?.inLanguage != null ? `${latest.inLanguage}%` : "–"}
+            detail={
+              firstWithShare &&
+              latest?.inLanguage != null &&
+              firstWithShare !== latest
+                ? t`from ${firstWithShare.inLanguage}% in lesson ${firstWithShare.number}`
+                : undefined
+            }
+            chart={{
+              kind: "bars",
+              tone: "terra",
+              values: progress.map((item) => item.inLanguage),
+              label: t`Share of each lesson in ${languageLabel}`,
+            }}
+          />
+        ) : null}
         <ProgressCard
           title={t`You spoke`}
           value={latest?.spoke != null ? `${latest.spoke}%` : "–"}
@@ -519,15 +601,19 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
                         {stats?.spoke != null
                           ? ` · ${t`you spoke ${stats.spoke}%`}`
                           : ""}
-                        {stats?.chinese != null
-                          ? ` · ${t`${stats.chinese}% in Chinese`}`
+                        {stats?.inLanguage != null
+                          ? ` · ${t`${stats.inLanguage}% in ${languageLabel}`}`
                           : ""}
                       </span>
                     </span>
                     <span className="flex shrink-0 flex-col items-end gap-1">
                       {lesson.sheet ? (
                         <span className="bg-mirna-moss text-mirna-serra rounded-pill px-2 py-0.5 text-[11px] font-semibold">
-                          <Trans>{stats?.newWords ?? 0} new words</Trans>
+                          {isLanguage ? (
+                            <Trans>{stats?.newWords ?? 0} new words</Trans>
+                          ) : (
+                            <Trans>{stats?.newWords ?? 0} new terms</Trans>
+                          )}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-[11px]">
@@ -596,7 +682,11 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
             {missed.length > 0 ? (
               <>
                 <h3 className="text-sm font-semibold">
-                  <Trans>Words you keep missing</Trans>
+                  {isLanguage ? (
+                    <Trans>Words you keep missing</Trans>
+                  ) : (
+                    <Trans>Terms you keep missing</Trans>
+                  )}
                 </h3>
                 <ul className="flex flex-wrap gap-2">
                   {missed.map((word) => (
@@ -614,7 +704,16 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
         ) : null}
       </div>
 
-      <CourseWords words={words} lessons={lessons} />
+      {subject === "maths" ? (
+        <CourseFormulaSheet lessons={lessons} courseName={courseName} />
+      ) : null}
+      <CourseWords words={words} lessons={lessons} glossary={!isLanguage} />
+      {subject === "topic" ? (
+        <>
+          <CourseFormulaSheet lessons={lessons} courseName={courseName} />
+          <CourseSources lessons={lessons} />
+        </>
+      ) : null}
 
       {practising ? (
         <LessonPracticeDialog
@@ -625,5 +724,6 @@ export function CoursePanel({ folderPath }: { folderPath: string }) {
         />
       ) : null}
     </section>
+    </LessonLanguageProvider>
   );
 }

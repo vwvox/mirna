@@ -12,6 +12,7 @@ import { joinWordTexts, type TranscriptParagraph } from "./utils";
 
 import { useLessonSession, useLessonSheet } from "~/lesson/queries";
 import type { LessonChapter, LessonVocabularyItem } from "~/lesson/types";
+import { usesPinyin } from "~/lesson/languages";
 import { hanVocabularyTerms } from "~/stt/pinyin";
 
 /**
@@ -21,6 +22,11 @@ import { hanVocabularyTerms } from "~/stt/pinyin";
 export type TranscriptNote = {
   /** Lessons show Chinese with pinyin above until the student picks a display. */
   isLesson: boolean;
+  /**
+   * Han characters get pinyin and tone colours. Off in lessons of other
+   * languages, where kanji are Japanese, not Mandarin.
+   */
+  chineseReadings: boolean;
   chapters: readonly LessonChapter[];
   vocabulary: ReadonlyMap<string, LessonVocabularyItem>;
   vocabularyTerms: ReadonlySet<string>;
@@ -39,6 +45,7 @@ const EMPTY_FLOORS = new Map<string, number>();
 
 const EMPTY_NOTE: TranscriptNote = {
   isLesson: false,
+  chineseReadings: true,
   chapters: [],
   vocabulary: EMPTY_VOCABULARY,
   vocabularyTerms: EMPTY_TERMS,
@@ -83,7 +90,10 @@ export function TranscriptNoteProvider({
   children: ReactNode;
 }) {
   const sheet = useLessonSheet(sessionId)?.sheet ?? null;
-  const isLesson = useLessonSession(sessionId).isLesson;
+  const lessonSession = useLessonSession(sessionId);
+  const isLesson = lessonSession.isLesson;
+  const chineseReadings =
+    !isLesson || usesPinyin(lessonSession.settings?.learning);
   const [lastRowStarts, setLastRowStarts] = useState<
     ReadonlyMap<string, number>
   >(() => new Map());
@@ -179,6 +189,7 @@ export function TranscriptNoteProvider({
     () => ({
       ...lesson,
       isLesson,
+      chineseReadings,
       chapterFloors,
       reportLastRowStart,
       registerText,
@@ -186,6 +197,7 @@ export function TranscriptNoteProvider({
     }),
     [
       chapterFloors,
+      chineseReadings,
       countInNote,
       isLesson,
       lesson,

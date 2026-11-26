@@ -22,6 +22,10 @@ const mocks = vi.hoisted(() => ({
     folder_path: string;
   }>,
   folders: ["Mandarin", "Statistics"],
+  lastSettings: { learning: "zh", explainIn: "en" } as Record<
+    string,
+    unknown
+  > | null,
 }));
 
 vi.mock("@anlg/plugin-detect", () => ({
@@ -34,13 +38,15 @@ vi.mock("@anlg/plugin-detect", () => ({
 }));
 vi.mock("../queries", () => ({
   loadCourseLessons: async () => [{ id: "a" }, { id: "b" }],
-  loadLessonSession: async () => ({
-    isLesson: false,
-    settings: null,
+  loadCourseSettings: async () => mocks.lastSettings,
+  loadLessonSession: async (id: string) => ({
+    isLesson: id === "old",
+    settings: id === "old" ? mocks.lastSettings : null,
     folderPath: "",
   }),
   markSessionAsLesson: mocks.markSessionAsLesson,
 }));
+vi.mock("./transcription-line", () => ({ TranscriptionLine: () => null }));
 vi.mock("../auto", () => ({ requestLessonSheet: mocks.requestLessonSheet }));
 vi.mock("~/ai/hooks", () => ({ useLanguageModel: () => "model" }));
 vi.mock("~/db", () => ({
@@ -85,11 +91,13 @@ describe("new lesson dialog", () => {
     vi.clearAllMocks();
     mocks.lastLessons = [{ id: "old", folder_path: "Mandarin" }];
     mocks.folders = ["Mandarin", "Statistics"];
+    mocks.lastSettings = { learning: "zh", explainIn: "en" };
   });
 
-  it("asks for a course name when there are no courses yet", async () => {
+  it("asks for a course name and a language when there are no courses yet", async () => {
     mocks.lastLessons = [];
     mocks.folders = [];
+    mocks.lastSettings = null;
     renderHost();
     act(() => openMakeLessonDialog("old-note", ""));
     const name = await screen.findByPlaceholderText("Mandarin with my teacher");
@@ -99,6 +107,11 @@ describe("new lesson dialog", () => {
     expect(submit.disabled).toBe(true);
 
     fireEvent.change(name, { target: { value: "Chinese" } });
+    const learning = screen.getByLabelText("I'm learning") as HTMLSelectElement;
+    // No language is assumed for a first lesson.
+    expect(learning.value).toBe("");
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(learning, { target: { value: "zh" } });
     await waitFor(() => expect(submit.disabled).toBe(false));
     fireEvent.click(submit);
     await waitFor(() =>
@@ -165,6 +178,34 @@ describe("new lesson dialog", () => {
       expect.objectContaining({
         id: "old-note",
         state: expect.objectContaining({ view: { type: "lesson" } }),
+      }),
+    );
+  });
+
+  it("starts a topic lesson with its subject, class language and the sections left out", async () => {
+    renderHost();
+    act(() => openNewLessonDialog());
+    await waitFor(() =>
+      expect(screen.getByDisplayValue("Lesson 3")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /Topic/ }));
+    fireEvent.change(screen.getByLabelText("Subject"), {
+      target: { value: "Contract law" },
+    });
+    fireEvent.change(screen.getByLabelText("Class is in"), {
+      target: { value: "en" },
+    });
+    fireEvent.click(screen.getByLabelText(/Main ideas/));
+    expect(screen.queryByLabelText("Show Chinese as")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start lesson" }));
+    await waitFor(() =>
+      expect(mocks.markSessionAsLesson).toHaveBeenCalledWith("new-session", {
+        learning: "en",
+        explainIn: "en",
+        subject: "topic",
+        subjectName: "Contract law",
+        leaveOut: ["ideas"],
       }),
     );
   });

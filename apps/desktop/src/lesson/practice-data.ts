@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { buildPracticeCards, dueCards, type PracticeCard } from "./practice";
-import { parseLessonPractice, parseLessonSheetDocument } from "./schema";
-import type { LessonPracticeDocument, LessonSheetDocument } from "./types";
+import {
+  buildPracticeCards,
+  dueCards,
+  type PracticeCard,
+  practiceItemsOf,
+} from "./practice";
+import {
+  parseLessonFixes,
+  parseLessonPractice,
+  parseLessonSettings,
+  parseLessonSheetDocument,
+} from "./schema";
+import type {
+  LessonFixesDocument,
+  LessonPracticeDocument,
+  LessonSettings,
+  LessonSheetDocument,
+} from "./types";
 
 import { useLiveQuery } from "~/db";
 
@@ -12,6 +27,7 @@ type Row = {
   body: string;
   title: string;
   started: string;
+  lesson?: string | null;
 };
 
 function parse<T>(body: string, parser: (raw: unknown) => T | null) {
@@ -26,8 +42,10 @@ export type PracticeLesson = {
   sessionId: string;
   title: string;
   started: string;
+  settings: LessonSettings | null;
   sheet: LessonSheetDocument | null;
   practice: LessonPracticeDocument | null;
+  fixes: LessonFixesDocument | null;
 };
 
 export function groupPracticeRows(rows: Row[]): PracticeLesson[] {
@@ -37,13 +55,17 @@ export function groupPracticeRows(rows: Row[]): PracticeLesson[] {
       sessionId: row.session_id,
       title: row.title,
       started: row.started,
+      settings: parseLessonSettings(row.lesson ?? null),
       sheet: null,
       practice: null,
+      fixes: null,
     };
     if (row.kind === "lesson_sheet") {
       lesson.sheet = parse(row.body, parseLessonSheetDocument);
     } else if (row.kind === "lesson_practice") {
       lesson.practice = parse(row.body, parseLessonPractice);
+    } else if (row.kind === "lesson_fixes") {
+      lesson.fixes = parse(row.body, parseLessonFixes);
     }
     lessons.set(row.session_id, lesson);
   }
@@ -61,11 +83,12 @@ export function usePracticeLessons(sessionIds: string[]): PracticeLesson[] {
     sql: `
       SELECT document.session_id, document.kind, document.body,
         session.title,
+        json_extract(session.metadata_json, '$.lesson') AS lesson,
         COALESCE(NULLIF(session.started_at, ''), session.created_at) AS started
       FROM session_documents AS document
       JOIN sessions AS session ON session.id = document.session_id
       WHERE document.session_id IN (${placeholders || "''"})
-        AND document.kind IN ('lesson_sheet', 'lesson_practice')
+        AND document.kind IN ('lesson_sheet', 'lesson_practice', 'lesson_fixes')
         AND document.deleted_at IS NULL AND session.deleted_at IS NULL
     `,
     params: sessionIds,
@@ -82,7 +105,7 @@ export function practiceCardsOf(
   return buildPracticeCards(
     lessons.map((lesson) => ({
       sessionId: lesson.sessionId,
-      vocabulary: lesson.sheet?.sheet.vocabulary ?? [],
+      items: practiceItemsOf(lesson.sheet?.sheet, lesson.fixes),
       practice: lesson.practice,
     })),
     options,
