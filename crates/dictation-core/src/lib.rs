@@ -18,8 +18,8 @@ pub use caret::{CaretFit, fit_to_caret};
 pub use corrections::{SuggestRequest, suggest_terms};
 pub use refine::{
     CLEANUP_DEADLINE_MS, EDIT_DEADLINE_MS, ModelCall, ModelReply, PendingRefinement, RefineKind,
-    RefineOutcome, RefinePlan, RefineReason, RefineRequest, TextPolicy, prepare_refinement,
-    resolve_refinement,
+    RefineOutcome, RefinePlan, RefineReason, RefineRequest, TextPolicy, WritingStyle,
+    prepare_refinement, resolve_refinement,
 };
 pub use replace::{Replacement, apply_replacements};
 pub use weights::{RankRequest, RecordRequest, TermEvent, rank_terms, record_terms};

@@ -17,6 +17,7 @@ fn request(text: &str) -> RefineRequest {
         terms: vec![],
         replacements: vec![],
         instructions: None,
+        style: None,
         before: None,
         context: None,
     }
@@ -434,4 +435,38 @@ fn uses_context_only_from_its_own_fresh_operation_and_bounds_what_it_sends() {
         ..request("bye")
     });
     assert_eq!(pending.before.as_deref(), Some("Thanks."));
+}
+
+#[test]
+fn adds_a_writing_style_only_when_it_is_not_formal_and_keeps_the_strict_checks() {
+    let (formal, _) = ask(request("hey are you free tonight"));
+    let (stated, _) = ask(RefineRequest {
+        style: Some(WritingStyle::Formal),
+        ..request("hey are you free tonight")
+    });
+    assert_eq!(formal.system, stated.system);
+    assert!(!formal.system.contains("Style:"));
+
+    let (casual, pending) = ask(RefineRequest {
+        style: Some(WritingStyle::Casual),
+        ..request("hey are you free tonight")
+    });
+    assert!(casual.system.contains("Style: casual"));
+    assert!(!pending.instructed);
+
+    let (very, _) = ask(RefineRequest {
+        style: Some(WritingStyle::VeryCasual),
+        instructions: Some("Use British spelling.".into()),
+        ..request("hey are you free tonight")
+    });
+    let style_at = very.system.find("Style: very casual").unwrap();
+    let personal_at = very.system.find("<instructions>").unwrap();
+    assert!(style_at < personal_at, "personal instructions still win");
+}
+
+#[test]
+fn asks_for_spoken_line_breaks_and_counted_lists() {
+    let (call, _) = ask(request("first eggs second milk third bread"));
+    assert!(call.system.contains("\"new paragraph\""));
+    assert!(call.system.contains("numbered (\"1. \") when they counted"));
 }

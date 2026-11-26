@@ -10,6 +10,20 @@ pub(crate) async fn capture_target() -> Result<String, String> {
 
 #[tauri::command]
 #[specta::specta]
+pub(crate) async fn play_dictation_sound(sound: crate::insertion::DictationSound) {
+    crate::insertion::play_sound(sound);
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn dictation_target_app(
+    target: String,
+) -> Result<Option<crate::insertion::TargetApp>, String> {
+    crate::insertion::target_app(target).await
+}
+
+#[tauri::command]
+#[specta::specta]
 pub(crate) async fn begin_dictation<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     request: crate::engine::BeginDictation,

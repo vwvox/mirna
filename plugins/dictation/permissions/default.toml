@@ -2,6 +2,8 @@
 description = "Default permissions for the plugin"
 permissions = [
   "allow-capture-target",
+  "allow-play-dictation-sound",
+  "allow-dictation-target-app",
   "allow-begin-dictation",
   "allow-attach-dictation-stream",
   "allow-finish-dictation",

@@ -2,6 +2,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  notify: vi.fn(),
   session: { user: { id: "user-1" } } as { user: { id: string } } | null,
   billing: { isPro: true, isReady: true },
   platform: "macos",
@@ -34,7 +35,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./planner", () => ({
   useDictationPlanner: () => ({
     microphone: () => "",
-    options: () => ({ context: false, learning: false, voiceEdit: false }),
+    options: () => ({
+      context: false,
+      learning: false,
+      voiceEdit: false,
+      cleanup: false,
+    }),
     used: async () => {},
     kept: async () => {},
     plan: async () => ({
@@ -42,6 +48,7 @@ vi.mock("./planner", () => ({
       microphoneDevice: null,
       recovery: false,
       ducking: false,
+      sounds: false,
       livePreview: mocks.settings.dictation_live_preview,
       stream: () => mocks.stream(),
       transcribe: async () => "Batched words.",
@@ -54,6 +61,9 @@ vi.mock("./planner", () => ({
 }));
 vi.mock("~/analytics", () => ({ trackAnalyticsEvent: () => {} }));
 vi.mock("./panel", () => ({ waitForDictationPanel: vi.fn(async () => {}) }));
+vi.mock("./error-notification", () => ({
+  showDictationErrorNotification: mocks.notify,
+}));
 vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {
     constructor(public onmessage: (event: unknown) => void) {}
@@ -366,6 +376,10 @@ describe("system dictation", () => {
     expect(useDictationStatus.getState().owner).toBeNull();
     expect(mocks.captureTarget).not.toHaveBeenCalled();
     expect(mocks.native.ops.size).toBe(0);
+    // Mirna is usually behind the app being dictated into, so the error is also a notification.
+    expect(mocks.notify).toHaveBeenCalledWith(
+      expect.stringMatching(/microphone permission/u),
+    );
   });
 
   it.each(["windows", "linux"])(

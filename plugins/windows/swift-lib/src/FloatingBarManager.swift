@@ -250,7 +250,7 @@ final class FloatingBarManager {
     FloatingBarWindowLayout(
       isExpanded: isExpanded,
       showsExpand: model.liveCaptionToggleVisible,
-      showsPause: model.showsPause
+      showsPause: model.showsSecondaryControl
     )
   }
 

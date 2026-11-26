@@ -9,6 +9,7 @@ import { Button } from "@anlg/ui/components/ui/button";
 import { Textarea } from "@anlg/ui/components/ui/textarea";
 
 import { DictationEngineSettings } from "./dictation-engine";
+import { DictationModelSettings } from "./dictation-models";
 import { DictationShortcut } from "./dictation-shortcut";
 
 import { useBillingAccess } from "~/auth/billing-context";
@@ -31,6 +32,8 @@ export function SettingsDictation() {
   const setLivePreview = useSetSettingValue("dictation_live_preview");
   const setEnabled = useSetSettingValue("dictation_enabled");
   const setHandsFree = useSetSettingValue("dictation_hands_free");
+  const sounds = useConfigValue("dictation_sounds");
+  const setSounds = useSetSettingValue("dictation_sounds");
   const microphone = useConfigValue("microphone_device");
   const setMicrophone = useSetSettingValue("microphone_device");
   const microphones = useQuery({
@@ -89,6 +92,7 @@ export function SettingsDictation() {
             devices={microphones.data ?? []}
             onChange={setMicrophone}
           />
+          <DictationModelSettings />
           <SettingSwitchRow
             title={<Trans>Live transcript preview</Trans>}
             description={
@@ -116,6 +120,16 @@ export function SettingsDictation() {
             }
             checked={handsFree}
             onChange={setHandsFree}
+          />
+          <SettingSwitchRow
+            title={<Trans>Play sounds</Trans>}
+            description={
+              <Trans>
+                A soft sound when Mirna starts listening and when it finishes.
+              </Trans>
+            }
+            checked={sounds}
+            onChange={setSounds}
           />
           <DictationEngineSettings />
           <p className="text-muted-foreground text-xs">
@@ -209,10 +223,10 @@ export function SettingsDictation() {
           </label>
           <p className="text-muted-foreground text-xs">
             <Trans>
-              Dictation uses your microphone, transcription provider, languages,
-              and dictionary. Temporary audio is deleted after transcription.
-              Your last transcript stays in memory until dictation is disabled
-              or Mirna closes.
+              Dictation uses your microphone, speech model, languages, and
+              dictionary. Temporary audio is deleted after transcription. Your
+              last transcript stays in memory until dictation is disabled or
+              Mirna closes.
             </Trans>
           </p>
           {status.lastTranscript && (

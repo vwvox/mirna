@@ -15,6 +15,8 @@ fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
         .plugin_name(PLUGIN_NAME)
         .commands(tauri_specta::collect_commands![
             commands::capture_target,
+            commands::play_dictation_sound,
+            commands::dictation_target_app,
             commands::begin_dictation::<tauri::Wry>,
             commands::attach_dictation_stream::<tauri::Wry>,
             commands::finish_dictation::<tauri::Wry>,

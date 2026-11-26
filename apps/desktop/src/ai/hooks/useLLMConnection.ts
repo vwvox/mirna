@@ -84,8 +84,14 @@ type LLMConnectionResult = {
 export const normalizeLLMProviderId = (providerId: string): string =>
   providerId === "hyprnote" ? "anarlog" : providerId;
 
-export const useLanguageModel = (task?: CharTask): LanguageModelV3 | null => {
-  const { conn } = useLLMConnection();
+/** A provider and model used instead of the person's main AI model selection. */
+export type LLMSelectionOverride = { provider: string; model: string };
+
+export const useLanguageModel = (
+  task?: CharTask,
+  override?: LLMSelectionOverride | null,
+): LanguageModelV3 | null => {
+  const { conn } = useLLMConnection(override);
   const auth = useAuth();
 
   // Auth is resolved at fetch time (not model construction) so token
@@ -111,7 +117,14 @@ export const useLanguageModel = (task?: CharTask): LanguageModelV3 | null => {
   }, [conn, task]);
 };
 
-export const useLLMConnection = (): LLMConnectionResult => {
+/**
+ * The connection for the person's main AI model, or for `override` when it names both a
+ * provider and a model. An override uses that provider's own saved credentials and the
+ * provider's default reasoning effort.
+ */
+export const useLLMConnection = (
+  override?: LLMSelectionOverride | null,
+): LLMConnectionResult => {
   const settingsReady = useSettingsReady();
   const auth = useAuth();
   // Only the session feeds the connection; the auth object itself changes
@@ -119,17 +132,23 @@ export const useLLMConnection = (): LLMConnectionResult => {
   const session = auth?.session;
   const billing = useBillingAccess();
 
-  const {
-    intelligence_disabled,
-    current_llm_provider,
-    current_llm_model,
-    current_llm_reasoning_effort,
-  } = useConfigValues([
+  const values = useConfigValues([
     "intelligence_disabled",
     "current_llm_provider",
     "current_llm_model",
     "current_llm_reasoning_effort",
   ] as const);
+  const { intelligence_disabled } = values;
+  const overridden = !!(override?.provider && override.model);
+  const current_llm_provider = overridden
+    ? override!.provider
+    : values.current_llm_provider;
+  const current_llm_model = overridden
+    ? override!.model
+    : values.current_llm_model;
+  const current_llm_reasoning_effort = overridden
+    ? "default"
+    : values.current_llm_reasoning_effort;
   const providerConfig = useAiProvider("llm", current_llm_provider) as
     | AIProviderStorage
     | undefined;

@@ -15,4 +15,7 @@ final class FloatingBarViewModel: ObservableObject {
   @Published var placement: FloatingControlPlacement.Layout?
 
   var showsPause: Bool { dictation == nil }
+  var showsCancel: Bool { dictation != nil }
+  /// The slot beside the main control holds pause for a meeting or cancel for a dictation.
+  var showsSecondaryControl: Bool { showsPause || showsCancel }
 }

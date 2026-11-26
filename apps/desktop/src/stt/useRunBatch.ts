@@ -349,13 +349,16 @@ export const useRunBatch = (sessionId: string) => {
         selectedProviderId && selectedModel
           ? getBatchProvider(selectedProviderId, selectedModel)
           : null;
+      // A caller that passes its own connection (dictation's own model) doesn't need the
+      // main one to be ready.
+      const selectedBaseUrl = options?.baseUrl ?? conn?.baseUrl;
       const selectedTarget =
-        conn && selectedModel && selectedProvider
+        selectedBaseUrl !== undefined && selectedModel && selectedProvider
           ? {
               provider: selectedProvider,
               model: selectedModel,
-              baseUrl: options?.baseUrl ?? conn.baseUrl,
-              apiKey: options?.apiKey ?? conn.apiKey,
+              baseUrl: selectedBaseUrl,
+              apiKey: options?.apiKey ?? conn?.apiKey ?? "",
               label: selectedModel,
             }
           : null;

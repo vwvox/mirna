@@ -367,6 +367,18 @@
           "markdownDescription": "Denies the complete_dictation command without any pre-configured scope."
         },
         {
+          "description": "Enables the dictation_target_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-dictation-target-app",
+          "markdownDescription": "Enables the dictation_target_app command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the dictation_target_app command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-dictation-target-app",
+          "markdownDescription": "Denies the dictation_target_app command without any pre-configured scope."
+        },
+        {
           "description": "Enables the discard_dictation_recovery command without any pre-configured scope.",
           "type": "string",
           "const": "allow-discard-dictation-recovery",
@@ -425,6 +437,18 @@
           "type": "string",
           "const": "deny-list-dictation-recovery",
           "markdownDescription": "Denies the list_dictation_recovery command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the play_dictation_sound command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-play-dictation-sound",
+          "markdownDescription": "Enables the play_dictation_sound command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the play_dictation_sound command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-play-dictation-sound",
+          "markdownDescription": "Denies the play_dictation_sound command without any pre-configured scope."
         },
         {
           "description": "Enables the prepare_dictation_recovery_audio command without any pre-configured scope.",
@@ -571,10 +595,10 @@
           "markdownDescription": "Denies the suggest_dictation_terms command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-capture-target`\n- `allow-begin-dictation`\n- `allow-attach-dictation-stream`\n- `allow-finish-dictation`\n- `allow-complete-dictation`\n- `allow-release-dictation`\n- `allow-cancel-dictation`\n- `allow-retire-dictations`\n- `allow-list-dictation-recovery`\n- `allow-prepare-dictation-recovery-audio`\n- `allow-save-dictation-recovery-text`\n- `allow-claim-dictation-recovery`\n- `allow-discard-dictation-recovery`\n- `allow-fit-dictation-text`\n- `allow-prepare-dictation-refinement`\n- `allow-resolve-dictation-refinement`\n- `allow-suggest-dictation-terms`\n- `allow-rank-dictation-terms`\n- `allow-record-dictation-terms`\n- `allow-read-dictation-context`\n- `allow-insert-dictation`\n- `allow-read-dictation-kept`\n- `allow-release-dictation-target`",
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-capture-target`\n- `allow-play-dictation-sound`\n- `allow-dictation-target-app`\n- `allow-begin-dictation`\n- `allow-attach-dictation-stream`\n- `allow-finish-dictation`\n- `allow-complete-dictation`\n- `allow-release-dictation`\n- `allow-cancel-dictation`\n- `allow-retire-dictations`\n- `allow-list-dictation-recovery`\n- `allow-prepare-dictation-recovery-audio`\n- `allow-save-dictation-recovery-text`\n- `allow-claim-dictation-recovery`\n- `allow-discard-dictation-recovery`\n- `allow-fit-dictation-text`\n- `allow-prepare-dictation-refinement`\n- `allow-resolve-dictation-refinement`\n- `allow-suggest-dictation-terms`\n- `allow-rank-dictation-terms`\n- `allow-record-dictation-terms`\n- `allow-read-dictation-context`\n- `allow-insert-dictation`\n- `allow-read-dictation-kept`\n- `allow-release-dictation-target`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-capture-target`\n- `allow-begin-dictation`\n- `allow-attach-dictation-stream`\n- `allow-finish-dictation`\n- `allow-complete-dictation`\n- `allow-release-dictation`\n- `allow-cancel-dictation`\n- `allow-retire-dictations`\n- `allow-list-dictation-recovery`\n- `allow-prepare-dictation-recovery-audio`\n- `allow-save-dictation-recovery-text`\n- `allow-claim-dictation-recovery`\n- `allow-discard-dictation-recovery`\n- `allow-fit-dictation-text`\n- `allow-prepare-dictation-refinement`\n- `allow-resolve-dictation-refinement`\n- `allow-suggest-dictation-terms`\n- `allow-rank-dictation-terms`\n- `allow-record-dictation-terms`\n- `allow-read-dictation-context`\n- `allow-insert-dictation`\n- `allow-read-dictation-kept`\n- `allow-release-dictation-target`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-capture-target`\n- `allow-play-dictation-sound`\n- `allow-dictation-target-app`\n- `allow-begin-dictation`\n- `allow-attach-dictation-stream`\n- `allow-finish-dictation`\n- `allow-complete-dictation`\n- `allow-release-dictation`\n- `allow-cancel-dictation`\n- `allow-retire-dictations`\n- `allow-list-dictation-recovery`\n- `allow-prepare-dictation-recovery-audio`\n- `allow-save-dictation-recovery-text`\n- `allow-claim-dictation-recovery`\n- `allow-discard-dictation-recovery`\n- `allow-fit-dictation-text`\n- `allow-prepare-dictation-refinement`\n- `allow-resolve-dictation-refinement`\n- `allow-suggest-dictation-terms`\n- `allow-rank-dictation-terms`\n- `allow-record-dictation-terms`\n- `allow-read-dictation-context`\n- `allow-insert-dictation`\n- `allow-read-dictation-kept`\n- `allow-release-dictation-target`"
         }
       ]
     }

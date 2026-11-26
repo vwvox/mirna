@@ -120,6 +120,11 @@ export class FakeNative implements DictationNative {
     op.micOpen = false;
   };
 
+  sounds: Array<"start" | "stop"> = [];
+  playSound = (sound: "start" | "stop") => {
+    this.sounds.push(sound);
+  };
+
   saveRecoveryText = async (accountId: string, id: string, text: string) => {
     const record = this.records.find(
       (entry) => entry.id === id && entry.accountId === accountId,

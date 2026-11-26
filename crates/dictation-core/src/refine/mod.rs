@@ -31,6 +31,17 @@ pub struct TextPolicy {
     pub voice_edit: bool,
 }
 
+/// How casually cleanup writes, chosen per kind of app. `Formal` adds nothing to the prompt: it
+/// is the written form the cleanup rules already ask for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum WritingStyle {
+    #[default]
+    Formal,
+    Casual,
+    VeryCasual,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RefineRequest {
@@ -47,6 +58,10 @@ pub struct RefineRequest {
     pub terms: Vec<String>,
     pub replacements: Vec<Replacement>,
     pub instructions: Option<String>,
+    /// The writing style for the app the dictation goes into. Unlike personal instructions it
+    /// changes only casing and end punctuation, so it keeps the strict length checks.
+    #[serde(default)]
+    pub style: Option<WritingStyle>,
     /// The text before the caret in an Anarlog field (chat).
     pub before: Option<String>,
     /// What the native side read for this operation, after its privacy decision.
@@ -238,6 +253,7 @@ pub fn prepare_refinement(request: RefineRequest) -> RefinePlan {
         &terms,
         screen,
         before.as_deref(),
+        request.style.unwrap_or_default(),
         instructions.as_deref(),
     );
     RefinePlan::Ask {

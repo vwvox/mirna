@@ -16,6 +16,7 @@ swift!(fn _dictation_target_window_text(target: &SRString, max: Int) -> SRString
 swift!(fn _dictation_target_release(target: &SRString) -> Bool);
 swift!(fn _dictation_output_level() -> SRString);
 swift!(fn _dictation_set_output_level(device: &SRString, volume: Float) -> Bool);
+swift!(fn _dictation_play_sound(kind: Int));
 
 pub fn capture_target() -> Result<String, String> {
     let value = unsafe { _capture_dictation_target() }.to_string();
@@ -132,6 +133,22 @@ pub fn paste_revoke(id: isize) -> PasteState {
 /// bounded hold, unless the person changed it since.
 pub fn paste_finish(id: isize) {
     unsafe { _dictation_paste_finish(id) };
+}
+
+/// A short cue as dictation starts or finishes listening.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sound {
+    Start,
+    Stop,
+}
+
+/// Plays `sound` without waiting for it; a cue still playing is cut off.
+pub fn play_sound(sound: Sound) {
+    let kind = match sound {
+        Sound::Start => 0,
+        Sound::Stop => 1,
+    };
+    unsafe { _dictation_play_sound(kind) }
 }
 
 pub fn target_facts(target: &str) -> Option<TargetFacts> {

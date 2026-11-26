@@ -54,6 +54,31 @@ export const SETTING_DEFINITIONS = {
     path: ["dictation", "ducking"],
     default: false as boolean,
   },
+  dictation_sounds: {
+    type: "boolean",
+    path: ["dictation", "sounds"],
+    default: true as boolean,
+  },
+  dictation_style_personal: {
+    type: "string",
+    path: ["dictation", "style_personal"],
+    default: "formal" as string,
+  },
+  dictation_style_work: {
+    type: "string",
+    path: ["dictation", "style_work"],
+    default: "formal" as string,
+  },
+  dictation_style_email: {
+    type: "string",
+    path: ["dictation", "style_email"],
+    default: "formal" as string,
+  },
+  dictation_style_other: {
+    type: "string",
+    path: ["dictation", "style_other"],
+    default: "formal" as string,
+  },
   dictation_recovery: {
     type: "boolean",
     path: ["dictation", "recovery"],
@@ -67,6 +92,28 @@ export const SETTING_DEFINITIONS = {
   dictation_dictionary_suggestions: {
     type: "string",
     path: ["dictation", "dictionary_suggestions"],
+    default: "" as string,
+  },
+  /** Empty means dictation cleanup uses the main AI model. */
+  dictation_llm_provider: {
+    type: "string",
+    path: ["dictation", "llm_provider"],
+    default: "" as string,
+  },
+  dictation_llm_model: {
+    type: "string",
+    path: ["dictation", "llm_model"],
+    default: "" as string,
+  },
+  /** Empty means dictation uses the main transcription model. */
+  dictation_stt_provider: {
+    type: "string",
+    path: ["dictation", "stt_provider"],
+    default: "" as string,
+  },
+  dictation_stt_model: {
+    type: "string",
+    path: ["dictation", "stt_model"],
     default: "" as string,
   },
   export_directory: {

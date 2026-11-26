@@ -126,6 +126,13 @@ pub fn window_text(target: &str, max_chars: usize) -> Option<String> {
     ui::target_window_text(target, max_chars)
 }
 
+pub fn play_sound(sound: super::DictationSound) {
+    ui::play_sound(match sound {
+        super::DictationSound::Start => ui::Sound::Start,
+        super::DictationSound::Stop => ui::Sound::Stop,
+    });
+}
+
 pub fn release(target: &str) {
     ui::target_release(target);
 }

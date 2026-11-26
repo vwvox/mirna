@@ -5,6 +5,7 @@ import {
   commands as dictation,
   type ContextExclusions,
   type InsertRequest,
+  type TargetApp,
   type TargetContext,
 } from "@anlg/plugin-dictation";
 import { commands as permissions } from "@anlg/plugin-permissions";
@@ -17,8 +18,10 @@ import { useDictationAccount } from "./account";
 import {
   DictationEngine,
   DictationRetired,
+  NO_SPEECH_MESSAGE,
   type DictationView,
 } from "./engine";
+import { showDictationErrorNotification } from "./error-notification";
 import { nativeDictation } from "./native";
 import { waitForDictationPanel } from "./panel";
 import { useDictationPlanner } from "./planner";
@@ -100,6 +103,9 @@ export function SystemDictation({
       if (disposed) return;
       useDictationStatus.setState({ error: message });
       toast.error(message);
+      // A press held a little too long says nothing; that isn't worth interrupting for.
+      if (message !== NO_SPEECH_MESSAGE)
+        void showDictationErrorNotification(message);
     };
     const setActive = (next: boolean) => {
       if (next === active) return;
@@ -180,12 +186,23 @@ export function SystemDictation({
             });
             context = read.status === "ok" ? read.data : null;
           }
+          // Only cleanup writes in a style, so only then is the app looked up (on this device).
+          let app: TargetApp | null = null;
+          if (options.cleanup) {
+            try {
+              const read = await dictation.dictationTargetApp(target);
+              app = read.status === "ok" ? read.data : null;
+            } catch {
+              // Unknown app: the "other apps" style.
+            }
+          }
           signal.throwIfAborted();
           const accountId = current.current.account;
           if (!accountId) throw new DictationRetired();
           const plan = await planner.plan({
             accountId,
             context: options.context ? (context?.snapshot ?? null) : null,
+            app,
           });
           const selection =
             options.voiceEdit && context?.fingerprint

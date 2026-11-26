@@ -145,6 +145,38 @@ pub async fn capture() -> Result<String, String> {
     platform::capture().await
 }
 
+/// A short cue as dictation starts or finishes listening.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum DictationSound {
+    Start,
+    Stop,
+}
+
+/// Plays `sound` without waiting for it; silent where the platform has no cues.
+pub fn play_sound(sound: DictationSound) {
+    platform::play_sound(sound);
+}
+
+/// The app that owns a captured field. Read locally to pick a writing style; it never leaves
+/// the device.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetApp {
+    pub bundle_id: Option<String>,
+    pub app_name: Option<String>,
+}
+
+pub async fn target_app(target: String) -> Result<Option<TargetApp>, String> {
+    blocking(move || {
+        Ok(platform::facts(&target).map(|facts| TargetApp {
+            bundle_id: facts.bundle_id,
+            app_name: facts.app_name,
+        }))
+    })
+    .await
+}
+
 pub async fn read_context(
     target: String,
     request: ContextRequest,

@@ -53,4 +53,14 @@ export const nativeDictation: DictationNative = {
       await dictation.saveDictationRecoveryText(accountId, id, text),
     );
   },
+  playSound: (sound) => {
+    // A missing cue never holds up or fails a dictation.
+    void (async () => {
+      try {
+        await dictation.playDictationSound(sound);
+      } catch {
+        // Silence is fine.
+      }
+    })();
+  },
 };

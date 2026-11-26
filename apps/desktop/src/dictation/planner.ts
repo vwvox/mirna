@@ -1,11 +1,12 @@
 import { arch, platform } from "@tauri-apps/plugin-os";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 
 import {
   commands as dictation,
   type ContextSnapshot,
   type DictationPolicy,
   type PreviewConfig,
+  type TargetApp,
 } from "@anlg/plugin-dictation";
 
 import { useDictationAccount } from "./account";
@@ -15,6 +16,7 @@ import {
   parseReplacements,
   parseSuggestions,
 } from "./learning";
+import { appCategory, parseWritingStyle } from "./styles";
 
 import { refineDictation } from "~/ai/dictation-refine";
 import { useLanguageModel } from "~/ai/hooks/useLLMConnection";
@@ -37,10 +39,16 @@ import { useSTTConnection } from "~/stt/useSTTConnection";
 
 const LOCAL_UNAVAILABLE =
   "Your local transcription model can't finish this dictation. Check Settings > Transcription; Mirna won't send it to a cloud provider instead.";
+const DICTATION_LOCAL_UNAVAILABLE =
+  "Your dictation speech model can't finish this dictation. Check the speech model in Settings > Dictation; Mirna won't send it to a cloud provider instead.";
 
 const SETTING_KEYS = [
   "current_stt_provider",
   "current_stt_model",
+  "dictation_stt_provider",
+  "dictation_stt_model",
+  "dictation_llm_provider",
+  "dictation_llm_model",
   "microphone_device",
   "ai_language",
   "spoken_languages",
@@ -52,6 +60,11 @@ const SETTING_KEYS = [
   "dictation_context",
   "dictation_learning",
   "dictation_ducking",
+  "dictation_sounds",
+  "dictation_style_personal",
+  "dictation_style_work",
+  "dictation_style_email",
+  "dictation_style_other",
   "dictation_recovery",
   "dictation_term_weights",
 ] as const;
@@ -88,6 +101,7 @@ export type DictationOptions = {
   context: boolean;
   learning: boolean;
   voiceEdit: boolean;
+  cleanup: boolean;
 };
 
 /**
@@ -96,13 +110,24 @@ export type DictationOptions = {
  * a recording fails instead of reaching a cloud provider.
  */
 export function useDictationPlanner(sessionId: string) {
+  const values = useConfigValues(SETTING_KEYS);
+  const sttOverride = useDictationOverride(
+    values.dictation_stt_provider,
+    values.dictation_stt_model,
+  );
+  const llmOverride = useDictationOverride(
+    values.dictation_llm_provider,
+    values.dictation_llm_model,
+  );
   const runBatch = useRunBatch(sessionId);
-  const stt = useSTTConnection();
+  const stt = useSTTConnection(sttOverride);
   const auth = useAuth();
   const account = useDictationAccount();
-  const model = useLanguageModel();
+  const model = useLanguageModel(undefined, llmOverride);
   const settingsReady = useSettingsReady();
-  const values = useConfigValues(SETTING_KEYS);
+  const localUnavailable = sttOverride
+    ? DICTATION_LOCAL_UNAVAILABLE
+    : LOCAL_UNAVAILABLE;
   const latest = useRef({
     runBatch,
     stt,
@@ -111,6 +136,7 @@ export function useDictationPlanner(sessionId: string) {
     model,
     settingsReady,
     values,
+    localUnavailable,
   });
   latest.current = {
     runBatch,
@@ -120,6 +146,7 @@ export function useDictationPlanner(sessionId: string) {
     model,
     settingsReady,
     values,
+    localUnavailable,
   };
 
   // Learning writes only while the same account is signed in with learning still on.
@@ -136,24 +163,40 @@ export function useDictationPlanner(sessionId: string) {
         context: values.dictation_context,
         learning: values.dictation_learning,
         voiceEdit: values.dictation_voice_edit,
+        cleanup: values.dictation_cleanup,
       };
     },
 
     plan: async ({
       accountId,
       context,
+      app = null,
     }: {
       accountId: string;
       context: ContextSnapshot | null;
+      /** The app the text goes into, which picks the writing style; none for Mirna's own fields. */
+      app?: TargetApp | null;
     }): Promise<DictationPlan> => {
-      const { stt, auth, model, settingsReady, values } = latest.current;
+      const { stt, auth, model, settingsReady, values, localUnavailable } =
+        latest.current;
       const conn = stt.conn;
       const localOnly =
         stt.isLocalModel || (!!conn && isLoopback(conn.baseUrl));
-      if (localOnly && !conn) throw new Error(LOCAL_UNAVAILABLE);
+      if (localOnly && !conn) throw new Error(localUnavailable);
+      const ownModel = !!(
+        values.dictation_stt_provider && values.dictation_stt_model
+      );
       const policy: DictationPolicy = {
-        provider: conn?.provider ?? values.current_stt_provider ?? "",
-        model: conn?.model ?? values.current_stt_model ?? null,
+        provider:
+          conn?.provider ??
+          (ownModel
+            ? values.dictation_stt_provider
+            : values.current_stt_provider) ??
+          "",
+        model:
+          conn?.model ??
+          (ownModel ? values.dictation_stt_model : values.current_stt_model) ??
+          null,
         localOnly,
       };
       const languages = values.spoken_languages ?? [];
@@ -191,12 +234,16 @@ export function useDictationPlanner(sessionId: string) {
           }
         : null;
       const isCloudModel = stt.isCloudModel;
+      const style = parseWritingStyle(
+        values[`dictation_style_${appCategory(app)}`],
+      );
 
       return {
         policy,
         microphoneDevice: values.microphone_device || null,
         recovery: values.dictation_recovery,
         ducking: values.dictation_ducking,
+        sounds: values.dictation_sounds,
         livePreview: values.dictation_live_preview,
         stream: async (): Promise<PreviewConfig | null> => {
           if (!conn) return null;
@@ -232,7 +279,7 @@ export function useDictationPlanner(sessionId: string) {
               now.model !== conn.model ||
               !(await canBatchLocally(conn, batchLanguages))
             )
-              throw new Error(LOCAL_UNAVAILABLE);
+              throw new Error(localUnavailable);
           }
           signal.throwIfAborted();
           let text = "";
@@ -277,6 +324,7 @@ export function useDictationPlanner(sessionId: string) {
               terms: await keywords,
               replacements,
               instructions: null,
+              style,
               before: request.before,
               context: request.context,
             },
@@ -381,4 +429,15 @@ function isLoopback(baseUrl: string) {
   } catch {
     return false;
   }
+}
+
+/** A provider and model chosen for dictation only, or null to use the main selection. */
+function useDictationOverride(
+  provider: string | undefined,
+  model: string | undefined,
+) {
+  return useMemo(
+    () => (provider && model ? { provider, model } : null),
+    [provider, model],
+  );
 }

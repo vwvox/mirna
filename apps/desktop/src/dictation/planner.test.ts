@@ -18,6 +18,10 @@ const mocks = vi.hoisted(() => ({
   getSessionForRequest: vi.fn(),
   microphone: "",
   learning: false,
+  config: {} as Record<string, unknown>,
+  sttOverride: undefined as unknown,
+  llmOverride: undefined as unknown,
+  refine: vi.fn(),
   stored: {} as Record<string, string>,
   // A settings write waits its turn in the database queue before its updater runs.
   queue: Promise.resolve() as Promise<void>,
@@ -35,7 +39,10 @@ vi.mock("@tauri-apps/plugin-os", () => ({
   arch: () => "aarch64",
 }));
 vi.mock("~/stt/useSTTConnection", () => ({
-  useSTTConnection: () => mocks.stt,
+  useSTTConnection: (override: unknown) => {
+    mocks.sttOverride = override;
+    return mocks.stt;
+  },
 }));
 vi.mock("~/stt/useRunBatch", () => ({
   getBatchProvider: (provider: string) =>
@@ -69,9 +76,14 @@ vi.mock("~/auth", () => ({
   }),
 }));
 vi.mock("~/ai/hooks/useLLMConnection", () => ({
-  useLanguageModel: () => null,
+  useLanguageModel: (_task: unknown, override: unknown) => {
+    mocks.llmOverride = override;
+    return null;
+  },
 }));
-vi.mock("~/ai/dictation-refine", () => ({ refineDictation: vi.fn() }));
+vi.mock("~/ai/dictation-refine", () => ({
+  refineDictation: (args: unknown) => mocks.refine(args),
+}));
 vi.mock("~/settings/queries", () => ({
   useSettingsReady: () => true,
   getStoredSettingValues: async () => ({ values: { ...mocks.stored } }),
@@ -96,15 +108,18 @@ vi.mock("~/shared/config", () => ({
     Object.fromEntries(
       keys.map((key) => [
         key,
-        key === "spoken_languages" || key === "personalization_dictionary_terms"
-          ? []
-          : key === "dictation_learning"
-            ? mocks.learning
-            : key === "microphone_device"
-              ? mocks.microphone
-              : key.startsWith("dictation_")
-                ? false
-                : "",
+        key in mocks.config
+          ? mocks.config[key]
+          : key === "spoken_languages" ||
+              key === "personalization_dictionary_terms"
+            ? []
+            : key === "dictation_learning"
+              ? mocks.learning
+              : key === "microphone_device"
+                ? mocks.microphone
+                : key.startsWith("dictation_")
+                  ? false
+                  : "",
       ]),
     ),
 }));
@@ -138,12 +153,94 @@ describe("dictation planner", () => {
     mocks.getSessionForRequest.mockResolvedValue(null);
     mocks.microphone = "";
     mocks.learning = true;
+    mocks.config = {};
+    mocks.sttOverride = undefined;
+    mocks.llmOverride = undefined;
+    mocks.refine.mockReset();
+    mocks.refine.mockResolvedValue({
+      type: "raw",
+      text: "",
+      reason: "cleanupOff",
+    });
     mocks.stored = {};
     mocks.queue = Promise.resolve();
     mocks.queued = 0;
     // Weights as a list of recorded events, so lost updates show.
     mocks.record = async ({ weights, event }) =>
       JSON.stringify([...JSON.parse(weights ?? "[]"), event]);
+  });
+
+  it("uses the main models until dictation has its own provider and model", async () => {
+    mocks.config = {
+      dictation_stt_provider: "soniqo",
+      dictation_stt_model: "",
+    };
+    renderHook(() => useDictationPlanner("dictation-1"));
+    expect(mocks.sttOverride).toBeNull();
+    expect(mocks.llmOverride).toBeNull();
+
+    mocks.config = {
+      dictation_stt_provider: "soniqo",
+      dictation_stt_model: "soniqo-parakeet-streaming",
+      dictation_llm_provider: "groq",
+      dictation_llm_model: "llama-fast",
+    };
+    renderHook(() => useDictationPlanner("dictation-1"));
+    expect(mocks.sttOverride).toEqual({
+      provider: "soniqo",
+      model: "soniqo-parakeet-streaming",
+    });
+    expect(mocks.llmOverride).toEqual({
+      provider: "groq",
+      model: "llama-fast",
+    });
+  });
+
+  it("points a local failure of dictation's own speech model at Dictation settings", async () => {
+    mocks.config = {
+      dictation_stt_provider: "soniqo",
+      dictation_stt_model: "soniqo-parakeet-streaming",
+    };
+    mocks.stt = { conn: null, isLocalModel: true, isCloudModel: false };
+    const { result } = renderHook(() => useDictationPlanner("dictation-1"));
+
+    await expect(
+      result.current.plan({ accountId: "user-1", context: null }),
+    ).rejects.toThrow(/Settings > Dictation; Mirna won't send it/u);
+  });
+
+  it("cleans up in the style chosen for the kind of app the text goes into", async () => {
+    mocks.config = {
+      dictation_style_personal: "veryCasual",
+      dictation_style_other: "casual",
+    };
+    const { result } = renderHook(() => useDictationPlanner("dictation-1"));
+    const refine = async (app: { bundleId: string; appName: null } | null) => {
+      const plan = await result.current.plan({
+        accountId: "user-1",
+        context: null,
+        app,
+      });
+      await plan.refine(
+        {
+          operationId: "op",
+          text: "see you at six",
+          selection: null,
+          before: null,
+          context: null,
+        },
+        new AbortController().signal,
+      );
+      return mocks.refine.mock.lastCall![0].request.style;
+    };
+
+    await expect(
+      refine({ bundleId: "com.apple.MobileSMS", appName: null }),
+    ).resolves.toBe("veryCasual");
+    await expect(refine(null)).resolves.toBe("casual");
+    await expect(
+      refine({ bundleId: "com.apple.mail", appName: null }),
+    ).resolves.toBe("formal");
   });
 
   it("transcribes a local recording on the selected local model", async () => {

@@ -663,7 +663,7 @@ export function getLlmProviderStatus({
   };
 }
 
-function useConfiguredMapping(): {
+export function useConfiguredMapping(): {
   providers: Record<string, ProviderStatus>;
   isReady: boolean;
 } {

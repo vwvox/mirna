@@ -45,6 +45,8 @@ export type DictationNative = {
     id: string,
     text: string,
   ) => Promise<void>;
+  /** A short cue; fire and forget. */
+  playSound: (sound: "start" | "stop") => void;
 };
 
 /** The provider route, options and text rules captured once when an operation opens. */
@@ -53,6 +55,8 @@ export type DictationPlan = {
   microphoneDevice: string | null;
   recovery: boolean;
   ducking: boolean;
+  /** Cues when listening starts and when it finishes. */
+  sounds: boolean;
   livePreview: boolean;
   stream: () => Promise<PreviewConfig | null>;
   transcribe: (audioPath: string, signal: AbortSignal) => Promise<string>;
@@ -417,8 +421,11 @@ export class DictationEngine {
       this.check(op);
       await ports.present?.(op.id, signal);
       this.check(op);
+      if (plan.sounds) ports.native.playSound("start");
       await op.stopped;
       this.check(op);
+      // A cancelled dictation ends quietly; only a finished one hears the stop cue.
+      if (plan.sounds) ports.native.playSound("stop");
 
       this.emit(op, { phase: "transcribing", amplitude: 0 });
       const stoppedAt = Date.now();

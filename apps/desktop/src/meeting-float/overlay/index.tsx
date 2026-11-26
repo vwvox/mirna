@@ -83,6 +83,13 @@ export function FloatingBarOverlayScreen() {
             void windowsEvents.floatingBarStop.emit({});
           }
         }}
+        onCancel={() => {
+          if (!state.dictation) return;
+          void windowsEvents.floatingBarDictationAction.emit({
+            sessionId: state.dictation.sessionId,
+            action: "cancel",
+          });
+        }}
         onSetPaused={(paused) => {
           void windowsEvents.floatingBarPause.emit({ paused });
         }}

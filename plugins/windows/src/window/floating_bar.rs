@@ -126,8 +126,9 @@ pub(crate) mod layout {
         compact_controls_width(shows_expand, shows_pause) + COMPACT_HORIZONTAL_PADDING * 2.0
     }
 
+    /// A dictation shows its cancel button where a meeting shows pause.
     pub fn dictation_container_size(expanded: bool) -> (f64, f64) {
-        container_size(expanded, true, false)
+        container_size(expanded, true, true)
     }
 
     pub fn container_size(is_expanded: bool, shows_expand: bool, shows_pause: bool) -> (f64, f64) {
@@ -707,7 +708,7 @@ mod tests {
         assert_eq!(layout::container_size(false, true, true), (138.0, 67.0));
         assert_eq!(layout::container_size(false, false, true), (114.0, 67.0));
         assert_eq!(layout::container_size(true, true, true), (368.0, 459.0));
-        assert_eq!(layout::dictation_container_size(false), (108.0, 67.0));
+        assert_eq!(layout::dictation_container_size(false), (138.0, 67.0));
     }
 
     #[test]

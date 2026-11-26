@@ -177,6 +177,8 @@ pub fn window_text(_target: &str, _max_chars: usize) -> Option<String> {
     None
 }
 
+pub fn play_sound(_sound: super::DictationSound) {}
+
 pub fn release(_target: &str) {}
 
 /// The default render endpoint's master volume. Each call opens its own COM apartment, since the

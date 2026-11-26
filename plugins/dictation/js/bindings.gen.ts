@@ -15,6 +15,24 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  async playDictationSound(sound: DictationSound): Promise<void> {
+    await TAURI_INVOKE("plugin:dictation|play_dictation_sound", { sound });
+  },
+  async dictationTargetApp(
+    target: string,
+  ): Promise<Result<TargetApp | null, string>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE("plugin:dictation|dictation_target_app", {
+          target,
+        }),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   async beginDictation(
     request: BeginDictation,
     updates: TAURI_CHANNEL<DictationUpdate>,
@@ -443,6 +461,10 @@ export type DictationRecoveryItem = {
   policy: DictationPolicy;
 };
 export type DictationRecoveryState = "audio" | "text";
+/**
+ * A short cue as dictation starts or finishes listening.
+ */
+export type DictationSound = "start" | "stop";
 export type DictationSurface = "system" | "chat";
 export type DictationTicket = {
   operationId: string;
@@ -666,6 +688,11 @@ export type RefineRequest = {
   replacements: Replacement[];
   instructions: string | null;
   /**
+   * The writing style for the app the dictation goes into. Unlike personal instructions it
+   * changes only casing and end punctuation, so it keeps the strict length checks.
+   */
+  style?: WritingStyle | null;
+  /**
    * The text before the caret in an Anarlog field (chat).
    */
   before: string | null;
@@ -700,6 +727,11 @@ export type SuggestRequest = {
   seen: string[];
 };
 export type TAURI_CHANNEL<TSend> = null;
+/**
+ * The app that owns a captured field. Read locally to pick a writing style; it never leaves
+ * the device.
+ */
+export type TargetApp = { bundleId: string | null; appName: string | null };
 export type TargetContext = {
   /**
    * Local only, for fitting: the end of the text before the caret.
@@ -741,6 +773,11 @@ export type TextPolicy = {
    */
   voiceEdit: boolean;
 };
+/**
+ * How casually cleanup writes, chosen per kind of app. `Formal` adds nothing to the prompt: it
+ * is the written form the cleanup rules already ask for.
+ */
+export type WritingStyle = "formal" | "casual" | "veryCasual";
 
 /** tauri-specta globals **/
 

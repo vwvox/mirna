@@ -5,6 +5,8 @@ Default permissions for the plugin
 #### This default permission set includes the following:
 
 - `allow-capture-target`
+- `allow-play-dictation-sound`
+- `allow-dictation-target-app`
 - `allow-begin-dictation`
 - `allow-attach-dictation-stream`
 - `allow-finish-dictation`
@@ -196,6 +198,32 @@ Denies the complete_dictation command without any pre-configured scope.
 <tr>
 <td>
 
+`dictation:allow-dictation-target-app`
+
+</td>
+<td>
+
+Enables the dictation_target_app command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`dictation:deny-dictation-target-app`
+
+</td>
+<td>
+
+Denies the dictation_target_app command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `dictation:allow-discard-dictation-recovery`
 
 </td>
@@ -319,6 +347,32 @@ Enables the list_dictation_recovery command without any pre-configured scope.
 <td>
 
 Denies the list_dictation_recovery command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`dictation:allow-play-dictation-sound`
+
+</td>
+<td>
+
+Enables the play_dictation_sound command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`dictation:deny-play-dictation-sound`
+
+</td>
+<td>
+
+Denies the play_dictation_sound command without any pre-configured scope.
 
 </td>
 </tr>

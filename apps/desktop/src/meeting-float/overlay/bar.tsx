@@ -12,6 +12,7 @@ import {
   Play,
   Square,
   WarningCircle,
+  X,
 } from "@anlg/ui/components/icons";
 import { DancingSticks } from "@anlg/ui/components/ui/dancing-sticks";
 import { cn } from "@anlg/utils";
@@ -37,11 +38,13 @@ import {
 export function FloatingBarOverlay({
   state,
   onStop,
+  onCancel,
   onSetPaused,
   onToggleExpanded,
 }: {
   state: FloatingBarState;
   onStop: () => void;
+  onCancel: () => void;
   onSetPaused: (paused: boolean) => void;
   onToggleExpanded: (expanded: boolean) => void;
 }) {
@@ -50,9 +53,10 @@ export function FloatingBarOverlay({
     state.liveCaptionToggleVisible && !state.liveCaptionMinimized;
   const showsHoverHandle = hovered && !isExpanded;
   const colors = barColors(state);
+  // The slot beside the main control holds pause for a meeting, cancel for a dictation.
   const controlsWidth = compactControlsWidth(
     state.liveCaptionToggleVisible,
-    !state.dictation,
+    true,
   );
   const expandsUpward = state.layout?.expandsUpward ?? false;
 
@@ -132,6 +136,7 @@ export function FloatingBarOverlay({
               isExpanded={isExpanded}
               colors={colors}
               onStop={onStop}
+              onCancel={onCancel}
               onSetPaused={onSetPaused}
               onToggleExpanded={onToggleExpanded}
             />
@@ -147,6 +152,7 @@ function FloatingControls({
   isExpanded,
   colors,
   onStop,
+  onCancel,
   onSetPaused,
   onToggleExpanded,
 }: {
@@ -154,6 +160,7 @@ function FloatingControls({
   isExpanded: boolean;
   colors: BarColors;
   onStop: () => void;
+  onCancel: () => void;
   onSetPaused: (paused: boolean) => void;
   onToggleExpanded: (expanded: boolean) => void;
 }) {
@@ -165,7 +172,24 @@ function FloatingControls({
       style={{ gap: FLOATING_BAR_COMPACT_GAP }}
     >
       <StopControl state={state} colors={colors} onStop={onStop} />
-      {state.dictation ? null : (
+      {state.dictation ? (
+        <button
+          type="button"
+          data-tauri-drag-region="false"
+          aria-label="Cancel dictation"
+          title="Cancel dictation (Esc)"
+          onClick={onCancel}
+          className="flex items-center justify-center"
+          style={{
+            width: FLOATING_BAR_COMPACT_ICON_SIZE,
+            height: FLOATING_BAR_COMPACT_ICON_SIZE,
+            borderRadius: FLOATING_BAR_CONTROL_RADIUS,
+            color: colors.content,
+          }}
+        >
+          <X size={14} weight="bold" />
+        </button>
+      ) : (
         <button
           type="button"
           data-tauri-drag-region="false"

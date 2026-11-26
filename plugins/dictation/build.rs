@@ -1,5 +1,7 @@
 const COMMANDS: &[&str] = &[
     "capture_target",
+    "play_dictation_sound",
+    "dictation_target_app",
     "begin_dictation",
     "attach_dictation_stream",
     "finish_dictation",

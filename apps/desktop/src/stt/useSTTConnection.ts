@@ -19,20 +19,35 @@ import {
 } from "~/stt/capabilities";
 import { localSttQueries } from "~/stt/useLocalSttModel";
 
-export const useSTTConnection = () => {
+/** A provider and model used instead of the person's main transcription selection. */
+export type STTSelectionOverride = { provider: string; model: string };
+
+/**
+ * The connection for the person's main transcription model, or for `override` when it names
+ * both a provider and a model. An on-device override never starts or swaps a model server; it
+ * connects only to a model that is already running or runs in-process.
+ */
+export const useSTTConnection = (override?: STTSelectionOverride | null) => {
   const auth = useAuth();
   const billing = useBillingAccess();
   const settingsReady = useSettingsReady();
-  const { current_stt_provider, current_stt_model, local_stt_model_path } =
-    useConfigValues([
-      "current_stt_provider",
-      "current_stt_model",
-      "local_stt_model_path",
-    ] as const) as {
-      current_stt_provider: ProviderId | undefined;
-      current_stt_model: string | undefined;
-      local_stt_model_path: string | undefined;
-    };
+  const values = useConfigValues([
+    "current_stt_provider",
+    "current_stt_model",
+    "local_stt_model_path",
+  ] as const) as {
+    current_stt_provider: ProviderId | undefined;
+    current_stt_model: string | undefined;
+    local_stt_model_path: string | undefined;
+  };
+  const overridden = !!(override?.provider && override.model);
+  const current_stt_provider = overridden
+    ? (override!.provider as ProviderId)
+    : values.current_stt_provider;
+  const current_stt_model = overridden
+    ? override!.model
+    : values.current_stt_model;
+  const { local_stt_model_path } = values;
 
   const { providers, isReady: providerConfigReady } =
     useAiProvidersState("stt");

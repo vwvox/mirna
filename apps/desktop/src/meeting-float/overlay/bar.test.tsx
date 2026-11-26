@@ -56,6 +56,7 @@ describe("FloatingBarOverlay", () => {
         <FloatingBarOverlay
           state={state({ status })}
           onStop={onStop}
+          onCancel={vi.fn()}
           onSetPaused={vi.fn()}
           onToggleExpanded={vi.fn()}
         />,
@@ -74,6 +75,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={vi.fn()}
+        onCancel={vi.fn()}
         onSetPaused={vi.fn()}
         onToggleExpanded={onToggleExpanded}
       />,
@@ -89,6 +91,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state({ liveCaptionMinimized: false })}
         onStop={vi.fn()}
+        onCancel={vi.fn()}
         onSetPaused={vi.fn()}
         onToggleExpanded={onToggleExpanded}
       />,
@@ -111,6 +114,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state()}
         onStop={onStop}
+        onCancel={vi.fn()}
         onSetPaused={onSetPaused}
         onToggleExpanded={vi.fn()}
       />,
@@ -124,6 +128,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state({ paused: true, amplitude: 0 })}
         onStop={onStop}
+        onCancel={vi.fn()}
         onSetPaused={onSetPaused}
         onToggleExpanded={vi.fn()}
       />,
@@ -148,6 +153,7 @@ describe("FloatingBarOverlay", () => {
       <FloatingBarOverlay
         state={state({ paused: true, status: "error" })}
         onStop={vi.fn()}
+        onCancel={vi.fn()}
         onSetPaused={vi.fn()}
         onToggleExpanded={vi.fn()}
       />,
@@ -172,6 +178,7 @@ describe("FloatingBarOverlay", () => {
           },
         })}
         onStop={vi.fn()}
+        onCancel={vi.fn()}
         onSetPaused={vi.fn()}
         onToggleExpanded={vi.fn()}
       />,

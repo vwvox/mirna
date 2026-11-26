@@ -96,7 +96,8 @@ struct FloatingBarView: View {
         floatingControls(isExpanded: model.isExpanded)
           .frame(
             width: FloatingBarLayout.compactControlsWidth(
-              showsExpand: model.liveCaptionToggleVisible, showsPause: model.showsPause),
+              showsExpand: model.liveCaptionToggleVisible,
+              showsPause: model.showsSecondaryControl),
             height: FloatingBarLayout.compactHeight
           )
           .position(
@@ -227,6 +228,18 @@ struct FloatingBarView: View {
         )
       }
 
+      if model.showsCancel {
+        FloatingIconButton(
+          systemName: "xmark",
+          accessibilityLabel: "Cancel dictation",
+          color: primaryContentColor,
+          hoverFill: controlHoverFill,
+          size: FloatingBarLayout.compactIconSize,
+          action: { performClick { dictationAction("cancel") } }
+        )
+        .help("Cancel dictation (Esc)")
+      }
+
       if model.liveCaptionToggleVisible {
         FloatingIconButton(
           systemName: isExpanded
@@ -320,7 +333,7 @@ struct FloatingBarView: View {
       ?? FloatingBarLayout.containerSize(
         isExpanded: model.isExpanded,
         showsExpand: model.liveCaptionToggleVisible,
-        showsPause: model.showsPause
+        showsPause: model.showsSecondaryControl
       )
   }
 

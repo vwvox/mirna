@@ -28,6 +28,7 @@ function setup(overrides?: {
   selection?: string | null;
   restoreRaw?: DictationTarget["restoreRaw"];
   learn?: DictationTarget["learn"];
+  sounds?: boolean;
 }) {
   const native = new FakeNative();
   const inserted: { text: string; edit: boolean }[] = [];
@@ -43,6 +44,7 @@ function setup(overrides?: {
     microphoneDevice: null,
     recovery: overrides?.recovery ?? false,
     ducking: false,
+    sounds: overrides?.sounds ?? false,
     livePreview: false,
     stream: overrides?.stream ?? (async () => STREAM),
     transcribe:
@@ -164,6 +166,41 @@ describe("dictation engine", () => {
     expect(engine.busy).toBe(false);
     expect(native.openOps).toBe(0);
     expect(native.streamedAny).toBe(false);
+  });
+
+  it("cues the start and the finish of a dictation when sounds are on", async () => {
+    const { native, engine, inserted, idle } = setup({ sounds: true });
+    engine.prime();
+    engine.start(false);
+    await vi.waitFor(() => expect(native.sounds).toEqual(["start"]));
+    engine.stop();
+    await idle();
+
+    expect(native.sounds).toEqual(["start", "stop"]);
+    expect(inserted).toEqual([{ text: "hello world", edit: false }]);
+  });
+
+  it("plays no cue for a tap, a cancelled dictation or with sounds off", async () => {
+    const tap = setup({ sounds: true });
+    tap.engine.prime();
+    await settle();
+    tap.engine.unprime();
+    await tap.idle();
+    expect(tap.native.sounds).toEqual([]);
+
+    const cancelled = setup({ sounds: true });
+    cancelled.engine.start(true);
+    await vi.waitFor(() => expect(cancelled.native.sounds).toEqual(["start"]));
+    cancelled.engine.cancel();
+    await cancelled.idle();
+    expect(cancelled.native.sounds).toEqual(["start"]);
+
+    const quiet = setup();
+    quiet.engine.start(true);
+    await settle();
+    quiet.engine.stop();
+    await quiet.idle();
+    expect(quiet.native.sounds).toEqual([]);
   });
 
   it("delivers a finalized stream once and releases its files", async () => {

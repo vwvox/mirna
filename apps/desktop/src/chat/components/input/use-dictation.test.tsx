@@ -18,7 +18,12 @@ const mocks = vi.hoisted(() => ({
   transcribe: null as
     | null
     | ((path: string, signal: AbortSignal) => Promise<string>),
-  options: { context: false, learning: false, voiceEdit: false },
+  options: {
+    context: false,
+    learning: false,
+    voiceEdit: false,
+    cleanup: false,
+  },
   refine: null as unknown as (request: {
     text: string;
     selection: string | null;
@@ -83,6 +88,7 @@ vi.mock("~/dictation/planner", () => ({
       microphoneDevice: null,
       recovery: false,
       ducking: false,
+      sounds: false,
       livePreview: false,
       stream: async () => null,
       transcribe: (path: string, signal: AbortSignal) =>
@@ -122,7 +128,12 @@ describe("useDictation", () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     mocks.transcribe = null;
-    mocks.options = { context: false, learning: false, voiceEdit: false };
+    mocks.options = {
+      context: false,
+      learning: false,
+      voiceEdit: false,
+      cleanup: false,
+    };
     mocks.refine = async ({ text }) => ({
       type: "raw",
       text,
