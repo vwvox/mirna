@@ -10,6 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@anlg/ui/components/ui/popover";
+import { toast } from "@anlg/ui/components/ui/toast";
 import { cn } from "@anlg/utils";
 
 import { preserveScrollPosition } from "./viewport-hooks";
@@ -20,15 +21,21 @@ import { ContactImage } from "~/contacts/contact-avatar";
 import { createHuman, updateHuman, useHumans } from "~/contacts/queries";
 import { ContactFacehash } from "~/contacts/shared";
 import {
+  hasRememberedVoice,
+  rememberSpeakerVoice,
+} from "~/services/voiceprint";
+import {
   addSessionParticipant,
   useSession,
   useSessionParticipants,
 } from "~/session/queries";
+import { useConfigValue } from "~/shared/config";
 import { useOwnerUserId } from "~/shared/owner-user";
 import type { Segment } from "~/stt/live-segment";
 import {
   assignSessionTranscriptSpeaker,
   assignTranscriptSpeaker,
+  type NamedSpeakerVoice,
 } from "~/stt/queries";
 
 export type AssignmentMode = "all" | "segment";
@@ -52,13 +59,14 @@ export function SpeakerAssignPopover({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const handleNamedVoice = useRememberNamedVoice(sessionId);
 
   const handleOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
   }, []);
 
   const handleAssign = useCallback(
-    (humanId: string, assignmentMode: AssignmentMode) => {
+    (humanId: string, assignmentMode: AssignmentMode, name: string) => {
       if (segment.words.length === 0) return;
       const anchorWordId = getAssignmentAnchorWordId(segment);
       if (!anchorWordId) return;
@@ -85,19 +93,27 @@ export function SpeakerAssignPopover({
               wordIds: getAssignmentWordIds(segment),
             });
       void preserveScrollPosition(scrollContainer, assign)
-        .then(() => {
+        .then((voice) => {
           trackAnalyticsEvent("participant_assigned", {
             assignment_scope: assignmentMode,
             word_count: segment.words.length,
           });
           onAssigned?.(humanId);
           handleOpenChange(false);
+          handleNamedVoice(voice, name);
         })
         .catch((error) => {
           console.error("[transcript] failed to assign speaker", error);
         });
     },
-    [handleOpenChange, onAssigned, sessionId, transcriptId, segment],
+    [
+      handleNamedVoice,
+      handleOpenChange,
+      onAssigned,
+      sessionId,
+      transcriptId,
+      segment,
+    ],
   );
 
   return (
@@ -133,6 +149,74 @@ export function SpeakerAssignPopover({
         />
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Naming a speaker never keeps their voice on its own. With "Remember speakers"
+// on, or once the user agreed for this person, the voice is kept silently;
+// otherwise Mirna asks first, since a voiceprint identifies someone.
+function useRememberNamedVoice(sessionId: string | undefined) {
+  const { t } = useLingui();
+  const rememberSpeakers = useConfigValue("remember_speakers") === true;
+  const ownerUserId = useOwnerUserId();
+
+  return useCallback(
+    (voice: NamedSpeakerVoice | null | void, name: string) => {
+      if (!voice || !sessionId) return;
+      const isSelf = voice.humanId === ownerUserId;
+      const displayName = name.trim();
+
+      const remember = async (announce: boolean) => {
+        const stored = await rememberSpeakerVoice(sessionId, voice);
+        if (!announce) return;
+        if (stored) {
+          toast.success(
+            isSelf
+              ? t`Mirna will recognize you in future meetings.`
+              : t`Mirna will recognize ${displayName} in future meetings.`,
+          );
+        } else {
+          toast.info(
+            t`There wasn't enough clear speech to remember this voice.`,
+          );
+        }
+      };
+
+      void (async () => {
+        if (rememberSpeakers || (await hasRememberedVoice(voice.humanId))) {
+          await remember(false);
+          return;
+        }
+        const toastId = `remember-voice-${voice.transcriptId}-${voice.humanId}`;
+        toast(
+          isSelf
+            ? t`Remember your voice?`
+            : t`Remember ${displayName}'s voice?`,
+          {
+            id: toastId,
+            description: isSelf
+              ? t`Mirna can recognize you in future meetings. Your voiceprint stays on this device.`
+              : t`Mirna can recognize ${displayName} in future meetings. The voiceprint stays on this device. Only do this if ${displayName} is happy with it.`,
+            duration: 30_000,
+            closeButton: true,
+            action: {
+              label: t`Remember`,
+              onClick: () => {
+                toast.dismiss(toastId);
+                void remember(true);
+              },
+            },
+            secondaryAction: {
+              label: t`Not now`,
+              onClick: () => toast.dismiss(toastId),
+            },
+          },
+        );
+      })().catch((error) => {
+        console.error("[voiceprint] remember prompt failed", error);
+      });
+    },
+    [ownerUserId, rememberSpeakers, sessionId, t],
   );
 }
 
@@ -370,7 +454,11 @@ export function SpeakerParticipantPicker({
   showAssignmentScope = true,
 }: {
   sessionId: string | undefined;
-  onSelect: (humanId: string, mode: AssignmentMode) => void | Promise<void>;
+  onSelect: (
+    humanId: string,
+    mode: AssignmentMode,
+    name: string,
+  ) => void | Promise<void>;
   showAssignmentScope?: boolean;
 }) {
   const { t } = useLingui();
@@ -562,6 +650,7 @@ export function SpeakerParticipantPicker({
         await onSelect(
           humanId,
           showAssignmentScope && applyToAllMatching ? "all" : "segment",
+          selectedOption.name,
         );
       })
       .catch((error) => {

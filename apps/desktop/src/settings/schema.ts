@@ -260,7 +260,7 @@ export const SETTING_DEFINITIONS = {
   remember_speakers: {
     type: "boolean",
     path: ["general", "remember_speakers"],
-    default: true as boolean,
+    default: false as boolean,
   },
   microphone_device: {
     type: "string",

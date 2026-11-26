@@ -37,16 +37,16 @@ const cases = [
     expected: true,
   },
   {
-    name: "keeps remember speakers on until explicitly disabled",
+    name: "keeps remember speakers off until explicitly enabled",
     key: "remember_speakers",
     values: {},
-    expected: true,
+    expected: false,
   },
   {
-    name: "respects an explicit remember speakers opt-out",
+    name: "respects an explicit remember speakers opt-in",
     key: "remember_speakers",
-    values: { remember_speakers: false },
-    expected: false,
+    values: { remember_speakers: true },
+    expected: true,
   },
   {
     name: "uses disabled legacy bounce preferences for the general setting",

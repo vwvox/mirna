@@ -48,43 +48,24 @@ struct StoredHint {
 
 #[tauri::command]
 #[specta::specta]
+/// `keep_unnamed` is the "Remember speakers" setting. When it is off, the
+/// embeddings only name speakers from voices the user chose to remember and
+/// are dropped afterwards, so no one's voice is kept without being asked.
 pub async fn extract_voiceprint_candidates<R: tauri::Runtime>(
     app: tauri::AppHandle<R>,
     session_id: String,
     transcript_id: String,
     audio_path: String,
+    keep_unnamed: bool,
 ) -> Result<u32, String> {
-    let pool = app
-        .try_state::<tauri_plugin_db::ManagedState>()
-        .map(|state| state.pool().clone())
-        .ok_or_else(|| "database is not ready yet".to_string())?;
+    let pool = managed_pool(&app)?;
 
-    let Some((workspace_id, words_json, hints_json)) =
-        sqlx::query_as::<_, (String, String, String)>(
-            "SELECT workspace_id, words_json, speaker_hints_json
-             FROM transcripts
-             WHERE id = ? AND session_id = ? AND deleted_at IS NULL
-             LIMIT 1",
-        )
-        .bind(&transcript_id)
-        .bind(&session_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|error| error.to_string())?
-    else {
-        return Ok(0);
-    };
-
-    let Some(attachment_id) = sqlx::query_scalar::<_, String>(
-        "SELECT id FROM session_attachments
-         WHERE session_id = ? AND source_type = 'session_audio' AND deleted_at IS NULL
-         ORDER BY created_at
-         LIMIT 1",
-    )
-    .bind(&session_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|error| error.to_string())?
+    let Some(VoiceprintSource {
+        workspace_id,
+        words_json,
+        hints_json,
+        attachment_id,
+    }) = load_voiceprint_source(&pool, &session_id, &transcript_id).await?
     else {
         return Ok(0);
     };
@@ -122,6 +103,10 @@ pub async fn extract_voiceprint_candidates<R: tauri::Runtime>(
         return Ok(0);
     }
 
+    if !keep_unnamed && !workspace_has_voiceprints(&pool, &workspace_id).await? {
+        return Ok(0);
+    }
+
     let spans = spans_from_transcript(&words_json, &hints_json)?;
     if spans.is_empty() {
         return Ok(0);
@@ -136,63 +121,34 @@ pub async fn extract_voiceprint_candidates<R: tauri::Runtime>(
         .await
         .map_err(|error| error.to_string())??;
 
-    let expires_at = (chrono::Utc::now() + chrono::Duration::days(CANDIDATE_TTL_DAYS))
-        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
-        .to_string();
-
-    let mut stored: u32 = 0;
-    for (span, embedding) in &embeddings {
-        let id = uuid::Uuid::new_v4().to_string();
-        let encoded = encode_embedding(embedding);
-
-        if let Err(error) = tauri_plugin_store2::write_secret(
-            app.clone(),
-            anlg_db_app::VOICEPRINT_CANDIDATE_KEYRING_SCOPE.to_string(),
-            id.clone(),
-            encoded,
+    if !keep_unnamed {
+        if let Err(error) = maybe_assign_speakers_from_voiceprints(
+            &app,
+            &pool,
+            &session_id,
+            &transcript_id,
+            &workspace_id,
+            Some((&embeddings, &words_json, &hints_json)),
         )
         .await
         {
-            tracing::warn!(?error, "voiceprint_candidate_secret_write_failed");
-            continue;
+            tracing::warn!(%error, "voiceprint_assignment_failed");
         }
-
-        let inserted = anlg_db_app::insert_voiceprint_candidate(
-            &pool,
-            anlg_db_app::NewVoiceprintCandidate {
-                id: &id,
-                workspace_id: &workspace_id,
-                keyring_key: &id,
-                model_provider: MODEL_PROVIDER,
-                model_version: MODEL_VERSION,
-                capture_domain: capture_domain(span.channel),
-                source_session_id: &session_id,
-                source_transcript_id: &transcript_id,
-                source_attachment_id: &attachment_id,
-                source_speaker_label: &speaker_label(span),
-                speaker_channel: span.channel,
-                speaker_index: span.speaker_index,
-                source_start_ms: span.start_ms,
-                source_end_ms: span.end_ms,
-                quality_score: span.quality_score,
-                expires_at: &expires_at,
-            },
-        )
-        .await;
-
-        match inserted {
-            Ok(_) => stored += 1,
-            Err(error) => {
-                tracing::warn!(%error, "voiceprint_candidate_insert_failed");
-                delete_secret(
-                    &app,
-                    anlg_db_app::VOICEPRINT_CANDIDATE_KEYRING_SCOPE.to_string(),
-                    id,
-                )
-                .await;
-            }
-        }
+        return Ok(0);
     }
+
+    let stored = store_candidates(
+        &app,
+        &pool,
+        CandidateSource {
+            workspace_id: &workspace_id,
+            session_id: &session_id,
+            transcript_id: &transcript_id,
+            attachment_id: &attachment_id,
+        },
+        &embeddings,
+    )
+    .await;
 
     tracing::info!(
         session_id = %session_id,
@@ -233,6 +189,268 @@ pub async fn extract_voiceprint_candidates<R: tauri::Runtime>(
     }
 
     Ok(stored)
+}
+
+/// Keeps the voice of one speaker the user named and agreed to remember.
+/// Reuses candidates kept while "Remember speakers" was on; otherwise embeds
+/// only that speaker's spans, so the other voices in the meeting stay unkept.
+#[tauri::command]
+#[specta::specta]
+pub async fn remember_speaker_voice<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    session_id: String,
+    transcript_id: String,
+    audio_path: String,
+    speaker_channel: i32,
+    speaker_index: Option<i32>,
+    human_id: String,
+) -> Result<u32, String> {
+    let pool = managed_pool(&app)?;
+    let speaker_channel = i64::from(speaker_channel);
+    let speaker_index = speaker_index.map(i64::from);
+
+    let Some(VoiceprintSource {
+        workspace_id,
+        words_json,
+        hints_json,
+        attachment_id,
+    }) = load_voiceprint_source(&pool, &session_id, &transcript_id).await?
+    else {
+        return Ok(0);
+    };
+
+    let label = speaker_label(&SelectedSpan {
+        channel: speaker_channel,
+        speaker_index,
+        start_ms: 0,
+        end_ms: 0,
+        quality_score: 0.0,
+    });
+    let already_remembered: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+           SELECT 1 FROM voiceprint_exemplars
+           WHERE workspace_id = ?
+             AND source_transcript_id = ?
+             AND source_speaker_label = ?
+             AND human_id = ?
+             AND deleted_at IS NULL
+         )",
+    )
+    .bind(&workspace_id)
+    .bind(&transcript_id)
+    .bind(&label)
+    .bind(&human_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    if already_remembered {
+        return Ok(0);
+    }
+
+    let waiting = anlg_db_app::list_active_voiceprint_candidates_for_speaker(
+        &pool,
+        &workspace_id,
+        &transcript_id,
+        speaker_channel,
+        speaker_index,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+
+    if waiting.is_empty() {
+        let spans: Vec<SelectedSpan> = spans_from_transcript(&words_json, &hints_json)?
+            .into_iter()
+            .filter(|span| span.channel == speaker_channel && span.speaker_index == speaker_index)
+            .collect();
+        if spans.is_empty() {
+            return Ok(0);
+        }
+
+        let path = PathBuf::from(&audio_path);
+        if !path.exists() {
+            return Ok(0);
+        }
+
+        let embeddings =
+            tauri::async_runtime::spawn_blocking(move || compute_embeddings(&path, spans))
+                .await
+                .map_err(|error| error.to_string())??;
+        let stored = store_candidates(
+            &app,
+            &pool,
+            CandidateSource {
+                workspace_id: &workspace_id,
+                session_id: &session_id,
+                transcript_id: &transcript_id,
+                attachment_id: &attachment_id,
+            },
+            &embeddings,
+        )
+        .await;
+        if stored == 0 {
+            return Ok(0);
+        }
+    }
+
+    promote_speaker_candidates(
+        &app,
+        &pool,
+        SpeakerPromotion {
+            workspace_id: &workspace_id,
+            transcript_id: &transcript_id,
+            speaker_channel,
+            speaker_index,
+            human_id: &human_id,
+            confirmation_source: "manual_speaker_assignment",
+            label_confidence: 1.0,
+        },
+    )
+    .await
+}
+
+fn managed_pool<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<sqlx::SqlitePool, String> {
+    app.try_state::<tauri_plugin_db::ManagedState>()
+        .map(|state| state.pool().clone())
+        .ok_or_else(|| "database is not ready yet".to_string())
+}
+
+struct VoiceprintSource {
+    workspace_id: String,
+    words_json: String,
+    hints_json: String,
+    attachment_id: String,
+}
+
+async fn load_voiceprint_source(
+    pool: &sqlx::SqlitePool,
+    session_id: &str,
+    transcript_id: &str,
+) -> Result<Option<VoiceprintSource>, String> {
+    let Some((workspace_id, words_json, hints_json)) =
+        sqlx::query_as::<_, (String, String, String)>(
+            "SELECT workspace_id, words_json, speaker_hints_json
+             FROM transcripts
+             WHERE id = ? AND session_id = ? AND deleted_at IS NULL
+             LIMIT 1",
+        )
+        .bind(transcript_id)
+        .bind(session_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| error.to_string())?
+    else {
+        return Ok(None);
+    };
+
+    let Some(attachment_id) = sqlx::query_scalar::<_, String>(
+        "SELECT id FROM session_attachments
+         WHERE session_id = ? AND source_type = 'session_audio' AND deleted_at IS NULL
+         ORDER BY created_at
+         LIMIT 1",
+    )
+    .bind(session_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| error.to_string())?
+    else {
+        return Ok(None);
+    };
+
+    Ok(Some(VoiceprintSource {
+        workspace_id,
+        words_json,
+        hints_json,
+        attachment_id,
+    }))
+}
+
+async fn workspace_has_voiceprints(
+    pool: &sqlx::SqlitePool,
+    workspace_id: &str,
+) -> Result<bool, String> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(
+           SELECT 1 FROM voiceprint_exemplars
+           WHERE workspace_id = ? AND deleted_at IS NULL
+         )",
+    )
+    .bind(workspace_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| error.to_string())
+}
+
+struct CandidateSource<'a> {
+    workspace_id: &'a str,
+    session_id: &'a str,
+    transcript_id: &'a str,
+    attachment_id: &'a str,
+}
+
+async fn store_candidates<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    pool: &sqlx::SqlitePool,
+    source: CandidateSource<'_>,
+    embeddings: &[SpanEmbedding],
+) -> u32 {
+    let expires_at = (chrono::Utc::now() + chrono::Duration::days(CANDIDATE_TTL_DAYS))
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string();
+
+    let mut stored: u32 = 0;
+    for (span, embedding) in embeddings {
+        let id = uuid::Uuid::new_v4().to_string();
+        let encoded = encode_embedding(embedding);
+
+        if let Err(error) = tauri_plugin_store2::write_secret(
+            app.clone(),
+            anlg_db_app::VOICEPRINT_CANDIDATE_KEYRING_SCOPE.to_string(),
+            id.clone(),
+            encoded,
+        )
+        .await
+        {
+            tracing::warn!(?error, "voiceprint_candidate_secret_write_failed");
+            continue;
+        }
+
+        let inserted = anlg_db_app::insert_voiceprint_candidate(
+            pool,
+            anlg_db_app::NewVoiceprintCandidate {
+                id: &id,
+                workspace_id: source.workspace_id,
+                keyring_key: &id,
+                model_provider: MODEL_PROVIDER,
+                model_version: MODEL_VERSION,
+                capture_domain: capture_domain(span.channel),
+                source_session_id: source.session_id,
+                source_transcript_id: source.transcript_id,
+                source_attachment_id: source.attachment_id,
+                source_speaker_label: &speaker_label(span),
+                speaker_channel: span.channel,
+                speaker_index: span.speaker_index,
+                source_start_ms: span.start_ms,
+                source_end_ms: span.end_ms,
+                quality_score: span.quality_score,
+                expires_at: &expires_at,
+            },
+        )
+        .await;
+
+        match inserted {
+            Ok(_) => stored += 1,
+            Err(error) => {
+                tracing::warn!(%error, "voiceprint_candidate_insert_failed");
+                delete_secret(
+                    app,
+                    anlg_db_app::VOICEPRINT_CANDIDATE_KEYRING_SCOPE.to_string(),
+                    id,
+                )
+                .await;
+            }
+        }
+    }
+    stored
 }
 
 #[tauri::command]

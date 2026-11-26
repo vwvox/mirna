@@ -41,6 +41,7 @@ const COMMANDS: &[&str] = &[
     "acknowledge_completed_transcription",
     "extract_voiceprint_candidates",
     "promote_voiceprint_candidates",
+    "remember_speaker_voice",
     "delete_processed_session_audio",
     "get_meeting_capture_capability",
     "set_meeting_account",
@@ -54,6 +55,7 @@ const COMMANDS: &[&str] = &[
     "reconcile_refined_speaker_clusters",
     "extract_voiceprint_candidates",
     "promote_voiceprint_candidates",
+    "remember_speaker_voice",
 ];
 
 fn main() {

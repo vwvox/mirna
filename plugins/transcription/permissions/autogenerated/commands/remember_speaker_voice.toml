@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-remember-speaker-voice"
+description = "Enables the remember_speaker_voice command without any pre-configured scope."
+commands.allow = ["remember_speaker_voice"]
+
+[[permission]]
+identifier = "deny-remember-speaker-voice"
+description = "Denies the remember_speaker_voice command without any pre-configured scope."
+commands.deny = ["remember_speaker_voice"]

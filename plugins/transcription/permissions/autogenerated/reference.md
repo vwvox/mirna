@@ -46,6 +46,7 @@ Default permissions for the plugin
 - `allow-acknowledge-completed-transcription`
 - `allow-extract-voiceprint-candidates`
 - `allow-promote-voiceprint-candidates`
+- `allow-remember-speaker-voice`
 - `allow-delete-processed-session-audio`
 - `allow-get-meeting-capture-capability`
 - `allow-set-meeting-account`
@@ -59,6 +60,7 @@ Default permissions for the plugin
 - `allow-reconcile-refined-speaker-clusters`
 - `allow-extract-voiceprint-candidates`
 - `allow-promote-voiceprint-candidates`
+- `allow-remember-speaker-voice`
 
 ## Permission Table
 
@@ -1027,6 +1029,32 @@ Enables the release_live_transcript command without any pre-configured scope.
 <td>
 
 Denies the release_live_transcript command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:allow-remember-speaker-voice`
+
+</td>
+<td>
+
+Enables the remember_speaker_voice command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:deny-remember-speaker-voice`
+
+</td>
+<td>
+
+Denies the remember_speaker_voice command without any pre-configured scope.
 
 </td>
 </tr>

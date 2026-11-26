@@ -43,6 +43,7 @@ permissions = [
     "allow-acknowledge-completed-transcription",
     "allow-extract-voiceprint-candidates",
     "allow-promote-voiceprint-candidates",
+    "allow-remember-speaker-voice",
     "allow-delete-processed-session-audio",
     "allow-get-meeting-capture-capability",
     "allow-set-meeting-account",
@@ -56,4 +57,5 @@ permissions = [
     "allow-reconcile-refined-speaker-clusters",
     "allow-extract-voiceprint-candidates",
     "allow-promote-voiceprint-candidates",
+    "allow-remember-speaker-voice",
 ]

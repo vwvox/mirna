@@ -2,7 +2,6 @@ import type {
   LiveTranscriptDelta,
   RenderTranscriptHuman,
 } from "@anlg/plugin-transcription";
-import { commands as transcriptionCommands } from "@anlg/plugin-transcription";
 
 import type { RecoveryInterval } from "./capture-audio-recovery";
 import { selectRecoveredWords } from "./recovered-transcript";
@@ -587,6 +586,15 @@ export function mergeTranscriptSegments({
   });
 }
 
+// The speaker a whole-transcript naming applied to, so the caller can offer
+// to remember that voice. Mirna never keeps a voice from naming alone.
+export type NamedSpeakerVoice = {
+  transcriptId: string;
+  speakerChannel: number;
+  speakerIndex: number;
+  humanId: string;
+};
+
 export function assignTranscriptSpeaker({
   transcriptId,
   segmentKey,
@@ -603,7 +611,7 @@ export function assignTranscriptSpeaker({
   mode?: "all" | "segment";
   wordIds?: string[];
   extendToAdjacent?: boolean;
-}): Promise<void> {
+}): Promise<NamedSpeakerVoice | null> {
   return assignSpeakerInTranscript({
     transcriptId,
     segmentKey,
@@ -629,7 +637,7 @@ export async function assignSessionTranscriptSpeaker({
   humanId: string;
   anchorWordId: string;
   wordIds?: string[];
-}): Promise<void> {
+}): Promise<NamedSpeakerVoice | null> {
   const transcripts = await liveQueryClient.execute<{ id: string }>(
     `
       SELECT id
@@ -645,6 +653,7 @@ export async function assignSessionTranscriptSpeaker({
     );
   }
 
+  let namedVoice: NamedSpeakerVoice | null = null;
   await Promise.all(
     transcripts
       .filter(
@@ -660,6 +669,8 @@ export async function assignSessionTranscriptSpeaker({
               anchorWordId,
               wordIds,
               mode: "all",
+            }).then((voice) => {
+              namedVoice = voice;
             })
           : mutateTranscript(transcript.id, (store) => {
               const input = buildRenderTranscriptRequestFromRows([
@@ -692,6 +703,7 @@ export async function assignSessionTranscriptSpeaker({
             }),
       ),
   );
+  return namedVoice;
 }
 
 async function assignSpeakerInTranscript({
@@ -710,7 +722,7 @@ async function assignSpeakerInTranscript({
   mode?: "all" | "segment";
   wordIds?: string[];
   extendToAdjacent?: boolean;
-}): Promise<void> {
+}): Promise<NamedSpeakerVoice | null> {
   let assigned = false;
   await mutateTranscript(transcriptId, (store) => {
     const resolvedAnchorWordId =
@@ -739,34 +751,23 @@ async function assignSpeakerInTranscript({
   if (
     !assigned ||
     (mode ?? "all") !== "all" ||
+    typeof segmentKey.speaker_index !== "number" ||
     !Number.isInteger(segmentKey.speaker_index)
   ) {
-    return;
+    return null;
   }
 
-  const channel =
-    segmentKey.channel === "DirectMic"
-      ? 0
-      : segmentKey.channel === "RemoteParty"
-        ? 1
-        : 2;
-  void transcriptionCommands
-    .promoteVoiceprintCandidates(
-      transcriptId,
-      channel,
-      typeof segmentKey.speaker_index === "number"
-        ? segmentKey.speaker_index
-        : null,
-      humanId,
-    )
-    .then((result) => {
-      if (result.status === "error") {
-        console.error("[voiceprint] promotion failed", result.error);
-      }
-    })
-    .catch((error) => {
-      console.error("[voiceprint] promotion failed", error);
-    });
+  return {
+    transcriptId,
+    speakerChannel:
+      segmentKey.channel === "DirectMic"
+        ? 0
+        : segmentKey.channel === "RemoteParty"
+          ? 1
+          : 2,
+    speakerIndex: segmentKey.speaker_index,
+    humanId,
+  };
 }
 
 export function updateTranscriptSegmentText({

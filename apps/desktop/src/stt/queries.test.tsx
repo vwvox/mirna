@@ -822,7 +822,7 @@ describe("transcript SQLite queries", () => {
       .mockResolvedValueOnce([{ id: "transcript-1" }, { id: "transcript-2" }])
       .mockResolvedValueOnce([speakerRow("word-1", 0)]);
 
-    await assignSessionTranscriptSpeaker({
+    const namedVoice = await assignSessionTranscriptSpeaker({
       sessionId: "session-1",
       transcriptId: "transcript-1",
       segmentKey: {
@@ -834,6 +834,13 @@ describe("transcript SQLite queries", () => {
       anchorWordId: "word-1",
     });
 
+    expect(namedVoice).toEqual({
+      transcriptId: "transcript-1",
+      speakerChannel: 1,
+      speakerIndex: 0,
+      humanId: "alice",
+    });
+    expect(mocks.promoteVoiceprintCandidates).not.toHaveBeenCalled();
     expect(mocks.execute).toHaveBeenCalledTimes(2);
     expect(mocks.executeTransaction).toHaveBeenCalledTimes(1);
     expect(mocks.executeTransaction.mock.calls[0][0][0].params[3]).toBe(
@@ -900,7 +907,7 @@ describe("transcript SQLite queries", () => {
         },
       ]);
 
-    await assignSessionTranscriptSpeaker({
+    const namedVoice = await assignSessionTranscriptSpeaker({
       sessionId: "session-1",
       transcriptId: "transcript-1",
       segmentKey: {
@@ -922,6 +929,7 @@ describe("transcript SQLite queries", () => {
       word_ids: ["word-1", "word-2"],
       extend_to_adjacent: false,
     });
+    expect(namedVoice).toBeNull();
     expect(mocks.promoteVoiceprintCandidates).not.toHaveBeenCalled();
   });
 

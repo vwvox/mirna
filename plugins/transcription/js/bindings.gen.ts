@@ -743,17 +743,23 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * `keep_unnamed` is the "Remember speakers" setting. When it is off, the
+   * embeddings only name speakers from voices the user chose to remember and
+   * are dropped afterwards, so no one's voice is kept without being asked.
+   */
   async extractVoiceprintCandidates(
     sessionId: string,
     transcriptId: string,
     audioPath: string,
+    keepUnnamed: boolean,
   ): Promise<Result<number, string>> {
     try {
       return {
         status: "ok",
         data: await TAURI_INVOKE(
           "plugin:transcription|extract_voiceprint_candidates",
-          { sessionId, transcriptId, audioPath },
+          { sessionId, transcriptId, audioPath, keepUnnamed },
         ),
       };
     } catch (e) {
@@ -773,6 +779,39 @@ export const commands = {
         data: await TAURI_INVOKE(
           "plugin:transcription|promote_voiceprint_candidates",
           { transcriptId, speakerChannel, speakerIndex, humanId },
+        ),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
+  /**
+   * Keeps the voice of one speaker the user named and agreed to remember.
+   * Reuses candidates kept while "Remember speakers" was on; otherwise embeds
+   * only that speaker's spans, so the other voices in the meeting stay unkept.
+   */
+  async rememberSpeakerVoice(
+    sessionId: string,
+    transcriptId: string,
+    audioPath: string,
+    speakerChannel: number,
+    speakerIndex: number | null,
+    humanId: string,
+  ): Promise<Result<number, string>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE(
+          "plugin:transcription|remember_speaker_voice",
+          {
+            sessionId,
+            transcriptId,
+            audioPath,
+            speakerChannel,
+            speakerIndex,
+            humanId,
+          },
         ),
       };
     } catch (e) {

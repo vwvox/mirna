@@ -31,6 +31,10 @@ const {
   assignTranscriptSpeakerMock,
   addSessionParticipantMock,
   createHumanMock,
+  hasRememberedVoiceMock,
+  rememberSpeakerVoiceMock,
+  rememberSpeakersSetting,
+  toastMock,
   useHumansMock,
   useSessionParticipantsMock,
 } = vi.hoisted(() => ({
@@ -38,8 +42,29 @@ const {
   assignTranscriptSpeakerMock: vi.fn(),
   addSessionParticipantMock: vi.fn(),
   createHumanMock: vi.fn(),
+  hasRememberedVoiceMock: vi.fn(),
+  rememberSpeakerVoiceMock: vi.fn(),
+  rememberSpeakersSetting: { value: false },
+  toastMock: Object.assign(vi.fn(), {
+    success: vi.fn(),
+    info: vi.fn(),
+    dismiss: vi.fn(),
+  }),
   useHumansMock: vi.fn(),
   useSessionParticipantsMock: vi.fn(),
+}));
+
+vi.mock("@anlg/ui/components/ui/toast", () => ({ toast: toastMock }));
+
+vi.mock("~/services/voiceprint", () => ({
+  hasRememberedVoice: hasRememberedVoiceMock,
+  rememberSpeakerVoice: rememberSpeakerVoiceMock,
+}));
+
+vi.mock("~/shared/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/shared/config")>()),
+  useConfigValue: (key: string) =>
+    key === "remember_speakers" ? rememberSpeakersSetting.value : undefined,
 }));
 
 vi.mock("@anlg/ui/components/ui/popover", async () => {
@@ -156,6 +181,9 @@ beforeEach(() => {
     },
   ]);
   useSessionParticipantsMock.mockReturnValue([]);
+  hasRememberedVoiceMock.mockResolvedValue(false);
+  rememberSpeakerVoiceMock.mockResolvedValue(3);
+  rememberSpeakersSetting.value = false;
 });
 
 function option(
@@ -350,6 +378,107 @@ describe("SpeakerAssignPopover", () => {
         }),
       );
     });
+  });
+});
+
+describe("SpeakerAssignPopover voice memory", () => {
+  const namedVoice = {
+    transcriptId: "transcript-1",
+    speakerChannel: 1,
+    speakerIndex: 2,
+    humanId: "human-1",
+  };
+
+  function nameSpeakerTwoAsAlice() {
+    assignSessionTranscriptSpeakerMock.mockResolvedValue(namedVoice);
+    render(
+      createElement(SpeakerAssignPopover, {
+        segment: {
+          id: "segment-1",
+          key: {
+            channel: "RemoteParty",
+            speaker_index: 2,
+            speaker_human_id: null,
+          },
+          start_ms: 0,
+          end_ms: 100,
+          text: "hello",
+          words: [
+            {
+              id: "word-1",
+              text: "hello",
+              start_ms: 0,
+              end_ms: 100,
+              channel: "RemoteParty",
+              is_final: true,
+            },
+          ],
+        } as Segment,
+        transcriptId: "transcript-1",
+        sessionId: "session-1",
+        color: "red",
+        label: "Speaker 2",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Speaker 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Alice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+  }
+
+  it("asks before remembering a named voice and keeps nothing until the user agrees", async () => {
+    nameSpeakerTwoAsAlice();
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalledTimes(1));
+    const [title, options] = toastMock.mock.calls[0];
+    expect(title).toBe("Remember Alice's voice?");
+    expect(options.description).toContain("Only do this if Alice is happy");
+    expect(rememberSpeakerVoiceMock).not.toHaveBeenCalled();
+
+    options.action.onClick();
+
+    await waitFor(() =>
+      expect(rememberSpeakerVoiceMock).toHaveBeenCalledWith(
+        "session-1",
+        namedVoice,
+      ),
+    );
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  });
+
+  it("keeps nothing when the user says not now", async () => {
+    nameSpeakerTwoAsAlice();
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalledTimes(1));
+    toastMock.mock.calls[0][1].secondaryAction.onClick();
+
+    expect(rememberSpeakerVoiceMock).not.toHaveBeenCalled();
+  });
+
+  it("remembers without asking when Remember speakers is on", async () => {
+    rememberSpeakersSetting.value = true;
+    nameSpeakerTwoAsAlice();
+
+    await waitFor(() =>
+      expect(rememberSpeakerVoiceMock).toHaveBeenCalledWith(
+        "session-1",
+        namedVoice,
+      ),
+    );
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("does not ask again for someone whose voice the user already chose to remember", async () => {
+    hasRememberedVoiceMock.mockResolvedValue(true);
+    nameSpeakerTwoAsAlice();
+
+    await waitFor(() =>
+      expect(rememberSpeakerVoiceMock).toHaveBeenCalledWith(
+        "session-1",
+        namedVoice,
+      ),
+    );
+    expect(hasRememberedVoiceMock).toHaveBeenCalledWith("human-1");
+    expect(toastMock).not.toHaveBeenCalled();
   });
 });
 

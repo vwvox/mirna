@@ -53,9 +53,10 @@ export function AudioSettingsView({
         title={<Trans>Remember speakers</Trans>}
         description={
           <Trans>
-            Build voiceprints from meeting audio so speakers you name in a
-            transcript are recognized in later meetings. Voiceprints never leave
-            this device, and unnamed ones are deleted after 45 days.
+            Keep a voiceprint of every speaker, so anyone you name is recognized
+            in later meetings. When off, Mirna asks before remembering someone's
+            voice. Voiceprints never leave this device, and unnamed ones are
+            deleted after 45 days.
           </Trans>
         }
         checked={rememberSpeakers.value}

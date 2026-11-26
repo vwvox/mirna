@@ -203,6 +203,7 @@ fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             listener2::commands::list_documented_language_codes_batch::<tauri::Wry>,
             voiceprint::extract_voiceprint_candidates::<tauri::Wry>,
             voiceprint::promote_voiceprint_candidates::<tauri::Wry>,
+            voiceprint::remember_speaker_voice::<tauri::Wry>,
             audio_retention::delete_processed_session_audio::<tauri::Wry>,
             meeting::get_meeting_capture_capability::<tauri::Wry>,
             meeting::set_meeting_account::<tauri::Wry>,
