@@ -1143,6 +1143,10 @@ msgstr "Based on the conversation so far, suggest a few questions I could ask ne
 msgid "Before the next class"
 msgstr "Before the next class"
 
+#: src/stt/recording-consent.tsx
+msgid "Before you record"
+msgstr "Before you record"
+
 #: src/settings/ai/stt/select.tsx
 msgid "Best for this Mac"
 msgstr "Best for this Mac"
@@ -1190,8 +1194,8 @@ msgid "Browser handoff not working? Paste the callback link instead"
 msgstr "Browser handoff not working? Paste the callback link instead"
 
 #: src/settings/general/audio-settings.tsx
-msgid "Build voiceprints from meeting audio so speakers you name in a transcript are recognized in later meetings. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
-msgstr "Build voiceprints from meeting audio so speakers you name in a transcript are recognized in later meetings. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
+#~ msgid "Build voiceprints from meeting audio so speakers you name in a transcript are recognized in later meetings. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
+#~ msgstr "Build voiceprints from meeting audio so speakers you name in a transcript are recognized in later meetings. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
 
 #: src/settings/stats/insights.tsx
 msgid "Busiest day"
@@ -1256,6 +1260,7 @@ msgstr "Can view"
 #: src/settings/todo/github.tsx
 #: src/shared/ui/destructive-confirmation-dialog.tsx
 #: src/sidebar/folder-name-dialog.tsx
+#: src/stt/recording-consent.tsx
 #: src/templates/auto-format-examples-dialog.tsx
 msgid "Cancel"
 msgstr "Cancel"
@@ -1381,6 +1386,10 @@ msgstr "Chat"
 #: src/chat/components/toolbar-controls.tsx
 msgid "Chat history"
 msgstr "Chat history"
+
+#: src/stt/recording-consent.tsx
+msgid "Check the rules where you and the people you record are. Mirna can't know where everyone is, so it can't decide this for you."
+msgstr "Check the rules where you and the people you record are. Mirna can't know where everyone is, so it can't decide this for you."
 
 #: src/settings/team/index.tsx
 msgid "Checking availability…"
@@ -1653,6 +1662,7 @@ msgstr "Clone"
 #: src/session/components/note-input/search/bar.tsx
 #: src/session/components/outer-header/overflow/trim-recording.tsx
 #: src/shared/open-note-dialog.tsx
+#: src/stt/recording-consent.tsx
 msgid "Close"
 msgstr "Close"
 
@@ -3724,6 +3734,10 @@ msgstr "I didn't get this (Alt+2)"
 msgid "I saved it"
 msgstr "I saved it"
 
+#: src/stt/recording-consent.tsx
+msgid "I understand, start recording"
+msgstr "I understand, start recording"
+
 #: src/lesson/components/new-lesson-dialog.tsx
 msgid "I'm learning"
 msgstr "I'm learning"
@@ -4008,6 +4022,10 @@ msgstr "Joined {0}"
 #: src/onboarding/account/after-login.tsx
 msgid "Keep {PRO_TRIAL_DAYS} days"
 msgstr "Keep {PRO_TRIAL_DAYS} days"
+
+#: src/settings/general/audio-settings.tsx
+msgid "Keep a voiceprint of every speaker, so anyone you name is recognized in later meetings. When off, Mirna asks before remembering someone's voice. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
+msgstr "Keep a voiceprint of every speaker, so anyone you name is recognized in later meetings. When off, Mirna asks before remembering someone's voice. Voiceprints never leave this device, and unnamed ones are deleted after 45 days."
 
 #: src/session-sharing/management-panel.tsx
 msgid "Keep desktop edits"
@@ -4778,6 +4796,14 @@ msgstr "Mirna can hear your voice"
 msgid "Mirna can read meeting details"
 msgstr "Mirna can read meeting details"
 
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Mirna can recognize {displayName} in future meetings. The voiceprint stays on this device. Only do this if {displayName} is happy with it."
+msgstr "Mirna can recognize {displayName} in future meetings. The voiceprint stays on this device. Only do this if {displayName} is happy with it."
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Mirna can recognize you in future meetings. Your voiceprint stays on this device."
+msgstr "Mirna can recognize you in future meetings. Your voiceprint stays on this device."
+
 #: src/lesson/components/practice-dialog.tsx
 msgid "Mirna can't use the microphone here. You can still listen and grade yourself."
 msgstr "Mirna can't use the microphone here. You can still listen and grade yourself."
@@ -4860,6 +4886,14 @@ msgstr "Mirna user"
 #: src/settings/sync/index.tsx
 msgid "Mirna will keep retrying."
 msgstr "Mirna will keep retrying."
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Mirna will recognize {displayName} in future meetings."
+msgstr "Mirna will recognize {displayName} in future meetings."
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Mirna will recognize you in future meetings."
+msgstr "Mirna will recognize you in future meetings."
 
 #: src/settings/sync/index.tsx
 msgid "Mirna will retry automatically."
@@ -5342,6 +5376,7 @@ msgid "Not invited"
 msgstr "Not invited"
 
 #: src/billing/trial-payment-reminder-dialog.tsx
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
 msgid "Not now"
 msgstr "Not now"
 
@@ -6114,6 +6149,10 @@ msgstr "Re-transcription failed"
 msgid "Read"
 msgstr "Read"
 
+#: src/settings/general/meeting-settings.tsx
+msgid "Read again"
+msgstr "Read again"
+
 #: src/onboarding/permissions.tsx
 msgid "Read meeting controls and visible chat"
 msgstr "Read meeting controls and visible chat"
@@ -6234,9 +6273,18 @@ msgstr "Record your voice in meetings and calls."
 msgid "Recording"
 msgstr "Recording"
 
+#: src/settings/general/meeting-settings.tsx
+#: src/sidebar/settings-nav-groups.ts
+msgid "Recording consent"
+msgstr "Recording consent"
+
 #: src/stt/long-recording-guard.tsx
 msgid "Recording for 2 h"
 msgstr "Recording for 2 h"
+
+#: src/stt/recording-consent.tsx
+msgid "Recording laws differ from place to place. Some places need only your consent; others need everyone in the conversation to agree."
+msgstr "Recording laws differ from place to place. Some places need only your consent; others need everyone in the conversation to agree."
 
 #: src/session/components/note-input/transcript/actions.ts
 #: src/session/components/outer-header/overflow/index.tsx
@@ -6276,6 +6324,10 @@ msgstr "Recording time"
 msgid "Recording trimmed"
 msgstr "Recording trimmed"
 
+#: src/stt/recording-consent.tsx
+msgid "Recordings and notes stay on this device unless you turn on cloud transcription or cloud AI."
+msgstr "Recordings and notes stay on this device unless you turn on cloud transcription or cloud AI."
+
 #: src/main/windows-title-bar.tsx
 msgid "Redo"
 msgstr "Redo"
@@ -6312,10 +6364,22 @@ msgstr "Reinstall"
 msgid "Related Notes"
 msgstr "Related Notes"
 
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Remember"
+msgstr "Remember"
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Remember {displayName}'s voice?"
+msgstr "Remember {displayName}'s voice?"
+
 #: src/settings/general/audio-settings.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Remember speakers"
 msgstr "Remember speakers"
+
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "Remember your voice?"
+msgstr "Remember your voice?"
 
 #: src/settings/todo/provider-content.tsx
 msgid "Reminders"
@@ -7980,6 +8044,10 @@ msgstr "Teams"
 msgid "Tell participants when listening starts; this does not confirm consent."
 msgstr "Tell participants when listening starts; this does not confirm consent."
 
+#: src/stt/recording-consent.tsx
+msgid "Tell people before you start, and stop if anyone would rather you didn't."
+msgstr "Tell people before you start, and stop if anyone would rather you didn't."
+
 #: src/templates/auto-form.tsx
 #: src/templates/details.tsx
 #: src/templates/template-form.tsx
@@ -8058,6 +8126,10 @@ msgstr "The recording reached the 12-hour limit."
 msgid "The recording stays on this Mac. After class, the transcript goes to the AI picked in Intelligence, which writes the study sheet. Let your teacher know you're recording."
 msgstr "The recording stays on this Mac. After class, the transcript goes to the AI picked in Intelligence, which writes the study sheet. Let your teacher know you're recording."
 
+#: src/settings/general/meeting-settings.tsx
+msgid "The reminder about consent Mirna shows before your first recording."
+msgstr "The reminder about consent Mirna shows before your first recording."
+
 #: src/lesson/components/practice-dialog.tsx
 msgid "The sentence"
 msgstr "The sentence"
@@ -8103,6 +8175,10 @@ msgstr "Theme"
 msgid "Then"
 msgstr "Then"
 
+#: src/session/components/note-input/transcript/renderer/speaker-assign.tsx
+msgid "There wasn't enough clear speech to remember this voice."
+msgstr "There wasn't enough clear speech to remember this voice."
+
 #: src/settings/team/index.tsx
 msgid "These rules apply to every member. Sharing changes fail closed on the server."
 msgstr "These rules apply to every member. Sharing changes fail closed on the server."
@@ -8147,6 +8223,10 @@ msgstr "This guest needs Team access"
 #: src/session/components/outer-header/index.tsx
 msgid "This is a prerecorded demo, so your camera stays off. Click Join & record to see Mirna in action."
 msgstr "This is a prerecorded demo, so your camera stays off. Click Join & record to see Mirna in action."
+
+#: src/stt/recording-consent.tsx
+msgid "This isn't legal advice. You can read it again in Settings, under Meetings."
+msgstr "This isn't legal advice. You can read it again in Settings, under Meetings."
 
 #: src/lesson/components/study-sheet.tsx
 msgid "This lesson"
@@ -8772,6 +8852,14 @@ msgstr "View sync log"
 #: src/chat/components/input/use-dictation.ts
 msgid "Voice input is unavailable while Mirna is recording a meeting."
 msgstr "Voice input is unavailable while Mirna is recording a meeting."
+
+#: src/stt/recording-consent.tsx
+msgid "Voice recognition is off. Mirna asks before remembering anyone's voice."
+msgstr "Voice recognition is off. Mirna asks before remembering anyone's voice."
+
+#: src/sidebar/settings-nav-groups.ts
+msgid "Voiceprints"
+msgstr "Voiceprints"
 
 #: src/lesson/components/course-panel.tsx
 msgid "voices not told apart"
