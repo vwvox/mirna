@@ -1,12 +1,15 @@
 import { Trans } from "@lingui/react/macro";
 import { platform } from "@tauri-apps/plugin-os";
 
+import { Button } from "@anlg/ui/components/ui/button";
+
 import { DefaultMeetingShareAccessSelector } from "./default-share-access";
 import { PrimaryRecordingDeviceSelector } from "./primary-recording-device";
 
 import { useBillingAccess } from "~/auth/billing-context";
 import { PlanGate } from "~/settings/plan-gate";
-import { SettingSwitchRow } from "~/settings/setting-row";
+import { SettingRow, SettingSwitchRow } from "~/settings/setting-row";
+import { reviewRecordingConsent } from "~/stt/recording-consent";
 
 interface SettingItem {
   value: boolean;
@@ -42,6 +45,26 @@ export function MeetingSettingsView({
     <div className="flex flex-col gap-4">
       <DefaultMeetingShareAccessSelector />
       <PrimaryRecordingDeviceSelector />
+      <SettingRow
+        title={<Trans>Recording consent</Trans>}
+        description={
+          <Trans>
+            The reminder about consent Mirna shows before your first recording.
+          </Trans>
+        }
+        controlWidth="content"
+      >
+        {(labelProps) => (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reviewRecordingConsent}
+            {...labelProps}
+          >
+            <Trans>Read again</Trans>
+          </Button>
+        )}
+      </SettingRow>
       <PlanGate plan="pro" allowed={isPro} className="flex flex-col gap-4">
         <SettingSwitchRow
           title={<Trans>Start when meeting begins</Trans>}
@@ -111,9 +134,7 @@ export function MeetingSettingsView({
       )}
       <SettingSwitchRow
         title={<Trans>Show floating bar</Trans>}
-        description={
-          <Trans>Control listening without reopening Mirna.</Trans>
-        }
+        description={<Trans>Control listening without reopening Mirna.</Trans>}
         checked={floatingBar.value}
         onChange={floatingBar.onChange}
       />

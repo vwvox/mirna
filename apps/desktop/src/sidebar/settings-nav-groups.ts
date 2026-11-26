@@ -232,6 +232,8 @@ export function useSettingsNavGroups(): SettingsNavGroup[] {
           searchTerms: [
             t`Default sharing`,
             t`Primary recording device`,
+            t`Recording consent`,
+            t`Voiceprints`,
             t`Start when meeting begins`,
             t`Join scheduled meetings`,
             t`Stop when meeting ends`,

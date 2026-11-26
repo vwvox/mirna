@@ -91,8 +91,10 @@ const {
   idMock,
   openNewMock,
   emptyCaptureMock,
+  confirmRecordingConsentMock,
 } = vi.hoisted(() => ({
   emptyCaptureMock: vi.fn(),
+  confirmRecordingConsentMock: vi.fn(),
   queueAutoEnhanceMock: vi.fn(),
   queueAutoEnhanceIfSummaryEmptyMock: vi.fn(),
   resetEnhanceTasksMock: vi.fn(),
@@ -247,6 +249,10 @@ vi.mock("@anlg/ui/components/ui/toast", () => ({
 
 vi.mock("~/ai/task-window-sync", () => ({
   requestMainAutoEnhance: requestMainAutoEnhanceMock,
+}));
+
+vi.mock("./recording-consent", () => ({
+  confirmRecordingConsent: confirmRecordingConsentMock,
 }));
 
 vi.mock("./primary-device", () => ({
@@ -555,6 +561,7 @@ describe("useStartListening", () => {
       data: null,
     });
     emptyCaptureMock.mockResolvedValue(false);
+    confirmRecordingConsentMock.mockResolvedValue(true);
     idMock.mockReturnValue("generated-id");
 
     getEnhancerServiceMock.mockImplementation(() => ({
@@ -678,6 +685,16 @@ describe("useStartListening", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  test("does not start recording when the user cancels the consent screen", async () => {
+    confirmRecordingConsentMock.mockResolvedValue(false);
+    const { result } = renderHook(() => useStartListening("session-1"));
+    await act(async () => {
+      await result.current();
+    });
+    expect(confirmRecordingConsentMock).toHaveBeenCalledTimes(1);
+    expect(startMock).not.toHaveBeenCalled();
   });
 
   test("zero retention keeps untranscribed audio at stop after a disconnect", async () => {

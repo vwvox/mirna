@@ -18,6 +18,7 @@ import {
 } from "./meeting-disclosure";
 import { startMeetingScreenCapture } from "./meeting-screen-capture";
 import { startPrimaryDeviceCoordination } from "./primary-device";
+import { confirmRecordingConsent } from "./recording-consent";
 import {
   classifyStartFailure,
   getMicrophonePermission,
@@ -112,6 +113,9 @@ export function useStartListeningState(
 
   const startListening = useCallback(async () => {
     if (!canStartLiveSession(sessionId)) {
+      return;
+    }
+    if (!(await confirmRecordingConsent())) {
       return;
     }
     await stopMeetingChatTasks();

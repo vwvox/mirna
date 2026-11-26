@@ -60,6 +60,7 @@ import type { ThemePreference } from "./shared/theme/resolve";
 import { createAITaskStore } from "./store/zustand/ai-task";
 import { listenerStore } from "./store/zustand/listener/instance";
 import { LongRecordingGuard } from "./stt/long-recording-guard";
+import { RecordingConsentDialog } from "./stt/recording-consent";
 
 const toolRegistry = createToolRegistry();
 const queryClient = new QueryClient({
@@ -136,6 +137,7 @@ function ReadyApp() {
             {isMainWindow ? <TrayScheduleSync /> : null}
             {isMainWindow ? <TrayRecordingSync /> : null}
             {isMainWindow ? <LongRecordingGuard /> : null}
+            <RecordingConsentDialog />
             {isMainWindow && !isAppStoreBuild() ? <UpdaterMeetingSync /> : null}
             <Toaster position="bottom-right" theme={theme} />
           </AppLockGate>
