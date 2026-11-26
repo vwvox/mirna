@@ -13,6 +13,10 @@ enum FloatingBarLayout {
   static let compactIconSize: CGFloat = 30
   static let compactGap: CGFloat = 0
   static let compactHorizontalPadding: CGFloat = 4
+  static let compactMarkCount: CGFloat = 3
+  static let compactMarksSeparator: CGFloat = 4
+  static let compactMarksWidth: CGFloat =
+    compactMarkCount * (compactIconSize + compactGap) + compactMarksSeparator
   static let expandedWidth: CGFloat = 360
   static let expandedHeight: CGFloat = 430
   static let expandedCornerRadius: CGFloat = 21
@@ -31,22 +35,30 @@ enum FloatingBarLayout {
   static let hoverHandleHorizontalPadding: CGFloat = 8
   static let dragClickThreshold: CGFloat = 4
 
-  static func compactControlsWidth(showsExpand: Bool, showsPause: Bool) -> CGFloat {
+  static func compactControlsWidth(
+    showsExpand: Bool, showsPause: Bool, showsMarks: Bool = false
+  ) -> CGFloat {
     let main = showsExpand ? compactStopWidth + compactGap + compactIconSize : compactSoloStopWidth
-    return showsPause ? main + compactGap + compactIconSize : main
+    return (showsMarks ? compactMarksWidth : 0)
+      + (showsPause ? main + compactGap + compactIconSize : main)
   }
 
-  static func compactWidth(showsExpand: Bool, showsPause: Bool) -> CGFloat {
-    compactControlsWidth(showsExpand: showsExpand, showsPause: showsPause)
+  static func compactWidth(showsExpand: Bool, showsPause: Bool, showsMarks: Bool = false)
+    -> CGFloat
+  {
+    compactControlsWidth(showsExpand: showsExpand, showsPause: showsPause, showsMarks: showsMarks)
       + compactHorizontalPadding * 2
   }
 
-  static func containerSize(isExpanded: Bool, showsExpand: Bool, showsPause: Bool)
+  static func containerSize(
+    isExpanded: Bool, showsExpand: Bool, showsPause: Bool, showsMarks: Bool = false
+  )
     -> NSSize
   {
     NSSize(
       width: (isExpanded
-        ? expandedWidth : compactWidth(showsExpand: showsExpand, showsPause: showsPause))
+        ? expandedWidth
+        : compactWidth(showsExpand: showsExpand, showsPause: showsPause, showsMarks: showsMarks))
         + inset * 2,
       height: (isExpanded ? expandedHeight : compactHeight) + hoverHandleReservedHeight + inset * 2)
   }
@@ -97,7 +109,8 @@ struct FloatingBarView: View {
           .frame(
             width: FloatingBarLayout.compactControlsWidth(
               showsExpand: model.liveCaptionToggleVisible,
-              showsPause: model.showsSecondaryControl),
+              showsPause: model.showsSecondaryControl,
+              showsMarks: model.marksEnabled),
             height: FloatingBarLayout.compactHeight
           )
           .position(
@@ -211,6 +224,10 @@ struct FloatingBarView: View {
 
   private func floatingControls(isExpanded: Bool) -> some View {
     HStack(spacing: FloatingBarLayout.compactGap) {
+      if model.marksEnabled {
+        markControls
+      }
+
       audioControl(
         width: model.liveCaptionToggleVisible
           ? FloatingBarLayout.compactStopWidth : FloatingBarLayout.compactSoloStopWidth,
@@ -252,6 +269,21 @@ struct FloatingBarView: View {
         )
       }
     }
+  }
+
+  private var markControls: some View {
+    HStack(spacing: FloatingBarLayout.compactGap) {
+      ForEach(FloatingBarMarkKind.allCases, id: \.self) { kind in
+        FloatingMarkButton(
+          kind: kind,
+          color: primaryContentColor,
+          hoverFill: controlHoverFill,
+          size: FloatingBarLayout.compactIconSize,
+          action: { performClick { RustBridge.addMark(kind) } }
+        )
+      }
+    }
+    .padding(.trailing, FloatingBarLayout.compactMarksSeparator)
   }
 
   private func audioControl(width: CGFloat, height: CGFloat) -> some View {
@@ -333,7 +365,8 @@ struct FloatingBarView: View {
       ?? FloatingBarLayout.containerSize(
         isExpanded: model.isExpanded,
         showsExpand: model.liveCaptionToggleVisible,
-        showsPause: model.showsSecondaryControl
+        showsPause: model.showsSecondaryControl,
+        showsMarks: model.marksEnabled
       )
   }
 
@@ -446,13 +479,15 @@ struct FloatingBarView: View {
     }
   }
 
-  private func performClick(_ action: () -> Void) {
+  @discardableResult
+  private func performClick(_ action: () -> Void) -> Bool {
     if suppressNextClick {
       suppressNextClick = false
-      return
+      return false
     }
 
     action()
+    return true
   }
 
   private func setExpanded(_ expanded: Bool) {
@@ -689,6 +724,61 @@ private struct FloatingIconButton: View {
     .buttonStyle(.plain)
     .accessibilityLabel(accessibilityLabel)
     .onHover { isHovered = $0 }
+  }
+}
+
+private struct FloatingMarkButton: View {
+  let kind: FloatingBarMarkKind
+  let color: Color
+  let hoverFill: Color
+  let size: CGFloat
+  let action: () -> Bool
+  @State private var isHovered = false
+  @State private var isConfirming = false
+  @State private var confirmation = 0
+
+  var body: some View {
+    let shape = RoundedRectangle(
+      cornerRadius: FloatingBarLayout.controlCornerRadius,
+      style: .continuous
+    )
+
+    return Button(action: press) {
+      Image(systemName: isConfirming ? kind.confirmedSystemImage : kind.systemImage)
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(isConfirming ? tint : color)
+        .scaleEffect(isConfirming ? 1.15 : 1)
+        .frame(width: size, height: size)
+        .background(
+          shape
+            .fill(isConfirming ? tint.opacity(0.24) : isHovered ? hoverFill : Color.clear)
+        )
+        .contentShape(shape)
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(kind.accessibilityLabel)
+    .help(kind.help)
+    .onHover { isHovered = $0 }
+  }
+
+  private var tint: Color {
+    switch kind {
+    case .important: return Color(red: 0.98, green: 0.64, blue: 0.12)
+    case .confused: return Color(red: 0.42, green: 0.55, blue: 1)
+    case .homework: return Color(red: 0.22, green: 0.72, blue: 0.45)
+    }
+  }
+
+  // A brief highlight confirms the mark, since the panel never takes focus.
+  private func press() {
+    guard action() else { return }
+    confirmation += 1
+    let current = confirmation
+    withAnimation(.easeOut(duration: 0.12)) { isConfirming = true }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+      guard confirmation == current else { return }
+      withAnimation(.easeOut(duration: 0.25)) { isConfirming = false }
+    }
   }
 }
 

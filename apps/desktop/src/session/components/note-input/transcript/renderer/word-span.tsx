@@ -2,15 +2,12 @@ import { Fragment, memo, useMemo } from "react";
 
 import { cn } from "@anlg/utils";
 
+import type { HanGlyph } from "./han-layout";
+import { renderGlyphs, renderHanRuns } from "./han-text";
 import type { HighlightSegment } from "./utils";
 
 import type { SegmentWord } from "~/stt/live-segment";
-import {
-  annotatePinyin,
-  hasHan,
-  usePinyinModule,
-  usePinyinPreference,
-} from "~/stt/pinyin";
+import type { ChineseDisplayMode } from "~/stt/pinyin";
 import { isTranscriptWordSeekable } from "~/stt/timing";
 
 interface WordSpanProps {
@@ -20,6 +17,10 @@ interface WordSpanProps {
   onClickWord: (word: SegmentWord) => void;
   highlightSegments?: HighlightSegment[];
   isActiveMatch?: boolean;
+  /** The word's Chinese characters with their pinyin, once its line has been read. */
+  glyphs?: readonly HanGlyph[] | null;
+  mode?: ChineseDisplayMode;
+  toneColours?: boolean;
 }
 
 export const WordSpan = memo(function WordSpan(props: WordSpanProps) {
@@ -29,30 +30,21 @@ export const WordSpan = memo(function WordSpan(props: WordSpanProps) {
     props.highlightSegments,
     props.isActiveMatch ?? false,
   );
+  const mode = props.mode ?? "characters";
+  const toneColours = props.toneColours ?? false;
   // Search highlighting wins over pinyin, so matches stay visible.
-  const wantsPinyin =
-    usePinyinPreference((state) => state.show) &&
-    !props.highlightSegments &&
-    hasHan(props.displayText);
-  const pinyin = usePinyinModule(wantsPinyin);
-  const content = useMemo(
-    () =>
-      pinyin
-        ? annotatePinyin(props.displayText, pinyin).map((part, index) =>
-            part.pinyin ? (
-              <ruby key={index} className="mx-[0.12em]">
-                {part.text}
-                <rt className="text-muted-foreground text-[0.72em] font-normal tracking-normal">
-                  {part.pinyin}
-                </rt>
-              </ruby>
-            ) : (
-              <Fragment key={index}>{part.text}</Fragment>
-            ),
-          )
-        : highlighted,
-    [highlighted, pinyin, props.displayText],
-  );
+  const content = useMemo(() => {
+    if (props.highlightSegments) return highlighted;
+    if (props.glyphs) return renderGlyphs(props.glyphs, mode, toneColours);
+    return renderHanRuns(props.displayText);
+  }, [
+    highlighted,
+    mode,
+    props.displayText,
+    props.glyphs,
+    props.highlightSegments,
+    toneColours,
+  ]);
   const canSeek = props.audioExists && isTranscriptWordSeekable(props.word);
   const className = useMemo(
     () =>
@@ -67,6 +59,11 @@ export const WordSpan = memo(function WordSpan(props: WordSpanProps) {
     <span
       onClick={() => canSeek && props.onClickWord(props.word)}
       className={className}
+      title={
+        mode === "pinyin-only" && props.glyphs && !props.highlightSegments
+          ? props.displayText
+          : undefined
+      }
       data-transcript-word-id={props.word.id}
       data-transcript-word-start-ms={props.word.start_ms}
     >
@@ -94,10 +91,12 @@ function useHighlightedContent(
           key={`${baseKey}-match-${index}`}
           className={isActive ? "bg-yellow-500" : "bg-yellow-200/50"}
         >
-          {segment.text}
+          {renderHanRuns(segment.text)}
         </span>
       ) : (
-        <Fragment key={`${baseKey}-text-${index}`}>{segment.text}</Fragment>
+        <Fragment key={`${baseKey}-text-${index}`}>
+          {renderHanRuns(segment.text)}
+        </Fragment>
       ),
     );
   }, [displayText, isActive, segments, word.id, word.text]);

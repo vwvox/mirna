@@ -5,6 +5,8 @@ const COMMANDS: &[&str] = &[
     "configure_gestures",
     "validate",
     "set_active",
+    "register_mark_shortcuts",
+    "unregister_mark_shortcuts",
 ];
 
 fn main() {

@@ -9,6 +9,9 @@ private func rustOnFloatingBarPause(_ paused: Int32)
 @_silgen_name("rust_on_floating_bar_open_main")
 private func rustOnFloatingBarOpenMain()
 
+@_silgen_name("rust_on_floating_bar_mark")
+private func rustOnFloatingBarMark(_ kind: UnsafePointer<CChar>)
+
 @_silgen_name("rust_on_floating_bar_settings_change")
 private func rustOnFloatingBarSettingsChange(_ settingsPtr: UnsafePointer<CChar>)
 
@@ -26,6 +29,10 @@ enum RustBridge {
 
   static func openMainWindow() {
     rustOnFloatingBarOpenMain()
+  }
+
+  static func addMark(_ kind: FloatingBarMarkKind) {
+    kind.rawValue.withCString { rustOnFloatingBarMark($0) }
   }
 
   static func floatingBarSettingsChanged(_ payload: FloatingOverlaySettingsChangePayload) {

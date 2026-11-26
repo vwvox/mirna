@@ -122,6 +122,57 @@ describe("transcript word selection", () => {
     ).toEqual(["word-2"]);
   });
 
+  it("maps Chinese write-mode selection and focus without spaces between words", () => {
+    const container = document.createElement("div");
+    const section = createSection();
+    const editor = document.createElement("div");
+    editor.tabIndex = 0;
+    editor.dataset.transcriptSegmentContent = "";
+    editor.dataset.transcriptEditor = "";
+    editor.dataset.transcriptEditWordIds = JSON.stringify([
+      "word-1",
+      "word-2",
+      "word-3",
+    ]);
+    editor.dataset.transcriptEditWordTexts = JSON.stringify([
+      "我们",
+      "都",
+      "很好。",
+    ]);
+    editor.dataset.transcriptEditWordStartMs = JSON.stringify([100, 200, 300]);
+    editor.textContent = "我们都很好。";
+    section.append(editor);
+    container.append(section);
+    document.body.append(container);
+    const range = document.createRange();
+    range.setStart(editor.firstChild!, 2);
+    range.setEnd(editor.firstChild!, 3);
+
+    expect(
+      getTranscriptSelectionFromRange(range, container)?.groups[0]?.wordIds,
+    ).toEqual(["word-2"]);
+
+    focusTranscriptSelection(
+      {
+        text: "很好。",
+        startMs: 300,
+        groups: [
+          {
+            transcriptId: "transcript-1",
+            segmentKey: {
+              channel: "RemoteParty",
+              speaker_index: 1,
+              speaker_human_id: null,
+            },
+            wordIds: ["word-3"],
+          },
+        ],
+      },
+      container,
+    );
+    expect(window.getSelection()?.toString()).toBe("很好。");
+  });
+
   it("combines scattered entry selections by transcript", () => {
     expect(
       mergeTranscriptSelections([

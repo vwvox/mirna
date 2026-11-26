@@ -34,6 +34,7 @@ describe("dictation floating panel", () => {
         onCancel={() => onAction("cancel")}
         onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
+        onMark={vi.fn()}
       />,
     );
     fireEvent.click(
@@ -69,6 +70,7 @@ describe("dictation floating panel", () => {
         onCancel={() => onAction("cancel")}
         onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
+        onMark={vi.fn()}
       />,
     );
     expect(screen.getByText("world")).toBeTruthy();
@@ -87,6 +89,7 @@ describe("dictation floating panel", () => {
         onCancel={() => onAction("cancel")}
         onSetPaused={() => onAction("pause")}
         onToggleExpanded={() => onAction("togglePreview")}
+        onMark={vi.fn()}
       />,
     );
     expect(screen.getByText("Hello world.")).toBeTruthy();
@@ -124,6 +127,7 @@ describe("dictation floating panel", () => {
       onCancel: vi.fn(),
       onSetPaused: vi.fn(),
       onToggleExpanded: vi.fn(),
+      onMark: vi.fn(),
     };
     const view = render(
       <FloatingBarOverlay

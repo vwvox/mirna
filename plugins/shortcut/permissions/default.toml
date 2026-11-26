@@ -7,4 +7,6 @@ permissions = [
   "allow-set-active",
   "allow-register-hotkey",
   "allow-unregister-hotkey",
+  "allow-register-mark-shortcuts",
+  "allow-unregister-mark-shortcuts",
 ]

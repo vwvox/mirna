@@ -313,6 +313,7 @@ fn make_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::FloatingBarStop,
             events::FloatingBarPause,
             events::FloatingBarDictationAction,
+            events::FloatingBarMark,
             events::FloatingBarOpenMain,
             events::FloatingBarOverlayState,
             events::FloatingBarOverlayAmplitude,

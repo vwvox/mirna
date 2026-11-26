@@ -65,3 +65,10 @@ common_event_derives! {
         Discarded,
     }
 }
+
+common_event_derives! {
+    /// A lesson mark shortcut was pressed; `index` is its position in the registered list.
+    pub struct MarkShortcut {
+        pub index: u32,
+    }
+}

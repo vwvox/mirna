@@ -21,6 +21,7 @@ import { SearchBar } from "./search/bar";
 import { useSearch } from "./search/context";
 import { Transcript } from "./transcript";
 
+import { LessonStudySheet } from "~/lesson/components/study-sheet";
 import {
   registerCanonicalSessionEditor,
   unregisterCanonicalSessionEditor,
@@ -408,6 +409,9 @@ const NoteInputContent = forwardRef<
             )}
             {renderedCurrentTab.type === "shared" && (
               <SharedNoteSummary shareId={renderedCurrentTab.id} />
+            )}
+            {renderedCurrentTab.type === "lesson" && (
+              <LessonStudySheet sessionId={sessionId} />
             )}
             {renderedCurrentTab.type === "transcript" && (
               <Transcript

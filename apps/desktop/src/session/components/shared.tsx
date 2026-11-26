@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { computeCurrentNoteTab } from "@anlg/utils/session";
 
+import { useLessonSession } from "~/lesson/queries";
 import { extractPlainText } from "~/search/contexts/engine/utils";
 import { useEnhancedNotes } from "~/session/hooks/useEnhancedNotes";
 import {
@@ -58,6 +59,8 @@ export function useCurrentNoteTab(
   );
 
   const sharedNoteIds = useSessionSharedNoteIds(tab.id);
+  const hasLessonTab =
+    useLessonSession(tab.id).isLesson && sessionMode === "inactive";
 
   return useMemo(() => {
     return computeCurrentNoteTab(
@@ -66,6 +69,7 @@ export function useCurrentNoteTab(
       enhancedNoteIds,
       canShowTranscript,
       sharedNoteIds,
+      hasLessonTab,
     );
   }, [
     tab.state.view,
@@ -73,6 +77,7 @@ export function useCurrentNoteTab(
     enhancedNoteIds,
     canShowTranscript,
     sharedNoteIds,
+    hasLessonTab,
   ]);
 }
 

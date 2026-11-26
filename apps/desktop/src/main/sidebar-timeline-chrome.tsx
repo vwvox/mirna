@@ -3,6 +3,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import { memo, type ReactNode } from "react";
 
 import {
+  GraduationCap,
   House,
   MagnifyingGlass,
   Microphone,
@@ -11,6 +12,8 @@ import {
 } from "@anlg/ui/components/icons";
 import { cn } from "@anlg/utils";
 
+import { openNewLessonDialog } from "~/lesson/components/new-lesson-dialog";
+import { SidebarCourses } from "~/lesson/components/sidebar-courses";
 import { useNewNoteAndListen } from "~/shared/useNewNote";
 import {
   SidebarNoteFilterMenu,
@@ -140,6 +143,19 @@ export function SidebarPrimaryActions({
         >
           <PencilSimpleLine size={17} />
         </button>
+        <button
+          type="button"
+          aria-label={t`New lesson`}
+          title={t`New lesson`}
+          onClick={() => openNewLessonDialog()}
+          className={cn([
+            "border-border bg-background text-mirna-wordmark flex size-[38px] items-center justify-center rounded-[10px] border",
+            "hover:bg-accent transition-colors",
+            "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
+          ])}
+        >
+          <GraduationCap size={17} />
+        </button>
       </div>
       <button
         type="button"
@@ -174,6 +190,7 @@ export function SidebarPrimaryActions({
         <House size={16} aria-hidden />
         <Trans>Home</Trans>
       </button>
+      <SidebarCourses />
       <div className="-mx-1 flex items-center">
         <SidebarScopeMenu />
         <div className="ml-auto">

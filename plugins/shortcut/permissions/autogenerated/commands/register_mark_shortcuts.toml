@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-register-mark-shortcuts"
+description = "Enables the register_mark_shortcuts command without any pre-configured scope."
+commands.allow = ["register_mark_shortcuts"]
+
+[[permission]]
+identifier = "deny-register-mark-shortcuts"
+description = "Denies the register_mark_shortcuts command without any pre-configured scope."
+commands.deny = ["register_mark_shortcuts"]

@@ -33,6 +33,11 @@ import { cn } from "@anlg/utils";
 import { useFolderSelection } from "./selection";
 
 import { useOptionalAuth } from "~/auth";
+import { CoursePanel } from "~/lesson/components/course-panel";
+import {
+  CourseSettingsFold,
+  useIsCourse,
+} from "~/lesson/components/course-settings-fold";
 import { ResourceShareButton, sharedFolderPayload } from "~/resource-sharing";
 import {
   deleteSharedResource,
@@ -103,6 +108,7 @@ export function FolderEditor({ folderPath }: { folderPath: string }) {
   );
   const icon = resolvedFolderIcon(folderPath, persistedIcons, iconOverrides);
   const materials = useFolderMaterials(folderPath);
+  const isCourse = useIsCourse(folderPath);
   const upload = useFolderMaterialUpload(folderPath);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipTitleCommit = useRef(false);
@@ -306,152 +312,160 @@ export function FolderEditor({ folderPath }: { folderPath: string }) {
       </div>
 
       <div className="scrollbar-hide flex-1 overflow-y-auto px-3 pt-3 pb-6">
-        <div className="flex max-w-2xl flex-col gap-6">
-          {auth?.session?.user.id ? (
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex flex-col gap-1.5">
-                <h4 className="text-sm font-medium">
-                  <Trans>Default access</Trans>
-                </h4>
-                <p className="text-muted-foreground text-xs">
-                  <Trans>
-                    Share new notes in this folder when their summary is ready.
-                    You can still change access on each note.
-                  </Trans>
-                </p>
+        <div
+          className={cn([
+            "flex flex-col gap-6",
+            isCourse ? "max-w-6xl" : "max-w-2xl",
+          ])}
+        >
+          <CoursePanel folderPath={folderPath} />
+          <CourseSettingsFold folderPath={folderPath}>
+            {auth?.session?.user.id ? (
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <h4 className="text-sm font-medium">
+                    <Trans>Default access</Trans>
+                  </h4>
+                  <p className="text-muted-foreground text-xs">
+                    <Trans>
+                      Share new notes in this folder when their summary is
+                      ready. You can still change access on each note.
+                    </Trans>
+                  </p>
+                </div>
+                <Select
+                  value={selectedAccessValue}
+                  disabled={accessMutation.isPending}
+                  onValueChange={(value) => {
+                    if (value === ONLY_ME_VALUE) {
+                      accessMutation.mutate(value);
+                      return;
+                    }
+                    setAccessConfirmation({ value, label: accessLabel(value) });
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label={t`Default access`}
+                    className="h-8 w-44 text-xs"
+                  >
+                    <SelectValue placeholder={t`Only me`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ONLY_ME_VALUE}>
+                      <Trans>Only me</Trans>
+                    </SelectItem>
+                    <SelectItem value={PARTICIPANTS_VALUE}>
+                      <Trans>People in the meeting</Trans>
+                    </SelectItem>
+                    {availableWorkspaces.map((workspace) => (
+                      <SelectItem
+                        key={workspace.id}
+                        value={`${WORKSPACE_VALUE_PREFIX}${workspace.id}`}
+                      >
+                        <Trans>Everyone in {workspace.name}</Trans>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select
-                value={selectedAccessValue}
-                disabled={accessMutation.isPending}
-                onValueChange={(value) => {
-                  if (value === ONLY_ME_VALUE) {
-                    accessMutation.mutate(value);
+            ) : null}
+
+            <div className="flex flex-col gap-1.5">
+              <h4 className="text-sm font-medium">
+                <Trans>Context</Trans>
+              </h4>
+              <p className="text-muted-foreground text-xs">
+                <Trans>What these notes are usually about</Trans>
+              </p>
+              <FolderInstructionsField folderPath={folderPath} rows={4} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium">
+                <Trans>Materials</Trans>
+              </h4>
+              <input
+                ref={inputRef}
+                type="file"
+                className="hidden"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) {
                     return;
                   }
-                  setAccessConfirmation({ value, label: accessLabel(value) });
+                  setBusy(true);
+                  try {
+                    await upload(file);
+                  } finally {
+                    setBusy(false);
+                  }
                 }}
-              >
-                <SelectTrigger
-                  aria-label={t`Default access`}
-                  className="h-8 w-44 text-xs"
-                >
-                  <SelectValue placeholder={t`Only me`} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ONLY_ME_VALUE}>
-                    <Trans>Only me</Trans>
-                  </SelectItem>
-                  <SelectItem value={PARTICIPANTS_VALUE}>
-                    <Trans>People in the meeting</Trans>
-                  </SelectItem>
-                  {availableWorkspaces.map((workspace) => (
-                    <SelectItem
-                      key={workspace.id}
-                      value={`${WORKSPACE_VALUE_PREFIX}${workspace.id}`}
-                    >
-                      <Trans>Everyone in {workspace.name}</Trans>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-1.5">
-            <h4 className="text-sm font-medium">
-              <Trans>Context</Trans>
-            </h4>
-            <p className="text-muted-foreground text-xs">
-              <Trans>What these notes are usually about</Trans>
-            </p>
-            <FolderInstructionsField folderPath={folderPath} rows={4} />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <h4 className="text-sm font-medium">
-              <Trans>Materials</Trans>
-            </h4>
-            <input
-              ref={inputRef}
-              type="file"
-              className="hidden"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (!file) {
-                  return;
-                }
-                setBusy(true);
-                try {
-                  await upload(file);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            />
-            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <li>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={cn([
-                    "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
-                    "flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed",
-                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
-                    "disabled:opacity-50",
-                  ])}
-                  onClick={() => inputRef.current?.click()}
-                >
-                  <Plus className="size-6" />
-                  <span className="text-xs font-medium">
-                    <Trans>Add file</Trans>
-                  </span>
-                </button>
-              </li>
-              {materials.map((material) => (
-                <li key={material.id}>
-                  <div className="border-border relative flex aspect-[4/3] flex-col items-center justify-center gap-1.5 rounded-lg border px-3 py-2">
-                    <File
-                      className="text-muted-foreground size-6 shrink-0"
-                      aria-hidden
-                    />
-                    <span
-                      className="w-full truncate text-center text-xs"
-                      title={material.filename}
-                    >
-                      {material.filename}
+              />
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <li>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={cn([
+                      "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+                      "flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed",
+                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
+                      "disabled:opacity-50",
+                    ])}
+                    onClick={() => inputRef.current?.click()}
+                  >
+                    <Plus className="size-6" />
+                    <span className="text-xs font-medium">
+                      <Trans>Add file</Trans>
                     </span>
-                    <button
-                      type="button"
-                      aria-label={t`Remove ${material.filename}`}
-                      disabled={busy}
-                      className={cn([
-                        "text-muted-foreground hover:bg-accent hover:text-foreground",
-                        "absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full",
-                        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
-                        "disabled:opacity-50",
-                      ])}
-                      onClick={async () => {
-                        setBusy(true);
-                        try {
-                          await deleteLocalFolderMaterial({
-                            folderPath,
-                            attachmentId: diskAttachmentId(
-                              material.relativePath,
-                            ),
-                          });
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
+                  </button>
                 </li>
-              ))}
-            </ul>
-          </div>
+                {materials.map((material) => (
+                  <li key={material.id}>
+                    <div className="border-border relative flex aspect-[4/3] flex-col items-center justify-center gap-1.5 rounded-lg border px-3 py-2">
+                      <File
+                        className="text-muted-foreground size-6 shrink-0"
+                        aria-hidden
+                      />
+                      <span
+                        className="w-full truncate text-center text-xs"
+                        title={material.filename}
+                      >
+                        {material.filename}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={t`Remove ${material.filename}`}
+                        disabled={busy}
+                        className={cn([
+                          "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          "absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-full",
+                          "focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-hidden",
+                          "disabled:opacity-50",
+                        ])}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await deleteLocalFolderMaterial({
+                              folderPath,
+                              attachmentId: diskAttachmentId(
+                                material.relativePath,
+                              ),
+                            });
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CourseSettingsFold>
         </div>
       </div>
 

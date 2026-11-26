@@ -184,6 +184,7 @@ export async function showFloatingMeetingWindow(
           ? routeState.transcriptBubbles
           : null,
         transcriptNotice: routeState.transcriptNotice ?? null,
+        marksEnabled: routeState.marksEnabled ?? false,
         paused: routeState.paused ?? false,
       });
   if (!shouldContinue()) {
@@ -241,6 +242,8 @@ function isAmplitudeOnlyFloatingRouteUpdate(
       nextState.liveCaptionToggleVisible &&
     previousState.transcriptBubbles === nextState.transcriptBubbles &&
     previousState.transcriptNotice === nextState.transcriptNotice &&
+    (previousState.marksEnabled ?? false) ===
+      (nextState.marksEnabled ?? false) &&
     (previousState.paused ?? false) === (nextState.paused ?? false)
   );
 }

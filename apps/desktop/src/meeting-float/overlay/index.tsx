@@ -90,6 +90,14 @@ export function FloatingBarOverlayScreen() {
             action: "cancel",
           });
         }}
+        onMark={(kind) => {
+          if (state.sessionId && !state.dictation) {
+            void windowsEvents.floatingBarMark.emit({
+              sessionId: state.sessionId,
+              kind,
+            });
+          }
+        }}
         onSetPaused={(paused) => {
           void windowsEvents.floatingBarPause.emit({ paused });
         }}

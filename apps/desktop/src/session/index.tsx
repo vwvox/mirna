@@ -29,6 +29,8 @@ import { shouldShowSessionTopAudioPlayer } from "./top-audio-player";
 import { getSessionEvent } from "./utils";
 
 import * as AudioPlayer from "~/audio-player";
+import { LessonBoard } from "~/lesson/components/lesson-board";
+import { useLessonSession } from "~/lesson/queries";
 import { isLockedFlag } from "~/lock/flag";
 import { revealLockedNote } from "~/lock/notes";
 import { NoteLockScreen } from "~/lock/screen";
@@ -190,14 +192,17 @@ function TabContentNoteInner({
   const isTranscribing = shouldShowTranscriptTabSpinner(sessionMode);
   const isLiveSessionActive = sessionMode === "active";
   const sharedNoteIds = useSessionSharedNoteIds(sessionId);
+  const isLesson = useLessonSession(sessionId).isLesson;
+  const hasLessonTab = isLesson && sessionMode === "inactive";
   const editorTabs = React.useMemo(
     () =>
       createEditorTabs({
         enhancedNoteIds,
         canShowTranscript,
         sharedNoteIds,
+        hasLesson: hasLessonTab,
       }),
-    [enhancedNoteIds, canShowTranscript, sharedNoteIds],
+    [enhancedNoteIds, canShowTranscript, sharedNoteIds, hasLessonTab],
   );
   const currentView = React.useMemo(() => {
     return computeCurrentNoteTab(
@@ -206,6 +211,7 @@ function TabContentNoteInner({
       enhancedNoteIds,
       canShowTranscript,
       sharedNoteIds,
+      hasLessonTab,
     );
   }, [
     tab.state.view,
@@ -213,6 +219,7 @@ function TabContentNoteInner({
     enhancedNoteIds,
     canShowTranscript,
     sharedNoteIds,
+    hasLessonTab,
   ]);
   useAutoFocusEditor({
     sessionId,
@@ -325,26 +332,31 @@ function TabContentNoteInner({
               </div>
             </div>
           ) : null}
-          <div className="min-h-0 flex-1">
-            {session ? (
-              <NoteInput
-                ref={noteInputRef}
-                tab={tab}
-                rawMd={session.raw_md}
-                sessionTitle={session.title}
-                eventTitle={sessionEvent?.title}
-                eventDescription={sessionEvent?.description}
-                editorTabs={editorTabs}
-                currentTab={currentView}
-                handleTabChange={handleTabChange}
-                sessionMode={sessionMode}
-                transcriptEditMode={transcriptEditMode}
-                onTranscriptEditModeChange={handleTranscriptEditModeChange}
-                hideHeader
-              />
-            ) : (
-              <SessionContentLoading />
-            )}
+          <div className="flex min-h-0 flex-1">
+            <div className="min-h-0 min-w-0 flex-1">
+              {session ? (
+                <NoteInput
+                  ref={noteInputRef}
+                  tab={tab}
+                  rawMd={session.raw_md}
+                  sessionTitle={session.title}
+                  eventTitle={sessionEvent?.title}
+                  eventDescription={sessionEvent?.description}
+                  editorTabs={editorTabs}
+                  currentTab={currentView}
+                  handleTabChange={handleTabChange}
+                  sessionMode={sessionMode}
+                  transcriptEditMode={transcriptEditMode}
+                  onTranscriptEditModeChange={handleTranscriptEditModeChange}
+                  hideHeader
+                />
+              ) : (
+                <SessionContentLoading />
+              )}
+            </div>
+            {isLesson && isLiveSessionActive && !lockOverlay ? (
+              <LessonBoard sessionId={sessionId} />
+            ) : null}
           </div>
         </div>
       </SessionSurface>

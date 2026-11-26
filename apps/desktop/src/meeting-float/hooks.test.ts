@@ -45,6 +45,7 @@ const rows = [
     human_name: "Remote speaker",
     speaker_context: null,
     live_started_at_ms: null,
+    session_kind: null,
   },
   {
     row_kind: "human",
@@ -55,6 +56,7 @@ const rows = [
     human_name: "Other person",
     speaker_context: null,
     live_started_at_ms: null,
+    session_kind: null,
   },
   {
     row_kind: "session",
@@ -65,6 +67,7 @@ const rows = [
     human_name: "",
     speaker_context: JSON.stringify(speakerContext),
     live_started_at_ms: 1_000,
+    session_kind: "lesson",
   },
 ] as const;
 
@@ -81,6 +84,7 @@ describe("meeting float SQLite data", () => {
 
     expect(data.sessions["session-1"]).toEqual({
       title: "Planning",
+      kind: "lesson",
       ownerUserId: "human-self",
       participantHumanIds: ["human-remote"],
       speakerContext,

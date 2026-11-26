@@ -10,6 +10,8 @@ Default permissions for the plugin
 - `allow-set-active`
 - `allow-register-hotkey`
 - `allow-unregister-hotkey`
+- `allow-register-mark-shortcuts`
+- `allow-unregister-mark-shortcuts`
 
 ## Permission Table
 
@@ -101,6 +103,32 @@ Denies the register_hotkey command without any pre-configured scope.
 <tr>
 <td>
 
+`shortcut:allow-register-mark-shortcuts`
+
+</td>
+<td>
+
+Enables the register_mark_shortcuts command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`shortcut:deny-register-mark-shortcuts`
+
+</td>
+<td>
+
+Denies the register_mark_shortcuts command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `shortcut:allow-set-active`
 
 </td>
@@ -146,6 +174,32 @@ Enables the unregister_hotkey command without any pre-configured scope.
 <td>
 
 Denies the unregister_hotkey command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`shortcut:allow-unregister-mark-shortcuts`
+
+</td>
+<td>
+
+Enables the unregister_mark_shortcuts command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`shortcut:deny-unregister-mark-shortcuts`
+
+</td>
+<td>
+
+Denies the unregister_mark_shortcuts command without any pre-configured scope.
 
 </td>
 </tr>

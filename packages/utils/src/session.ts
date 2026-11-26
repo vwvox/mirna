@@ -3,7 +3,8 @@ export type SessionNoteView =
   | { type: "enhanced"; id: string }
   | { type: "transcript" }
   | { type: "attachments" }
-  | { type: "shared"; id: string };
+  | { type: "shared"; id: string }
+  | { type: "lesson" };
 
 export function computeCurrentNoteTab(
   tabView: SessionNoteView | null,
@@ -11,7 +12,13 @@ export function computeCurrentNoteTab(
   enhancedNoteIds: readonly string[],
   canShowTranscript = false,
   sharedNoteIds: readonly string[] = [],
+  hasLesson = false,
 ): SessionNoteView {
+  if (!isLiveSessionActive && hasLesson) {
+    if (!tabView || tabView.type === "lesson") {
+      return { type: "lesson" };
+    }
+  }
   if (tabView?.type === "shared" && sharedNoteIds.includes(tabView.id)) {
     return tabView;
   }
@@ -60,10 +67,12 @@ export function createEditorTabs({
   enhancedNoteIds,
   canShowTranscript,
   sharedNoteIds = [],
+  hasLesson = false,
 }: {
   enhancedNoteIds: string[];
   canShowTranscript: boolean;
   sharedNoteIds?: readonly string[];
+  hasLesson?: boolean;
 }): SessionNoteView[] {
   const enhancedTabs: SessionNoteView[] = enhancedNoteIds.map((id) => ({
     type: "enhanced",
@@ -71,6 +80,7 @@ export function createEditorTabs({
   }));
 
   return [
+    ...(hasLesson ? [{ type: "lesson" } as const] : []),
     ...enhancedTabs,
     { type: "raw" },
     ...(canShowTranscript ? [{ type: "transcript" } as const] : []),

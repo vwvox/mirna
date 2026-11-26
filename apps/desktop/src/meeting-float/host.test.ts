@@ -7,7 +7,10 @@ import {
   getFloatingTranscriptBubbles,
   haveFloatingRouteInputsChanged,
 } from "./host";
-import { getFloatingLiveCaptionToggleVisible } from "./route-state";
+import {
+  getFloatingLiveCaptionToggleVisible,
+  isSameFloatingRouteState,
+} from "./route-state";
 
 import { createListenerStore } from "~/store/zustand/listener";
 import { LIVE_TRANSCRIPT_PREVIEW_SEGMENT_LIMIT } from "~/store/zustand/listener/transcript";
@@ -90,7 +93,23 @@ describe("getFloatingRouteState", () => {
       liveCaptionToggleVisible: false,
       transcriptBubbles: [],
       transcriptNotice: null,
+      marksEnabled: false,
     });
+  });
+
+  it("shows lesson marks only when asked and treats the flag as a change", () => {
+    const state = createListenerState({
+      status: "active",
+      sessionId: "session-1",
+    });
+    const plain = getFloatingRouteState(state);
+    const lesson = getFloatingRouteState(state, { marksEnabled: true });
+
+    expect(lesson?.marksEnabled).toBe(true);
+    expect(isSameFloatingRouteState(plain, lesson)).toBe(false);
+    expect(
+      isSameFloatingRouteState(plain, { ...plain!, marksEnabled: undefined }),
+    ).toBe(true);
   });
 
   it("builds transcript bubbles from speaker segments", () => {

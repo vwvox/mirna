@@ -12,6 +12,7 @@ import {
   FileArrowDown,
   FileText,
   FolderOpen,
+  GraduationCap,
   PictureInPicture,
   Scissors,
   Waveform,
@@ -42,6 +43,8 @@ import { TranscribeAgain } from "./transcribe-again";
 import { TrimRecordingDialog } from "./trim-recording";
 
 import { useAudioPlayer } from "~/audio-player";
+import { openMakeLessonDialog } from "~/lesson/components/new-lesson-dialog";
+import { useLessonSession } from "~/lesson/queries";
 import { DEVICE_AUTH_REASON } from "~/lock/auth";
 import { isLockedFlag } from "~/lock/flag";
 import { useAppLock } from "~/lock/store";
@@ -94,6 +97,9 @@ export function OverflowButton({
   const { uploadAudio, uploadTranscript } = useUploadFile(sessionId);
   const regenerateTranscript = useRegenerateTranscript(sessionId);
   const sessionMode = useListener((state) => state.getSessionMode(sessionId));
+  const isLesson = useLessonSession(sessionId).isLesson;
+  const showLessonAction =
+    sessionMode === "inactive" && hasTranscript && !noteLocked;
   const floatingBarEnabled = useConfigValue("floating_bar_enabled");
   const floatingBarSupported = isFloatingBarSupported();
   const isMeetingInProgress =
@@ -231,6 +237,24 @@ export function OverflowButton({
                 <Trans>Version history</Trans>
               </span>
             </DropdownMenuItem>
+            {showLessonAction && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setOpen(false);
+                  openMakeLessonDialog(sessionId, session?.folder_id ?? "");
+                }}
+                className="cursor-pointer"
+              >
+                <GraduationCap />
+                <span>
+                  {isLesson ? (
+                    <Trans>Lesson settings</Trans>
+                  ) : (
+                    <Trans>Make this a lesson</Trans>
+                  )}
+                </span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             {showListeningAction && (
               <Listening

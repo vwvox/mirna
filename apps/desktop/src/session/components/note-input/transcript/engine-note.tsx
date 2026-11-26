@@ -6,8 +6,9 @@ import { commands as localSttCommands } from "@anlg/plugin-local-stt";
 import { Cloud, Headphones, Laptop } from "@anlg/ui/components/icons";
 import { toast } from "@anlg/ui/components/ui/toast";
 
+import { ChineseDisplayMenu } from "./display-menu";
+
 import { useRegenerateTranscript } from "~/session/components/note-input/transcript/actions";
-import { usePinyinPreference } from "~/stt/pinyin";
 import { languageName, useTranscriptEngine } from "~/stt/transcript-engine";
 import { localSttQueries } from "~/stt/useLocalSttModel";
 
@@ -21,8 +22,6 @@ export function TranscriptEngineNote({ sessionId }: { sessionId: string }) {
   const { t, i18n } = useLingui();
   const summary = useTranscriptEngine(sessionId);
   const [downloading, setDownloading] = useState(false);
-  const showPinyin = usePinyinPreference((state) => state.show);
-  const setShowPinyin = usePinyinPreference((state) => state.setShow);
   const offersQwen3 = Boolean(
     summary?.qwen3Suggested || summary?.unsureLanguages,
   );
@@ -111,19 +110,7 @@ export function TranscriptEngineNote({ sessionId }: { sessionId: string }) {
         )}
         <span className="min-w-0 flex-1">{madeWith}</span>
         {summary.hasChinese ? (
-          <button
-            type="button"
-            role="switch"
-            aria-checked={showPinyin}
-            onClick={() => setShowPinyin(!showPinyin)}
-            className={
-              showPinyin
-                ? "bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-mist shrink-0 rounded-md px-2 py-0.5 font-semibold"
-                : "border-border hover:text-foreground shrink-0 rounded-md border px-2 py-0.5 font-medium"
-            }
-          >
-            {showPinyin ? t`Pinyin on` : t`Show pinyin`}
-          </button>
+          <ChineseDisplayMenu sessionId={sessionId} />
         ) : null}
       </p>
       {summary.qwen3Suggested && language ? (

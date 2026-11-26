@@ -15,33 +15,141 @@ import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 import {
   createTranscriptSearchIndex,
   getTranscriptSearchIndexMatches,
+  type MatchResult,
   registerTranscriptSearchSource,
   type TranscriptSearchSource,
 } from "../../search/matching";
+import { findPinyinMatches, layoutHanLine } from "./han-layout";
+import { findParagraphTranslation } from "./note-context";
+import { groupWordsIntoLines, groupWordsIntoParagraphs } from "./utils";
 
 import type { Segment } from "~/stt/live-segment";
+import {
+  type ChineseDisplayMode,
+  getLoadedPinyinModule,
+  hasHan,
+  type PinyinTools,
+  toPinyinQuery,
+} from "~/stt/pinyin";
 
-const ESTIMATED_LINE_HEIGHT = 22;
-const ESTIMATED_ROW_CHARS = 90;
-const ESTIMATED_ROW_CHROME = 36;
-const SEGMENT_GAP = 16;
 const OVERSCAN_PX = 800;
 const FALLBACK_VIEWPORT_HEIGHT = 800;
 
-export function estimateTranscriptRowHeight(segment: Segment, index: number) {
-  const characterCount = segment.words.reduce(
-    (total, word) => total + word.text.length + 1,
-    0,
-  );
-  const lineCount =
-    characterCount === 0
-      ? 0
-      : Math.max(1, Math.ceil(characterCount / ESTIMATED_ROW_CHARS));
-  return (
-    ESTIMATED_ROW_CHROME +
-    lineCount * ESTIMATED_LINE_HEIGHT +
-    (index > 0 ? SEGMENT_GAP : 0)
-  );
+// Heights of the row parts in segment.tsx, so rows that haven't been
+// measured yet take about the room they will need.
+const ROW_GAP = 4;
+const ROW_CHROME = 38;
+const CHIP_ROW = 28;
+const CHIP_RUBY_EXTRA = 10;
+const CHAPTER_HEIGHT = 56;
+const PARAGRAPH_GAP = 8;
+const TRANSLATION_GAP = 4;
+const TRANSLATION_LINE = 20;
+const TRANSLATION_CHAR_PX = 6.4;
+const LATIN_CHAR_PX = 7.2;
+const TEXT_INSET = 116;
+const FALLBACK_TEXT_WIDTH = 600;
+const LINE_HEIGHT: Record<ChineseDisplayMode | "latin", number> = {
+  latin: 24.4,
+  characters: 27,
+  "pinyin-above": 37.5,
+  "word-by-word": 50,
+  "pinyin-only": 24.4,
+};
+const MEANING_LINE_EXTRA = 12;
+// Width a Chinese character takes in each display, pinyin included.
+const HAN_CHAR_PX: Record<ChineseDisplayMode, number> = {
+  characters: 16.5,
+  "pinyin-above": 22,
+  "word-by-word": 24,
+  "pinyin-only": 25,
+};
+const HAN_CHARACTER = /\p{Script=Han}/u;
+
+export type TranscriptRowEstimate = {
+  variant?: "row" | "chip";
+  chapters?: number;
+  mode?: ChineseDisplayMode;
+  textWidth?: number | null;
+  translations?: ReadonlyMap<string, string> | null;
+  meanings?: boolean;
+};
+
+/** What the list knows about its rows beyond their words. */
+export type TranscriptRowLayout = {
+  chips: ReadonlySet<number>;
+  chapterCounts: ReadonlyMap<number, number>;
+  mode: ChineseDisplayMode;
+  translations: ReadonlyMap<string, string> | null;
+  meanings: boolean;
+};
+
+export function estimateTranscriptRowHeight(
+  segment: Segment,
+  index: number,
+  {
+    variant = "row",
+    chapters = 0,
+    mode = "characters",
+    textWidth,
+    translations,
+    meanings = false,
+  }: TranscriptRowEstimate = {},
+) {
+  const above = (index > 0 ? ROW_GAP : 0) + chapters * CHAPTER_HEIGHT;
+  if (variant === "chip") {
+    const ruby =
+      (mode === "pinyin-above" || mode === "word-by-word") &&
+      segment.words.some((word) => hasHan(word.text));
+    return Math.round(above + CHIP_ROW + (ruby ? CHIP_RUBY_EXTRA : 0));
+  }
+
+  const width = Math.max(160, textWidth ?? FALLBACK_TEXT_WIDTH);
+  const paragraphs = groupWordsIntoParagraphs(segment.words);
+  let height = above + ROW_CHROME;
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    let latin = 0;
+    let han = 0;
+    for (const line of paragraph.lines) {
+      for (const word of line.words) {
+        const text = word.text.trim();
+        if (!hasHan(text)) {
+          latin += text.length + 1;
+          continue;
+        }
+        for (const character of text) {
+          if (HAN_CHARACTER.test(character)) han += 1;
+          else latin += 1;
+        }
+      }
+    }
+    const lines = Math.max(
+      1,
+      Math.ceil((latin * LATIN_CHAR_PX + han * HAN_CHAR_PX[mode]) / width),
+    );
+    const lineHeight =
+      han === 0
+        ? LINE_HEIGHT.latin
+        : LINE_HEIGHT[mode] +
+          (mode === "word-by-word" && meanings ? MEANING_LINE_EXTRA : 0);
+    height += (paragraphIndex > 0 ? PARAGRAPH_GAP : 0) + lines * lineHeight;
+
+    const translation =
+      han > 0 && translations
+        ? findParagraphTranslation(paragraph, translations)
+        : null;
+    if (translation) {
+      height +=
+        PARAGRAPH_GAP -
+        TRANSLATION_GAP +
+        TRANSLATION_LINE *
+          Math.max(
+            1,
+            Math.ceil((translation.length * TRANSLATION_CHAR_PX) / width),
+          );
+    }
+  });
+  return Math.round(height);
 }
 
 export function useVirtualSegments({
@@ -52,6 +160,8 @@ export function useVirtualSegments({
   searchEnabled,
   currentMs,
   offsetMs,
+  layout,
+  vocabularyTerms,
 }: {
   segments: Segment[];
   segmentKeys: string[];
@@ -60,6 +170,8 @@ export function useVirtualSegments({
   searchEnabled: boolean;
   currentMs: number;
   offsetMs: number;
+  layout?: TranscriptRowLayout;
+  vocabularyTerms?: ReadonlySet<string>;
 }) {
   const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -76,6 +188,22 @@ export function useVirtualSegments({
   latestKeysRef.current = keySet;
   const pendingHeightsRef = useRef(new Map<string, number>());
   const measurementFrameRef = useRef<number | null>(null);
+  const mountedKeysRef = useRef<ReadonlySet<string>>(new Set());
+
+  // A new display changes the height of rows that aren't on screen, so their
+  // old measurements give way to fresh estimates; mounted rows re-measure.
+  const measurementKey = `${layout?.mode ?? "characters"}|${layout?.translations ? "translated" : ""}`;
+  const [measuredFor, setMeasuredFor] = useState(measurementKey);
+  if (measuredFor !== measurementKey) {
+    setMeasuredFor(measurementKey);
+    setMeasuredHeights((current) => {
+      const next = new Map<string, number>();
+      for (const [key, height] of current) {
+        if (mountedKeysRef.current.has(key)) next.set(key, height);
+      }
+      return next;
+    });
+  }
 
   useMountEffect(() => {
     return () => {
@@ -87,27 +215,37 @@ export function useVirtualSegments({
     };
   });
 
+  const viewport = useVirtualViewport(scrollElement, listElement);
+  // Whole steps, so dragging the window edge doesn't re-estimate every row each pixel.
+  const textWidth =
+    viewport.listWidth > TEXT_INSET
+      ? Math.round((viewport.listWidth - TEXT_INSET) / 16) * 16
+      : null;
   const estimatedHeights = useMemo(
     () =>
       segments.map((segment, index) =>
-        estimateTranscriptRowHeight(segment, index),
+        estimateTranscriptRowHeight(segment, index, {
+          variant: layout?.chips.has(index) ? "chip" : "row",
+          chapters: layout?.chapterCounts.get(index) ?? 0,
+          mode: layout?.mode,
+          textWidth,
+          translations: layout?.translations,
+          meanings: layout?.meanings,
+        }),
       ),
-    [segments],
+    [layout, segments, textWidth],
   );
   const offsets = useMemo(() => {
     const values = [0];
     for (const [index, key] of segmentKeys.entries()) {
       values.push(
         values[index] +
-          (measuredHeights.get(key) ??
-            estimatedHeights[index] ??
-            ESTIMATED_ROW_CHROME),
+          (measuredHeights.get(key) ?? estimatedHeights[index] ?? ROW_CHROME),
       );
     }
     return values;
   }, [estimatedHeights, measuredHeights, segmentKeys]);
   const totalHeight = offsets[offsets.length - 1] ?? 0;
-  const viewport = useVirtualViewport(scrollElement, listElement);
   const segmentIndex = useMemo(() => createSegmentIndex(segments), [segments]);
 
   const activeMatchIndex = activeMatchId
@@ -172,6 +310,7 @@ export function useVirtualSegments({
     viewport.listTop,
     viewport.scrollTop,
   ]);
+  mountedKeysRef.current = new Set(virtualItems.map((item) => item.key));
 
   const measureRow = useCallback((key: string, height: number) => {
     if (!Number.isFinite(height) || height <= 0) return;
@@ -270,10 +409,38 @@ export function useVirtualSegments({
         : null,
     [searchEnabled, segments],
   );
-  searchSourceRef.current = (preparedQuery, options) =>
-    searchIndex
-      ? getTranscriptSearchIndexMatches(searchIndex, preparedQuery, options)
-      : [];
+  searchSourceRef.current = (preparedQuery, options) => {
+    if (!searchIndex) return [];
+    const matches = getTranscriptSearchIndexMatches(
+      searchIndex,
+      preparedQuery,
+      options,
+    );
+    const pinyinQuery = toPinyinQuery(preparedQuery);
+    const tools = getLoadedPinyinModule();
+    if (!pinyinQuery || !tools) return matches;
+    const pinyinMatches = findTranscriptPinyinMatches(
+      segments,
+      pinyinQuery,
+      options.wholeWord,
+      tools,
+      vocabularyTerms,
+      (index) => scrollToIndexRef.current(index, "smooth"),
+    );
+    if (pinyinMatches.length === 0) return matches;
+    const ordinals = new Map(
+      searchIndex.entries.map((entry, ordinal) => [entry.element, ordinal]),
+    );
+    return [
+      ...matches.map((match) => ({
+        match,
+        ordinal: ordinals.get(match.element) ?? 0,
+      })),
+      ...pinyinMatches,
+    ]
+      .sort((left, right) => left.ordinal - right.ordinal)
+      .map(({ match }) => match);
+  };
 
   const listRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -413,8 +580,10 @@ function useVirtualViewport(
     store.getSnapshot,
     store.getSnapshot,
   );
-  const [scrollTop, height, listTop] = snapshot.split("|").map(Number);
-  return { scrollTop, height, listTop };
+  const [scrollTop, height, listTop, listWidth] = snapshot
+    .split("|")
+    .map(Number);
+  return { scrollTop, height, listTop, listWidth };
 }
 
 function createVirtualViewportStore(
@@ -422,14 +591,15 @@ function createVirtualViewportStore(
   listElement: HTMLDivElement | null,
 ) {
   let listTop: number | null = null;
-  let snapshot = "0|800|0";
+  let listWidth = 0;
+  let snapshot = `0|${FALLBACK_VIEWPORT_HEIGHT}|0|0`;
   let animationFrame: number | null = null;
   let shouldMeasureList = true;
   const listeners = new Set<() => void>();
 
   const refresh = (measureList: boolean) => {
     if (!scrollElement) {
-      snapshot = `0|${FALLBACK_VIEWPORT_HEIGHT}|0`;
+      snapshot = `0|${FALLBACK_VIEWPORT_HEIGHT}|0|0`;
       return;
     }
 
@@ -439,8 +609,9 @@ function createVirtualViewportStore(
       listTop = listRect
         ? scrollElement.scrollTop + listRect.top - scrollRect.top
         : scrollElement.scrollTop;
+      listWidth = listRect?.width || scrollElement.clientWidth || 0;
     }
-    const next = `${scrollElement.scrollTop}|${scrollElement.clientHeight || FALLBACK_VIEWPORT_HEIGHT}|${listTop}`;
+    const next = `${scrollElement.scrollTop}|${scrollElement.clientHeight || FALLBACK_VIEWPORT_HEIGHT}|${listTop}|${listWidth}`;
     if (next !== snapshot) {
       snapshot = next;
       listeners.forEach((listener) => listener());
@@ -579,4 +750,48 @@ function findPlaybackSegmentIndex(
   return index.playbackEnds[low]! >= target
     ? index.playbackSegmentIndexes[low]!
     : null;
+}
+
+/** Chinese words whose pinyin, typed without tones, matches the query ("dou" finds 都). */
+function findTranscriptPinyinMatches(
+  segments: Segment[],
+  query: string,
+  wholeWord: boolean,
+  tools: PinyinTools,
+  terms: ReadonlySet<string> | undefined,
+  scrollToSegment: (index: number) => void,
+): { match: MatchResult; ordinal: number }[] {
+  const results: { match: MatchResult; ordinal: number }[] = [];
+  let ordinal = 0;
+  segments.forEach((segment, segmentIndex) => {
+    const segmentOrdinal = ordinal;
+    ordinal += segment.words.length;
+    if (!segment.words.some((word) => hasHan(word.text))) return;
+    let lineOrdinal = segmentOrdinal;
+    const element = {
+      scrollIntoView: () => scrollToSegment(segmentIndex),
+    } as HTMLElement;
+    for (const line of groupWordsIntoLines(segment.words)) {
+      const hanLine = layoutHanLine(
+        line.words.map((word) => word.text.trim()),
+        tools,
+        terms,
+      );
+      if (hanLine) {
+        for (const wordIndexes of findPinyinMatches(
+          hanLine,
+          query,
+          wholeWord,
+        )) {
+          const first = wordIndexes[0]!;
+          results.push({
+            match: { element, id: line.words[first]?.id ?? null },
+            ordinal: lineOrdinal + first,
+          });
+        }
+      }
+      lineOrdinal += line.words.length;
+    }
+  });
+  return results;
 }

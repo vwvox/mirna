@@ -1,3 +1,10 @@
+const gains = new WeakMap<HTMLMediaElement, GainNode>();
+
+/** The volume node a media element plays through, once routed to the centre. */
+export function centeredGain(media: HTMLMediaElement): GainNode | null {
+  return gains.get(media) ?? null;
+}
+
 export function configureCenteredPlayback(
   media: HTMLMediaElement,
   createContext: () => AudioContext = () => new AudioContext(),
@@ -16,6 +23,7 @@ export function configureCenteredPlayback(
     gainNode.channelInterpretation = "speakers";
     gainNode.connect(context.destination);
     context.createMediaElementSource(media).connect(gainNode);
+    gains.set(media, gainNode);
   } catch {
     void context.close().catch(() => {});
     return null;

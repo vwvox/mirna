@@ -149,6 +149,7 @@ extension FloatingBarStatePayload {
       liveCaptionToggleVisible: liveCaptionToggleVisible,
       transcriptBubbles: transcriptBubbles,
       transcriptNotice: transcriptNotice,
+      marksEnabled: marksEnabled,
       paused: paused)
   }
 
@@ -168,6 +169,7 @@ extension FloatingBarStatePayload {
       liveCaptionToggleVisible: liveCaptionToggleVisible,
       transcriptBubbles: transcriptBubbles,
       transcriptNotice: transcriptNotice,
+      marksEnabled: marksEnabled,
       paused: paused)
   }
 }

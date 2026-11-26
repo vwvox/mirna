@@ -5,6 +5,7 @@ mod ext;
 mod gesture;
 mod global;
 mod handler;
+mod marks;
 
 pub use error::*;
 pub use events::*;
@@ -26,10 +27,13 @@ fn make_specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             global::configure_gestures,
             global::validate,
             global::set_active,
+            marks::register_mark_shortcuts,
+            marks::unregister_mark_shortcuts,
         ])
         .events(tauri_specta::collect_events![
             ShortcutEvent,
-            DictationGesture
+            DictationGesture,
+            MarkShortcut
         ])
         .error_handling(tauri_specta::ErrorHandlingMode::Result)
 }
@@ -44,6 +48,7 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
             let handler = Handler::new();
             app.manage(handler);
             app.manage(global::GlobalState::default());
+            app.manage(marks::MarkState::default());
             Ok(())
         })
         .build()

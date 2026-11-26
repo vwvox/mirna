@@ -10,6 +10,7 @@ import { runNoteEnhancedAutomations } from "~/automations/engine";
 import { syncCloudApiSnapshotBestEffort } from "~/cloud-api/client";
 import { releaseCloudsyncActivityEventually } from "~/db/cloudsync-activity";
 import { retryDatabaseLock } from "~/db/retry";
+import { requestLessonSheet } from "~/lesson/auto";
 import { showSummaryReadyNotification } from "~/services/enhancer/summary-notification";
 import { persistGeneratedEnhancedNote } from "~/session/content-mutations";
 import { loadSessionContentSnapshot } from "~/session/content-queries";
@@ -172,6 +173,7 @@ export const runEnhanceSuccess = async ({
     if (!signal.aborted) {
       void localApiCommands.dispatchEvent("note.enhanced", args.sessionId);
       void runNoteEnhancedAutomations(args.sessionId);
+      void requestLessonSheet(args.sessionId, model);
       syncCloudApiSnapshotBestEffort(args.sessionId);
       void showSummaryReadyNotification(args.sessionId, trimmedTitle);
       void playCompletionSound();
