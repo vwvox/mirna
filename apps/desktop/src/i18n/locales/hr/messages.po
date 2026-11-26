@@ -22,6 +22,18 @@ msgstr ""
 msgid "\"{title}\" is ready to read."
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "\"sounds good see you at 6\""
+msgstr ""
+
+#: src/settings/dictation-engine.tsx
+msgid "\"Sounds good. See you at 6.\""
+msgstr ""
+
+#: src/settings/dictation-engine.tsx
+msgid "\"Sounds good. See you at 6\""
+msgstr ""
+
 #: src/settings/general/notification.tsx
 msgid "(default)"
 msgstr ""
@@ -122,6 +134,14 @@ msgstr ""
 
 #: src/session/components/outer-header/overflow/trim-recording.tsx
 msgid "{minutes} min"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "{missingLabel} (unavailable)"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "{missingName} (unavailable)"
 msgstr ""
 
 #. placeholder {0}: formatLanguageList(unsupportedLanguages)
@@ -281,6 +301,14 @@ msgstr ""
 
 #: src/automations/starters.tsx
 msgid "A Slack message with the meeting title and recap."
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "A small, fast model keeps cleanup inside its few-second limit. Cleanup sends your words to the provider you pick here."
+msgstr ""
+
+#: src/settings/dictation.tsx
+msgid "A soft sound when Mirna starts listening and when it finishes."
 msgstr ""
 
 #: src/templates/template-sidebar.tsx
@@ -1075,6 +1103,10 @@ msgstr ""
 msgid "Capture your first conversation. Every collection starts somewhere."
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Casual"
+msgstr ""
+
 #: src/calendar/components/event-chip.tsx
 msgid "Change auto-add folder"
 msgstr ""
@@ -1182,6 +1214,14 @@ msgstr ""
 
 #: src/settings/automations/index.tsx
 msgid "Choose a Linear team first."
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Choose a model"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Choose a model. Until then, cleanup uses your main AI model."
 msgstr ""
 
 #: src/settings/automations/index.tsx
@@ -1316,6 +1356,14 @@ msgstr ""
 msgid "Cleaning up..."
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Cleanup matches how you write in each kind of app. Mirna reads which app you're typing into on this device; the app's name is never sent."
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Cleanup model"
+msgstr ""
+
 #: src/contacts/related-notes.tsx
 #: src/contacts/shared.tsx
 #: src/folders/sidebar.tsx
@@ -1361,10 +1409,6 @@ msgstr ""
 #: src/shared/open-note-dialog.tsx
 msgid "Close"
 msgstr ""
-
-#: src/changelog/index.tsx
-#~ msgid "Close changelog"
-#~ msgstr ""
 
 #: src/chat/components/toolbar-controls.tsx
 msgid "Close chat"
@@ -2331,12 +2375,16 @@ msgstr ""
 msgid "Dictation"
 msgstr ""
 
+#: src/dictation/error-notification.ts
+msgid "Dictation didn't finish"
+msgstr ""
+
 #: src/settings/dictation-shortcut.tsx
 msgid "Dictation shortcut"
 msgstr ""
 
 #: src/settings/dictation.tsx
-msgid "Dictation uses your microphone, transcription provider, languages, and dictionary. Temporary audio is deleted after transcription. Your last transcript stays in memory until dictation is disabled or Mirna closes."
+msgid "Dictation uses your microphone, speech model, languages, and dictionary. Temporary audio is deleted after transcription. Your last transcript stays in memory until dictation is disabled or Mirna closes."
 msgstr ""
 
 #: src/settings/dictation.tsx
@@ -2484,6 +2532,7 @@ msgstr ""
 
 #: src/contacts/details.tsx
 #: src/session-sharing/delivery-panel.tsx
+#: src/settings/dictation-engine.tsx
 #: src/settings/general/account-profile.tsx
 #: src/settings/team/index.tsx
 msgid "Email"
@@ -2654,6 +2703,10 @@ msgstr ""
 msgid "Everyone in the workspace"
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Everything else, including browsers and Mirna"
+msgstr ""
+
 #: src/templates/auto-format-examples-dialog.tsx
 msgid "Example summary"
 msgstr ""
@@ -2814,7 +2867,7 @@ msgid "Fix"
 msgstr ""
 
 #: src/settings/dictation-engine.tsx
-msgid "Fixes punctuation and filler words with your selected AI model. If it takes longer than a few seconds, your words are inserted as spoken."
+msgid "Fixes punctuation and filler words, and turns \"new line\", \"new paragraph\" and counted items into line breaks and lists, with your cleanup model. If it takes longer than a few seconds, your words are inserted as spoken."
 msgstr ""
 
 #: src/templates/template-icon-picker.tsx
@@ -2874,6 +2927,10 @@ msgstr ""
 
 #: src/settings/general/audio-settings.tsx
 msgid "Forever"
+msgstr ""
+
+#: src/settings/dictation-engine.tsx
+msgid "Formal"
 msgstr ""
 
 #: src/settings/general/billing.tsx
@@ -3766,6 +3823,10 @@ msgstr ""
 msgid "macOS couldn't add the camera: {extensionFailure}"
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Mail, Outlook, Spark, Superhuman"
+msgstr ""
+
 #: src/settings/general/main-language.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Main language"
@@ -3955,6 +4016,10 @@ msgstr ""
 
 #: src/composer/index.tsx
 msgid "Message Mirna"
+msgstr ""
+
+#: src/settings/dictation-engine.tsx
+msgid "Messages, WhatsApp, Telegram, Signal, Discord"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/export-modal.tsx
@@ -4316,10 +4381,6 @@ msgstr ""
 #: src/calendar/components/calendar-selection.tsx
 msgid "No calendars found"
 msgstr ""
-
-#: src/changelog/index.tsx
-#~ msgid "No changelog available for this version."
-#~ msgstr ""
 
 #: src/settings/automations/starter-config.tsx
 msgid "No channel selected yet."
@@ -4822,6 +4883,7 @@ msgid "Original offer: {amount} off your subscription after your friend's first 
 msgstr ""
 
 #: src/dictation/recovery.tsx
+#: src/settings/dictation-engine.tsx
 msgid "Other apps"
 msgstr ""
 
@@ -4978,6 +5040,10 @@ msgstr ""
 msgid "Personal email"
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Personal messages"
+msgstr ""
+
 #: src/crm/enrich-contact.tsx
 msgid "phone"
 msgstr ""
@@ -4987,6 +5053,10 @@ msgstr ""
 #: src/settings/phone/index.tsx
 #: src/sidebar/settings-nav-groups.ts
 msgid "Phone"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Pick a faster model for dictation than for meetings. Your own model file (BYO-model) can only be used as your main transcription model."
 msgstr ""
 
 #: src/services/camera-guidance.tsx
@@ -5015,6 +5085,10 @@ msgstr ""
 
 #: src/session/components/note-input/transcript/renderer/selection-menu.tsx
 msgid "Play from here"
+msgstr ""
+
+#: src/settings/dictation.tsx
+msgid "Play sounds"
 msgstr ""
 
 #: src/session/components/outer-header/overflow/trim-recording.tsx
@@ -5667,6 +5741,22 @@ msgstr ""
 msgid "Runs once the AI summary for the meeting is ready."
 msgstr ""
 
+#: src/settings/dictation-models.tsx
+msgid "Same as AI model"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Same as AI model ({main})"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Same as transcription"
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Same as transcription ({main})"
+msgstr ""
+
 #: src/settings/dictionary/index.tsx
 #: src/settings/sync/index.tsx
 #: src/templates/auto-form.tsx
@@ -6197,11 +6287,6 @@ msgstr ""
 msgid "Show pinyin"
 msgstr ""
 
-#: src/settings/general/app-settings.tsx
-#: src/sidebar/settings-nav-groups.ts
-#~ msgid "Show release notes"
-#~ msgstr ""
-
 #: src/main/windows-title-bar.tsx
 msgid "Show sidebar"
 msgstr ""
@@ -6419,6 +6504,10 @@ msgstr ""
 msgid "Slack recap"
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Slack, Teams, Zoom chat"
+msgstr ""
+
 #: src/templates/template-icon-picker.tsx
 msgid "Smileys & People"
 msgstr ""
@@ -6471,6 +6560,10 @@ msgstr ""
 
 #: src/settings/dictation.tsx
 msgid "Speak into the focused text field in your apps. Your transcript appears when you finish."
+msgstr ""
+
+#: src/settings/dictation-models.tsx
+msgid "Speech model"
 msgstr ""
 
 #: src/settings/general/storage/legacy-cleanup.tsx
@@ -7499,6 +7592,10 @@ msgstr ""
 msgid "Version history"
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Very casual"
+msgstr ""
+
 #: src/main/windows-title-bar.tsx
 #: src/settings/team/invitation-toast.tsx
 msgid "View"
@@ -7610,10 +7707,6 @@ msgid "What's new"
 msgstr ""
 
 #: src/changelog/index.tsx
-#~ msgid "What's new in {version}?"
-#~ msgstr ""
-
-#: src/changelog/index.tsx
 msgid "What's new in Mirna"
 msgstr ""
 
@@ -7661,6 +7754,10 @@ msgstr ""
 msgid "Words you fixed after dictating. Add them so dictation spells them right next time."
 msgstr ""
 
+#: src/settings/dictation-engine.tsx
+msgid "Work messages"
+msgstr ""
+
 #: src/task/tab-content.tsx
 msgid "Work on this task"
 msgstr ""
@@ -7695,6 +7792,10 @@ msgstr ""
 
 #: src/automations/starters.tsx
 msgid "Write to a folder"
+msgstr ""
+
+#: src/settings/dictation-engine.tsx
+msgid "Writing style"
 msgstr ""
 
 #: src/sidebar/timeline/item.tsx
