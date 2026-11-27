@@ -215,10 +215,12 @@ function NewLessonDialog() {
   const chosenLearning =
     learning ??
     (isLanguage
-      ? (known && lessonSubject(known) === "language" ? known.learning : "")
-      : (known && lessonSubject(known) !== "language"
-          ? known.learning
-          : (known?.explainIn ?? appLanguage(locale))));
+      ? known && lessonSubject(known) === "language"
+        ? known.learning
+        : ""
+      : known && lessonSubject(known) !== "language"
+        ? known.learning
+        : (known?.explainIn ?? appLanguage(locale)));
   const chosenExplainIn = isLanguage
     ? (explainIn ?? known?.explainIn ?? appLanguage(locale))
     : chosenLearning;
@@ -311,7 +313,12 @@ function NewLessonDialog() {
     "word-by-word": t`Word by word`,
     "pinyin-only": t`Pinyin only`,
   };
-  const kinds: { value: LessonSubject; name: string; what: string; for: string }[] = [
+  const kinds: {
+    value: LessonSubject;
+    name: string;
+    what: string;
+    for: string;
+  }[] = [
     {
       value: "language",
       name: t`Language`,
@@ -343,9 +350,7 @@ function NewLessonDialog() {
     problems: [t`Practice problems`, t`From class and the homework`],
   };
   const apps = callApps.data ?? [];
-  const appNames = apps
-    .map((app) => app.name.replace(/^‎/, ""))
-    .join(", ");
+  const appNames = apps.map((app) => app.name.replace(/^‎/, "")).join(", ");
   const field = "flex flex-col gap-1.5 text-sm font-medium";
   const select =
     "bg-background h-10 rounded-lg border px-3 text-sm font-normal";
@@ -450,7 +455,13 @@ function NewLessonDialog() {
                   autoFocus
                   value={newCourse}
                   onChange={(event) => setNewCourse(event.target.value)}
-                  placeholder={t`Mandarin with my teacher`}
+                  placeholder={
+                    kind === "language"
+                      ? t`Mandarin with my teacher`
+                      : kind === "maths"
+                        ? t`Statistics 101`
+                        : t`Law evening class`
+                  }
                   className={select}
                 />
               </label>

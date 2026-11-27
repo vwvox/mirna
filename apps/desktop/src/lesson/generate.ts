@@ -14,7 +14,7 @@ import {
   readingRule,
 } from "./languages";
 import { renameLessonWithTopic } from "./queries";
-import { type LessonRoleOf, lessonRoles } from "./roles";
+import { type LessonRoleOf, lessonRoles, speakingMs } from "./roles";
 import {
   lessonSubject,
   parseLessonMarks,
@@ -41,7 +41,7 @@ import { loadSessionContentSnapshot } from "~/session/content-queries";
 
 const MAX_TRANSCRIPT_CHARS = 160_000;
 const PROMPT_VERSION = "lesson-sheet-v4";
-const SUBJECT_PROMPT_VERSION = "subject-sheet-v1";
+const SUBJECT_PROMPT_VERSION = "subject-sheet-v2";
 
 const clock = z
   .string()
@@ -236,7 +236,7 @@ export function computeTalkStats(
   let studentMs = 0;
   let teacherMs = 0;
   for (const segment of segments) {
-    const duration = Math.max(0, segment.end_ms - segment.start_ms);
+    const duration = speakingMs(segment);
     const role = roleOf(segment);
     if (role === "student") studentMs += duration;
     else if (role === "teacher") teacherMs += duration;

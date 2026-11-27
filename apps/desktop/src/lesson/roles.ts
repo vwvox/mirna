@@ -1,6 +1,20 @@
 import type { RenderedTranscriptSegment } from "@anlg/plugin-transcription";
 
 export type LessonRole = "student" | "teacher";
+
+/** Longest a single recognised word can take; anything longer is silence. */
+const MAX_WORD_MS = 3000;
+
+/**
+ * How long a segment's speaker actually talked. Speech recognition sometimes
+ * hears one word ("so") in a stretch of silence and gives it the whole
+ * stretch, so a segment counts at most MAX_WORD_MS per word.
+ */
+export function speakingMs(segment: RenderedTranscriptSegment): number {
+  const span = Math.max(0, segment.end_ms - segment.start_ms);
+  const words = segment.words.length;
+  return words > 0 ? Math.min(span, words * MAX_WORD_MS) : span;
+}
 export type LessonRoleOf = (
   segment: RenderedTranscriptSegment,
 ) => LessonRole | null;

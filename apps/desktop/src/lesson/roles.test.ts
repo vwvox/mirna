@@ -24,6 +24,10 @@ function said(
   },
 ): RenderedTranscriptSegment {
   const channel = key.channel ?? "DirectMic";
+  const pieces = /\p{Script=Han}/u.test(text)
+    ? Array.from(text)
+    : text.split(" ");
+  const step = (endMs - startMs) / pieces.length;
   return {
     id: `${startMs}`,
     key: {
@@ -35,15 +39,16 @@ function said(
     start_ms: startMs,
     end_ms: endMs,
     text,
-    words: [
-      {
-        text,
-        start_ms: startMs,
-        end_ms: endMs,
-        channel,
-        is_final: true,
-      } as RenderedTranscriptSegment["words"][number],
-    ],
+    words: pieces.map(
+      (piece, index) =>
+        ({
+          text: piece,
+          start_ms: startMs + index * step,
+          end_ms: startMs + (index + 1) * step,
+          channel,
+          is_final: true,
+        }) as RenderedTranscriptSegment["words"][number],
+    ),
   };
 }
 
@@ -56,6 +61,19 @@ describe("who is the student and who the teacher", () => {
     expect(computeTalkStats(segments, lessonRoles(segments, ME))).toEqual({
       studentMs: 1_000,
       teacherMs: 3_000,
+    });
+  });
+
+  it("doesn't count a word heard in a long silence as the whole silence", () => {
+    const segments = [
+      said("so", 25_000, 49_900, { channel: "DirectMic" }),
+      said("the oil and water don't mix", 25_000, 27_000, {
+        channel: "RemoteParty",
+      }),
+    ];
+    expect(computeTalkStats(segments, lessonRoles(segments, ME))).toEqual({
+      studentMs: 3_000,
+      teacherMs: 2_000,
     });
   });
 

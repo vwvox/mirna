@@ -189,14 +189,14 @@ The transcript comes from speech recognition, so expect misheard words; prefer w
 Lines are "[time] Speaker: text". "Teacher" is the teacher, "Student" is the student.
 Write everything in CLASS_LANGUAGE. Only include what actually happened in this class: every part may be empty, and an empty part is better than an invented one.
 - topic: what the class covered in a few words.
-- keyTerms: the terms the class defined or relied on, at most 30, most important first, each defined as the teacher put it.
-- ideas: the main ideas or arguments, at most 6, each with the example the teacher used.
-- sources: people, books, cases, laws and studies the class cited, with why each came up.
+- keyTerms: the terms the class defined or relied on, at most 30, most important first, each defined as the teacher put it. Not things that only came up in passing.
+- ideas: the main ideas or arguments, at most 6, each with the example the teacher used. Leave out jokes, asides and small talk: three real ideas beat six thin ones.
+- sources: people, books, cases, laws and studies the class cited, with why each came up. Give names in full when the class did.
 - methods: only when the class walked through a method, a procedure or a recipe step by step. Keep quantities, temperatures and times exactly as said.
 - checkYourself: 3 to 6 questions a student could test themselves with, each answered from the class.
 - formulas: every formula used, in LaTeX, with what each symbol means and when to use it. Formulas are mostly written, not said, so rebuild them carefully from what was said. When the student's notes have a formula between $ signs, use theirs and set from to "notes".
 - workedExamples: problems solved in class, with each step as done in class. Put maths between $ signs.
-- slips: mistakes made in class, by the student or others, with the right version.
+- slips: mistakes people made in class, by the student or others, with the right version. Not misheard words in this transcript.
 - problems: problems set in class for practice, with their steps and answer if the class gave them.
 - homework: only tasks the teacher actually set.
 - markAnswers: one entry for every mark id given, saying what happened around that moment.EMPHASIS`;

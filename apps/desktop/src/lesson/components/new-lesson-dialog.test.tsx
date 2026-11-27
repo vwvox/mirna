@@ -209,4 +209,17 @@ describe("new lesson dialog", () => {
       }),
     );
   });
+
+  it("suggests a course name that fits the kind of class", async () => {
+    mocks.lastLessons = [];
+    mocks.folders = [];
+    mocks.lastSettings = null;
+    renderHost();
+    act(() => openMakeLessonDialog("old-note", ""));
+    await screen.findByPlaceholderText("Mandarin with my teacher");
+    fireEvent.click(screen.getByRole("radio", { name: /Topic/ }));
+    expect(screen.getByPlaceholderText("Law evening class")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /Maths/ }));
+    expect(screen.getByPlaceholderText("Statistics 101")).toBeTruthy();
+  });
 });

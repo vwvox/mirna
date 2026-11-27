@@ -1,7 +1,7 @@
 import type { RenderedTranscriptSegment } from "@anlg/plugin-transcription";
 
 import { languageFacts, scriptPattern } from "./languages";
-import { type LessonRoleOf, lessonRoles } from "./roles";
+import { type LessonRoleOf, lessonRoles, speakingMs } from "./roles";
 
 export type LessonLanguageStats = {
   /** Time with speech in it that could be told apart. */
@@ -62,7 +62,8 @@ function splitByScript(
   let learning = 0;
   let other = 0;
   for (const word of text.match(WORD) ?? []) {
-    if (pattern.test(word)) learning += Math.max(1, Math.round(word.length / 3));
+    if (pattern.test(word))
+      learning += Math.max(1, Math.round(word.length / 3));
     else other += Math.max(1, word.match(VOWELS)?.length ?? 0);
   }
   return { learning, other };
@@ -123,10 +124,7 @@ const MIN_TOLD_APART = 0.25;
 export function computeLanguageStats(
   segments: RenderedTranscriptSegment[],
   roleOf: LessonRoleOf = lessonRoles(segments, null),
-  {
-    learning,
-    explainIn,
-  }: { learning: string; explainIn: string } = {
+  { learning, explainIn }: { learning: string; explainIn: string } = {
     learning: "zh",
     explainIn: "en",
   },
@@ -146,7 +144,7 @@ export function computeLanguageStats(
   let inLanguageMs = 0;
   let studentInLanguageMs = 0;
   for (const segment of segments) {
-    const duration = Math.max(0, segment.end_ms - segment.start_ms);
+    const duration = speakingMs(segment);
     if (duration === 0 || !segment.text.trim()) continue;
     allMs += duration;
     const split = byScript

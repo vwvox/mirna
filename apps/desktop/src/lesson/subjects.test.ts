@@ -233,6 +233,8 @@ describe("subject sheet", () => {
     });
     expect(topic).toContain("a class on a topic");
     expect(topic).not.toContain("matter most");
+    expect(topic).toContain("Leave out jokes, asides and small talk");
+    expect(topic).toContain("Not misheard words in this transcript.");
   });
 
   it("maps the AI's answer, keeping formulas bare and every empty part empty", () => {
