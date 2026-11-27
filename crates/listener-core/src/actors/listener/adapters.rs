@@ -121,7 +121,7 @@ pub(super) async fn spawn_rx_task(
             )));
         }
 
-        if !model.supports_languages(&args.languages) {
+        if !model.supports_live_languages(&args.languages) {
             return Err(actor_error(format!(
                 "unsupported_language: {} does not support all requested spoken languages ({})",
                 model.as_str(),

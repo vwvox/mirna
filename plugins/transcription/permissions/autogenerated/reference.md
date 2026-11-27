@@ -53,6 +53,7 @@ Default permissions for the plugin
 - `allow-parse-subtitle`
 - `allow-export-to-vtt`
 - `allow-is-supported-languages-batch`
+- `allow-detect-live-language-mismatch`
 - `allow-suggest-providers-for-languages-batch`
 - `allow-list-documented-language-codes-batch`
 - `allow-refine-batch-transcript`
@@ -275,6 +276,32 @@ Enables the delete_transcribed_capture_audio command without any pre-configured 
 <td>
 
 Denies the delete_transcribed_capture_audio command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:allow-detect-live-language-mismatch`
+
+</td>
+<td>
+
+Enables the detect_live_language_mismatch command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`transcription:deny-detect-live-language-mismatch`
+
+</td>
+<td>
+
+Denies the detect_live_language_mismatch command without any pre-configured scope.
 
 </td>
 </tr>

@@ -10,34 +10,10 @@ type LiveTranscriptionConfig = {
   transcriptionMode?: TranscriptionMode;
 };
 
-const SONIQO_PARAKEET_BATCH_LANGUAGE_CODES = new Set([
-  "bg",
-  "cs",
-  "da",
-  "de",
-  "el",
-  "en",
-  "es",
-  "et",
-  "fi",
-  "fr",
-  "hr",
-  "hu",
-  "it",
-  "lt",
-  "lv",
-  "mt",
-  "nl",
-  "pl",
-  "pt",
-  "ro",
-  "ru",
-  "sk",
-  "sl",
-  "sv",
-  "uk",
-]);
-const SONIQO_STREAMING_LANGUAGE_CODES = SONIQO_PARAKEET_BATCH_LANGUAGE_CODES;
+// Live transcription runs Parakeet EOU-120M, whose vocabulary is English only.
+// Recordings in other languages are transcribed afterwards by Parakeet TDT v3
+// or Qwen3-ASR.
+const SONIQO_STREAMING_LANGUAGE_CODES = new Set(["en"]);
 
 // Base codes of SpeechTranscriber.supportedLocales on macOS 26 (30 regional
 // variants across these 10 languages).
@@ -372,6 +348,14 @@ export function getOnDeviceTranscriptionConfig(
   );
 
   if (languages.length > 0 && supportedLiveLanguages.length === 0) {
+    // English captions of another language are noise; transcribe the
+    // recording once it stops instead.
+    if (model === "soniqo-parakeet-streaming") {
+      return {
+        languages: [...languages],
+        transcriptionMode: "batch",
+      };
+    }
     return {
       languages: [],
       transcriptionMode: "live",

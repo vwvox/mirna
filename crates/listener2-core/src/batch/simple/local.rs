@@ -733,6 +733,23 @@ fn route_soniqo_recording(
     Ok(routing)
 }
 
+/// The first language, across the recording's channels, that the English-only
+/// live model could not have transcribed. None when every channel is English
+/// or had too little speech to tell.
+pub(in crate::batch) fn recording_non_english_language(
+    file_path: &str,
+) -> std::result::Result<Option<anlg_transcribe_soniqo::LanguagePrediction>, String> {
+    let source = anlg_audio_utils::source_from_path(file_path).map_err(|e| e.to_string())?;
+    let channel_files = resample_audio_to_channel_files_until(file_path, source, || false)?;
+    Ok(channel_files
+        .iter()
+        .enumerate()
+        .find_map(|(channel_index, channel)| {
+            let predictions = identify_soniqo_channel_language(channel_index, channel);
+            anlg_transcribe_soniqo::non_english_language(&predictions).cloned()
+        }))
+}
+
 /// The channel's top language guesses, likeliest first, or none when it had
 /// too little speech to tell.
 fn identify_soniqo_channel_language(

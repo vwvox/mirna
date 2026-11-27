@@ -54,6 +54,55 @@ fn language_support_per_model() {
 }
 
 #[test]
+fn live_model_only_understands_english() {
+    let english = "en-US".parse().unwrap();
+    let portuguese = "pt".parse().unwrap();
+
+    assert!(SoniqoModel::ParakeetStreaming.supports_live_language(&english));
+    assert!(!SoniqoModel::ParakeetStreaming.supports_live_language(&portuguese));
+    assert!(SoniqoModel::ParakeetStreaming.supports_live_languages(&[]));
+    assert!(SoniqoModel::ParakeetStreaming.supports_live_languages(&[english.clone()]));
+    assert!(
+        !SoniqoModel::ParakeetStreaming
+            .supports_live_languages(&[english.clone(), portuguese.clone()])
+    );
+    assert!(SoniqoModel::ParakeetStreaming.live_is_english_only());
+    assert!(!SoniqoModel::ParakeetBatch.supports_live_languages(&[english]));
+    // Recordings made with the live model are transcribed by Parakeet TDT v3.
+    assert!(SoniqoModel::ParakeetStreaming.supports_language(&portuguese));
+}
+
+fn prediction(code: &str, probability: f32) -> LanguagePrediction {
+    LanguagePrediction {
+        code: code.to_string(),
+        probability,
+    }
+}
+
+#[test]
+fn non_english_language_finds_recordings_the_live_model_cannot_transcribe() {
+    let portuguese = [prediction("pt", 1.0), prediction("it", 0.0)];
+    let english = [prediction("en", 0.93), prediction("nl", 0.04)];
+    let mixed_lesson = [prediction("en", 0.7), prediction("zh", 0.25)];
+    let unsure = [prediction("pt", 0.3), prediction("en", 0.1)];
+
+    assert_eq!(
+        non_english_language(&portuguese).map(|p| p.code.as_str()),
+        Some("pt")
+    );
+    assert_eq!(non_english_language(&english), None);
+    assert_eq!(
+        non_english_language(&mixed_lesson).map(|p| p.code.as_str()),
+        Some("zh")
+    );
+    assert_eq!(
+        non_english_language(&unsure).map(|p| p.code.as_str()),
+        Some("pt")
+    );
+    assert_eq!(non_english_language(&[]), None);
+}
+
+#[test]
 fn live_support_is_gated_by_platform() {
     assert_eq!(
         SoniqoModel::ParakeetStreaming.supports_live_on_current_platform(),

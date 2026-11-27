@@ -455,6 +455,16 @@ describe("getPostCaptureAction", () => {
       },
       expected: ["settled_speaker_diarization"],
     },
+    {
+      name: "reports a recording in a language the live model cannot transcribe",
+      input: {
+        audioPath: "/tmp/session.wav" as string | null,
+        liveTranscriptionActive: true,
+        needsBatchRepair: false,
+        liveLanguageUnsupported: true,
+      },
+      expected: ["live_language_unsupported"],
+    },
   ])("$name", ({ input, expected }) => {
     expect(getPostCaptureRepairReasons(input)).toEqual(expected);
   });
@@ -498,6 +508,28 @@ describe("getPostCaptureAction", () => {
         liveTranscriptionActive: true,
         needsBatchRepair: false,
         refineSpeakerDiarization: true,
+      },
+      canBatch: false,
+      expected: "enhance_only",
+    },
+    {
+      name: "retranscribes a live transcript of a language the live model cannot transcribe",
+      input: {
+        audioPath: "/tmp/session.wav" as string | null,
+        liveTranscriptionActive: true,
+        needsBatchRepair: false,
+        liveLanguageUnsupported: true,
+      },
+      canBatch: true,
+      expected: "batch_then_enhance",
+    },
+    {
+      name: "keeps the live transcript of another language when the full pass cannot run",
+      input: {
+        audioPath: "/tmp/session.wav" as string | null,
+        liveTranscriptionActive: true,
+        needsBatchRepair: false,
+        liveLanguageUnsupported: true,
       },
       canBatch: false,
       expected: "enhance_only",

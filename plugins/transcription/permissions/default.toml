@@ -50,6 +50,7 @@ permissions = [
     "allow-parse-subtitle",
     "allow-export-to-vtt",
     "allow-is-supported-languages-batch",
+    "allow-detect-live-language-mismatch",
     "allow-suggest-providers-for-languages-batch",
     "allow-list-documented-language-codes-batch",
     "allow-refine-batch-transcript",

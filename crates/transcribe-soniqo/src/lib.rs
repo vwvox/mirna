@@ -44,6 +44,24 @@ pub fn identify_language(samples: &[f32]) -> Result<Vec<LanguagePrediction>> {
     platform::identify_language(samples)
 }
 
+/// The language that the English-only live model could not have transcribed:
+/// the top guess when it isn't English and is likely enough, otherwise another
+/// language mixed in behind English with a large enough share. Same thresholds
+/// as `routing_language`.
+pub fn non_english_language(predictions: &[LanguagePrediction]) -> Option<&LanguagePrediction> {
+    let top = predictions.first()?;
+    if top.code != "en" && top.probability >= LANGUAGE_ROUTING_MIN_PROBABILITY {
+        return Some(top);
+    }
+    predictions
+        .iter()
+        .take(LANGUAGE_ROUTING_GUESSES)
+        .find(|prediction| {
+            prediction.code != "en"
+                && prediction.probability >= LANGUAGE_ROUTING_MIXED_MIN_PROBABILITY
+        })
+}
+
 pub fn parakeet_knows_language(code: &str) -> bool {
     anlg_language::PARAKEET_TDT_V3_LANGUAGE_CODES.contains(&code)
 }

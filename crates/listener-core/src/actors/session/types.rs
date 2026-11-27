@@ -69,7 +69,9 @@ pub fn resolve_transcription_mode(
     }
 
     if let Some(model) = anlg_transcribe_soniqo::local_model_from_request(base_url, model) {
-        return if model.supports_live_on_current_platform() && model.supports_languages(languages) {
+        return if model.supports_live_on_current_platform()
+            && model.supports_live_languages(languages)
+        {
             TranscriptionMode::Live
         } else {
             TranscriptionMode::Batch

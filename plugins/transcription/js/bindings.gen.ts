@@ -714,6 +714,28 @@ export const commands = {
       else return { status: "error", error: e as any };
     }
   },
+  /**
+   * The language a live-transcribed recording was really in, when the live
+   * model only understands English and the recording wasn't English.
+   */
+  async detectLiveLanguageMismatch(
+    provider: string,
+    model: string | null,
+    audioPath: string,
+  ): Promise<Result<string | null, string>> {
+    try {
+      return {
+        status: "ok",
+        data: await TAURI_INVOKE(
+          "plugin:transcription|detect_live_language_mismatch",
+          { provider, model, audioPath },
+        ),
+      };
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      else return { status: "error", error: e as any };
+    }
+  },
   async suggestProvidersForLanguagesBatch(
     languages: string[],
   ): Promise<Result<string[], string>> {

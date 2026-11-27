@@ -99,6 +99,24 @@ pub async fn is_supported_languages_batch<R: tauri::Runtime>(
     core::is_supported_languages_batch(&provider, model.as_deref(), &languages_parsed)
 }
 
+/// The language a live-transcribed recording was really in, when the live
+/// model only understands English and the recording wasn't English.
+#[tauri::command]
+#[specta::specta]
+pub async fn detect_live_language_mismatch<R: tauri::Runtime>(
+    _app: tauri::AppHandle<R>,
+    provider: String,
+    model: Option<String>,
+    audio_path: String,
+) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        core::live_language_mismatch(&provider, model.as_deref(), &audio_path)
+            .map(|language| language.map(|language| language.code))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn suggest_providers_for_languages_batch<R: tauri::Runtime>(

@@ -190,6 +190,26 @@ impl SoniqoModel {
             .all(|language| self.supports_language(language))
     }
 
+    /// Live transcription runs Parakeet EOU-120M, whose vocabulary is English
+    /// only. Files recorded with it are transcribed by Parakeet TDT v3, which
+    /// `supports_language` describes.
+    pub fn supports_live_language(self, language: &anlg_language::Language) -> bool {
+        self.supports_live() && language.iso639_code() == "en"
+    }
+
+    pub fn supports_live_languages(self, languages: &[anlg_language::Language]) -> bool {
+        self.supports_live()
+            && languages
+                .iter()
+                .all(|language| self.supports_live_language(language))
+    }
+
+    /// Whether the live model can only understand English, so a recording in
+    /// another language needs a full transcription pass after it stops.
+    pub const fn live_is_english_only(self) -> bool {
+        matches!(self, Self::ParakeetStreaming)
+    }
+
     fn matches_identifier(self, value: &str) -> bool {
         value == self.as_str()
             || value == self.repo()

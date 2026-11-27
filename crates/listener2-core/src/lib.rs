@@ -6,7 +6,7 @@ mod subtitle;
 
 pub use batch::{
     BatchParams, BatchProvider, BatchRunMode, BatchRunOutput, KnownSpeaker,
-    expects_progressive_batch, run_batch, uses_local_diarization,
+    expects_progressive_batch, live_language_mismatch, run_batch, uses_local_diarization,
 };
 pub use error::*;
 pub use events::*;
@@ -36,7 +36,9 @@ pub fn is_supported_languages_live(
             .parse::<anlg_transcribe_soniqo::SoniqoModel>()
             .map_err(|e| e.to_string())?;
 
-        return Ok(model.supports_live_on_current_platform() && model.supports_languages(languages));
+        return Ok(
+            model.supports_live_on_current_platform() && model.supports_live_languages(languages)
+        );
     }
 
     if provider == "apple-speech" {
@@ -53,9 +55,8 @@ pub fn is_supported_languages_live(
         && model != "cloud"
     {
         if let Ok(model) = model.parse::<anlg_transcribe_soniqo::SoniqoModel>() {
-            return Ok(
-                model.supports_live_on_current_platform() && model.supports_languages(languages)
-            );
+            return Ok(model.supports_live_on_current_platform()
+                && model.supports_live_languages(languages));
         }
 
         if let Ok(model) = model.parse::<anlg_transcribe_speechanalyzer::AppleSpeechModel>() {
@@ -227,6 +228,8 @@ mod tests {
     fn batch_language_support_by_provider_and_model() {
         let cases: &[(&str, &str, &[&str], bool)] = &[
             ("soniqo", "soniqo-parakeet-batch", &["fr"], true),
+            // Live recordings are transcribed afterwards by Parakeet TDT v3.
+            ("soniqo", "soniqo-parakeet-streaming", &["pt"], true),
             ("anarlog", "soniqo-parakeet-batch", &["ko"], false),
             ("soniqo", "soniqo-omnilingual", &["fr"], true),
             ("anarlog", "cloud", &["fr"], true),
@@ -251,10 +254,19 @@ mod tests {
     fn live_language_support_by_provider_and_model() {
         let cases: &[(&str, &str, &[&str], bool)] = &[
             ("anarlog", "soniqo-parakeet-streaming", &["ko"], false),
+            // The live model's vocabulary is English only.
+            ("anarlog", "soniqo-parakeet-streaming", &["fr"], false),
+            ("soniqo", "soniqo-parakeet-streaming", &["pt"], false),
             (
                 "anarlog",
                 "soniqo-parakeet-streaming",
-                &["fr"],
+                &["en"],
+                cfg!(all(target_os = "macos", target_arch = "aarch64")),
+            ),
+            (
+                "soniqo",
+                "soniqo-parakeet-streaming",
+                &["en-IE"],
                 cfg!(all(target_os = "macos", target_arch = "aarch64")),
             ),
             ("anarlog", "cloud", &["ko"], true),

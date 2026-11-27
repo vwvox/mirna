@@ -17,7 +17,10 @@ use consolidate::consolidate_hosted_speakers;
 pub use diarize::KnownSpeaker;
 use diarize::apply_local_diarization;
 use progressive::run_progressive_batch_session;
-use simple::{run_apple_speech_batch, run_direct_batch_for_adapter_kind, run_soniqo_batch};
+use simple::{
+    recording_non_english_language, run_apple_speech_batch, run_direct_batch_for_adapter_kind,
+    run_soniqo_batch,
+};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, strum::Display, strum::EnumString)]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -189,6 +192,28 @@ pub async fn run_batch(
     }
 
     result
+}
+
+/// When a recording was live-transcribed by a model that only understands
+/// English, the language it was actually in if that wasn't English, so the
+/// recording can get a full transcription pass instead of English guesses.
+pub fn live_language_mismatch(
+    provider: &str,
+    model: Option<&str>,
+    audio_path: &str,
+) -> std::result::Result<Option<anlg_transcribe_soniqo::LanguagePrediction>, String> {
+    let Some(model) =
+        model.and_then(|model| model.parse::<anlg_transcribe_soniqo::SoniqoModel>().ok())
+    else {
+        return Ok(None);
+    };
+    if !(provider == "soniqo" || crate::is_anarlog_provider(provider))
+        || !model.live_is_english_only()
+        || !model.is_available_on_current_platform()
+    {
+        return Ok(None);
+    }
+    recording_non_english_language(audio_path)
 }
 
 /// Whether this run transcribes on-device, in which case speaker labels come

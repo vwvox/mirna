@@ -135,13 +135,15 @@ type PostCaptureDetails = {
   needsBatchRepair: boolean;
   refineSpeakerDiarization?: boolean;
   transcriptWriteFailed?: boolean;
+  liveLanguageUnsupported?: boolean;
 };
 
 export type PostCaptureRepairReason =
   | "live_transcription_unavailable"
   | "live_stream_incomplete"
   | "settled_speaker_diarization"
-  | "transcript_persistence_failed";
+  | "transcript_persistence_failed"
+  | "live_language_unsupported";
 
 export function getPostCaptureRepairReasons(
   details: PostCaptureDetails,
@@ -159,6 +161,9 @@ export function getPostCaptureRepairReasons(
   if (details.transcriptWriteFailed) {
     reasons.push("transcript_persistence_failed");
   }
+  if (details.liveLanguageUnsupported) {
+    reasons.push("live_language_unsupported");
+  }
   return reasons;
 }
 
@@ -171,7 +176,11 @@ export function getPostCaptureAction(
     !details.needsBatchRepair &&
     !details.transcriptWriteFailed;
 
-  if (liveTranscriptComplete && !details.refineSpeakerDiarization) {
+  if (
+    liveTranscriptComplete &&
+    !details.refineSpeakerDiarization &&
+    !details.liveLanguageUnsupported
+  ) {
     return "enhance_only" as const;
   }
 
@@ -308,6 +317,49 @@ export function useCaptureLifecycle(sessionId: string) {
       let batchFromRetainedAudio =
         retainAudio &&
         (requiresRetainedBatchAudio(provider, model) || postStopBatch);
+      let liveLanguageUnsupported = false;
+      // The live model may only understand English. A recording in another
+      // language gets the full-file pass instead of its English guesses.
+      const detectLiveLanguageUnsupported = async (
+        details: Parameters<OnStoppedCallback>[1],
+      ) => {
+        if (
+          !provider ||
+          !retainAudio ||
+          !details.audioPath ||
+          !details.liveTranscriptionActive ||
+          !canRunBatchRef.current
+        ) {
+          return false;
+        }
+        try {
+          const result = await transcriptionCommands.detectLiveLanguageMismatch(
+            provider,
+            model ?? null,
+            details.audioPath,
+          );
+          if (result.status === "error") {
+            console.warn(
+              "[listener] could not check the recording's language",
+              result.error,
+            );
+            return false;
+          }
+          if (result.data) {
+            console.info("[listener] recording is not in English", {
+              sessionId,
+              language: result.data,
+            });
+          }
+          return result.data !== null;
+        } catch (error) {
+          console.warn(
+            "[listener] could not check the recording's language",
+            error,
+          );
+          return false;
+        }
+      };
       const hasMultipleRemoteParticipants =
         new Set(
           participantHumanIds.filter(
@@ -970,6 +1022,7 @@ export function useCaptureLifecycle(sessionId: string) {
                 ...details,
                 refineSpeakerDiarization,
                 transcriptWriteFailed: Boolean(transcriptWriteError),
+                liveLanguageUnsupported,
               },
               canRunBatchRef.current &&
                 (!usesChunkedAudio || batchFromRetainedAudio),
@@ -980,6 +1033,7 @@ export function useCaptureLifecycle(sessionId: string) {
               ...details,
               refineSpeakerDiarization,
               transcriptWriteFailed: Boolean(transcriptWriteError),
+              liveLanguageUnsupported,
             });
 
         let batchCompleted = false;
@@ -1306,6 +1360,7 @@ export function useCaptureLifecycle(sessionId: string) {
       };
       const onStopped: OnStoppedCallback = async (_sessionId, details) => {
         usesChunkedAudio = details.chunkedAudio === true;
+        liveLanguageUnsupported = await detectLiveLanguageUnsupported(details);
         if (usesChunkedAudio) {
           await transcriptPersistence.flush();
           if (transcriptPersistence.hasPendingFailure())
@@ -1313,7 +1368,9 @@ export function useCaptureLifecycle(sessionId: string) {
           // The native stop is authoritative for whether live STT ran.
           if (!requiresRetainedBatchAudio(provider, model))
             batchFromRetainedAudio =
-              retainAudio && details.requestedLiveTranscription === false;
+              retainAudio &&
+              (details.requestedLiveTranscription === false ||
+                liveLanguageUnsupported);
           await repairChunksWithoutRecording(details.audioPath);
           const recovery = await stopAudioRecovery().catch((error) => {
             console.error(
@@ -1374,6 +1431,19 @@ export function useCaptureLifecycle(sessionId: string) {
           recoveryUnlisten.forEach((unlisten) => unlisten());
         }
         if (!retainAudio) details = { ...details, audioPath: null };
+        if (liveLanguageUnsupported) {
+          batchFromRetainedAudio = true;
+          try {
+            await persistTranscriptWrite(async () => {
+              await saveCaptureLifecycleMarker(await marker());
+            });
+          } catch (error) {
+            console.warn(
+              "[listener] failed to record the full transcription pass",
+              error,
+            );
+          }
+        }
         recoveryPending = false;
         markExpectedPostStopBatch(details);
         return finalizeStopped(details, true);
@@ -1388,6 +1458,7 @@ export function useCaptureLifecycle(sessionId: string) {
           canRunBatchRef.current &&
           (!details.liveTranscriptionActive ||
             details.needsBatchRepair ||
+            liveLanguageUnsupported ||
             shouldRefineSpeakerDiarization())
         ) {
           updateBatchTranscriptionPending(true);

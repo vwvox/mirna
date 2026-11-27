@@ -52,13 +52,18 @@ describe("getOnDeviceTranscriptionMode", () => {
     { model: "soniqo-qwen3-small", languages: undefined, expected: "batch" },
     {
       model: "soniqo-parakeet-streaming",
-      languages: ["ko"],
+      languages: ["en"],
       expected: "live",
     },
     {
       model: "soniqo-parakeet-streaming",
-      languages: ["de"],
-      expected: "live",
+      languages: ["ko"],
+      expected: "batch",
+    },
+    {
+      model: "soniqo-parakeet-streaming",
+      languages: ["pt"],
+      expected: "batch",
     },
   ] as const)(
     "returns $expected for $model with $languages",
@@ -352,17 +357,17 @@ describe("getOnDeviceTranscriptionConfig", () => {
     {
       model: "soniqo-parakeet-streaming",
       languages: ["de", "en"],
-      expected: { languages: ["de"], transcriptionMode: "live" },
+      expected: { languages: ["en"], transcriptionMode: "live" },
     },
     {
       model: "soniqo-parakeet-streaming",
       languages: ["ko"],
-      expected: { languages: [], transcriptionMode: "live" },
+      expected: { languages: ["ko"], transcriptionMode: "batch" },
     },
     {
       model: "soniqo-parakeet-streaming",
-      languages: ["de"],
-      expected: { languages: ["de"], transcriptionMode: "live" },
+      languages: ["pt"],
+      expected: { languages: ["pt"], transcriptionMode: "batch" },
     },
   ])(
     "$model with $languages -> $expected",

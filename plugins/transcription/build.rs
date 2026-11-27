@@ -48,6 +48,7 @@ const COMMANDS: &[&str] = &[
     "parse_subtitle",
     "export_to_vtt",
     "is_supported_languages_batch",
+    "detect_live_language_mismatch",
     "suggest_providers_for_languages_batch",
     "list_documented_language_codes_batch",
     "refine_batch_transcript",
