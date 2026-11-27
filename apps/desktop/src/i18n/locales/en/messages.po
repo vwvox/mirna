@@ -521,6 +521,10 @@ msgstr "4th tone"
 msgid "5 minutes"
 msgstr "5 minutes"
 
+#: src/lesson/review/review-player.tsx
+msgid "5 more minutes"
+msgstr "5 more minutes"
+
 #: src/session/components/outer-header/overflow/transcribe-again.tsx
 msgid "52 languages, including Chinese."
 msgstr "52 languages, including Chinese."
@@ -3065,6 +3069,10 @@ msgstr "Done"
 #: src/lesson/review/review-player.tsx
 msgid "Done in {minutes} min {rest} s. {right} of {total} right."
 msgstr "Done in {minutes} min {rest} s. {right} of {total} right."
+
+#: src/lesson/review/review-player.tsx
+msgid "Done in {rest} s. {right} of {total} right."
+msgstr "Done in {rest} s. {right} of {total} right."
 
 #. placeholder {0}: item.text
 #: src/lesson/components/course-panel.tsx
@@ -6630,8 +6638,8 @@ msgid "Play step {0}"
 msgstr "Play step {0}"
 
 #: src/lesson/review/review-player.tsx
-msgid "Play the 10-minute review"
-msgstr "Play the 10-minute review"
+#~ msgid "Play the 10-minute review"
+#~ msgstr "Play the 10-minute review"
 
 #: src/session/components/outer-header/overflow/trim-recording.tsx
 msgid "Play the 5 s before the end"
