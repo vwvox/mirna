@@ -220,6 +220,29 @@ const practiceDocumentSchema = z.object({
     .array(z.object({ tone: z.number(), ok: z.boolean(), at: z.string() }))
     .optional()
     .catch(undefined),
+  reviews: z
+    .array(
+      z.object({
+        id: z.string(),
+        startedAt: z.string(),
+        endedAt: z.string(),
+        length: z.union([z.literal(5), z.literal(10)]),
+        device: z.enum(["mac", "phone"]),
+        right: z.number(),
+        total: z.number(),
+        results: z
+          .array(
+            z.object({
+              pieceId: z.string(),
+              kind: z.string(),
+              outcome: z.enum(["missed", "shaky", "knew"]),
+            }),
+          )
+          .catch([]),
+      }),
+    )
+    .optional()
+    .catch(undefined),
 });
 
 export function parseLessonPractice(

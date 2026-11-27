@@ -75,6 +75,10 @@ export function requestLessonSheet(
       modelName: modelNameOf(model),
     });
     setStatus(sessionId, null);
+    // The review is made from the sheet, so it follows it.
+    void import("./review/auto").then(({ requestReviewPlan }) =>
+      requestReviewPlan(sessionId, model),
+    );
   })()
     .catch((error: unknown) => {
       console.error(

@@ -48,6 +48,17 @@ function lessonTranscriptQuery(sessionId: string | null | undefined) {
   };
 }
 
+/** The same as `useLessonTranscript`, outside React. */
+export async function loadLessonTranscript(
+  sessionId: string,
+): Promise<{ segments: RenderedTranscriptSegment[]; roleOf: LessonRoleOf }> {
+  const data = await lessonTranscriptQuery(sessionId).queryFn();
+  return {
+    segments: data.segments,
+    roleOf: lessonRoles(data.segments, data.studentHumanId),
+  };
+}
+
 /**
  * The note's transcript as rendered segments, for finding where words were said,
  * with who is the student and who the teacher.

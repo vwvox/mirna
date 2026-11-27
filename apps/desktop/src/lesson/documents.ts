@@ -9,7 +9,8 @@ export type LessonDocumentKind =
   | "lesson_marks"
   | "lesson_sheet"
   | "lesson_practice"
-  | "lesson_fixes";
+  | "lesson_fixes"
+  | "lesson_review";
 
 type BodyRow = { body: string; source_hash: string };
 

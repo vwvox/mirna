@@ -29,6 +29,7 @@ import {
   useLessonSession,
   useLessonSheet,
 } from "../queries";
+import { LastReview, ReviewButton } from "../review/review-button";
 import { lessonSubject, parseLessonPractice } from "../schema";
 import type { LessonSettings, LessonSheet } from "../types";
 import { useLessonTranscript } from "../use-lesson-segments";
@@ -228,6 +229,7 @@ export function LessonStudySheet({ sessionId }: { sessionId: string }) {
                     </span>
                   ) : null}
                   <SubjectLine settings={settings} />
+                  <LastReview sessionId={sessionId} />
                   {sheetDocument?.model ? (
                     <span>
                       <Trans>
@@ -255,8 +257,13 @@ export function LessonStudySheet({ sessionId }: { sessionId: string }) {
                   <ArrowsClockwise className="size-3.5" />
                   <Trans>Write again</Trans>
                 </Button>
+                <ReviewButton
+                  sessionId={sessionId}
+                  title={session?.title || t`This lesson`}
+                />
                 <Button
                   size="sm"
+                  variant="outline"
                   onClick={() => setPractising(true)}
                   disabled={practice.due === 0}
                 >

@@ -247,6 +247,24 @@ export type LessonPracticeDocument = {
   skipped?: string[];
   /** Recent tone checks, one per syllable said, newest last. */
   toneChecks?: LessonToneCheck[];
+  /** Reviews played, on the Mac or the phone, oldest first. */
+  reviews?: LessonReviewRecord[];
+};
+
+/** A review once played, kept with the lesson's practice. */
+export type LessonReviewRecord = {
+  id: string;
+  startedAt: string;
+  endedAt: string;
+  length: 5 | 10;
+  device: "mac" | "phone";
+  right: number;
+  total: number;
+  results: {
+    pieceId: string;
+    kind: string;
+    outcome: "missed" | "shaky" | "knew";
+  }[];
 };
 
 export type LessonToneCheck = { tone: number; ok: boolean; at: string };
