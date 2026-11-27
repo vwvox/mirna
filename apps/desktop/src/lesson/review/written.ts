@@ -17,7 +17,7 @@ import type { ReviewFace } from "./types";
  * for a problem, a worked answer with one line made wrong. It only ever writes
  * from the lesson's own sheet, says where from, and never does the sums.
  */
-export const REVIEW_PROMPT_VERSION = "review-plan-v1";
+export const REVIEW_PROMPT_VERSION = "review-plan-v2";
 
 const WRITTEN_KINDS = [
   "contrast",
@@ -210,7 +210,7 @@ const KIND_LINES: Record<WrittenKind, string> = {
   apply_it:
     "- apply_it: a short new case, two to four sentences, that one idea or term from the class explains. Three options from the class's terms and ideas; exactly one fits.",
   sort_it:
-    "- sort_it: two or three groups taken from the class and four to eight short cards from the class that belong to them.",
+    "- sort_it: two or three groups taken from the class and four to eight short cards from the class that belong to them. A card never contains its group's name, or it sorts itself.",
   which_formula:
     "- which_formula: a short new situation where one of the class's formulas is the tool to use; give its id as formula.",
   twin_problem:
@@ -249,6 +249,24 @@ ${JSON.stringify(z.toJSONSchema(writtenReviewSchema))}`;
 
 function face(text: string): ReviewFace {
   return { text: inlineMathToText(text.trim()) };
+}
+
+const UNSPACED_SCRIPT =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u;
+
+/** Whether a card gives its group away by naming it, as 一碗汤面 does under 碗. */
+export function namesItsGroup(text: string, group: string | undefined) {
+  const name = group?.trim().toLowerCase();
+  if (!name) return false;
+  const card = text.toLowerCase();
+  // One character of Chinese is a whole word; one Latin letter is too short.
+  if (UNSPACED_SCRIPT.test(name)) return card.includes(name);
+  if (name.length < 2) return false;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`,
+    "u",
+  ).test(card);
 }
 
 function cleanList(values: string[]): string[] | null {
@@ -356,7 +374,9 @@ function toDraft(
           group: card.group,
           why: card.why.trim(),
         }))
-        .filter((card) => card.text);
+        .filter(
+          (card) => card.text && !namesItsGroup(card.text, groups[card.group]),
+        );
       if (cards.length < 4 || cards.length > 8) return null;
       if (cards.some((card) => card.group < 0 || card.group >= groups.length)) {
         return null;

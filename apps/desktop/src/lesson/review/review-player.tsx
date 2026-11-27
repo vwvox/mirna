@@ -18,6 +18,7 @@ import {
   useKindLabels,
 } from "./review-pieces";
 import {
+  morePieces,
   piecesFor,
   type ReviewClip,
   type ReviewLength,
@@ -43,21 +44,27 @@ export function ReviewPlayer({
   title,
   document,
   length,
+  extra = false,
   onClose,
-  onLength,
+  onMore,
 }: {
   sessionId: string;
   title: string;
   document: ReviewPlanDocument;
   length: ReviewLength;
+  /** "5 more minutes": the pieces the 5-minute review leaves out. */
+  extra?: boolean;
   onClose: () => void;
-  /** Play the other length, from the start. */
-  onLength: (length: ReviewLength) => void;
+  /** After a 5-minute review, go on with the pieces it left out. */
+  onMore: () => void;
 }) {
   const { t } = useLingui();
   const kindLabels = useKindLabels();
   const plan = document.plan;
-  const pieces = useMemo(() => piecesFor(plan, length), [plan, length]);
+  const pieces = useMemo(
+    () => (extra ? morePieces(plan) : piecesFor(plan, length)),
+    [extra, plan, length],
+  );
   const [index, setIndex] = useState(0);
   const [states, setStates] = useState<Record<string, PieceState>>({});
   const [results, setResults] = useState<Record<string, ReviewResult>>({});
@@ -256,6 +263,7 @@ export function ReviewPlayer({
         role="dialog"
         aria-modal="true"
         aria-label={t`Review of ${title}`}
+        data-escape-consumer=""
       >
         <header className="flex flex-wrap items-center gap-3.5 border-b border-[#344E40] bg-[#1C2D24] px-7 py-3">
           <button
@@ -271,7 +279,9 @@ export function ReviewPlayer({
               <Trans>Review · {title}</Trans>
             </b>
             <span className={cn(["text-xs", focus.muted])}>
-              {length === 5 ? (
+              {extra ? (
+                <Trans>5 more minutes</Trans>
+              ) : length === 5 ? (
                 <Trans>5 minutes</Trans>
               ) : (
                 <Trans>10 minutes</Trans>
@@ -416,10 +426,9 @@ export function ReviewPlayer({
               right={score.right}
               total={score.total}
               back={back}
-              length={length}
-              canGoLonger={length === 5 && plan.pieces.length > pieces.length}
+              moreLeft={!extra && length === 5 && morePieces(plan).length > 0}
               onClose={close}
-              onLonger={() => onLength(10)}
+              onMore={onMore}
             />
           )}
         </main>
@@ -488,9 +497,9 @@ function WrapUp({
   right,
   total,
   back,
-  canGoLonger,
+  moreLeft,
   onClose,
-  onLonger,
+  onMore,
 }: {
   title: string;
   seconds: number;
@@ -500,22 +509,28 @@ function WrapUp({
   right: number;
   total: number;
   back: string[];
-  length: ReviewLength;
-  canGoLonger: boolean;
+  moreLeft: boolean;
   onClose: () => void;
-  onLonger: () => void;
+  onMore: () => void;
 }) {
-  const minutes = Math.floor(seconds / 60);
-  const rest = Math.round(seconds % 60);
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
   return (
     <>
       <div className={cn(["text-sm font-semibold", focus.muted])}>
         <Trans>Wrap-up</Trans>
       </div>
       <h2 className="font-brand text-[28px] leading-tight font-medium">
-        <Trans>
-          Done in {minutes} min {rest} s. {right} of {total} right.
-        </Trans>
+        {minutes > 0 ? (
+          <Trans>
+            Done in {minutes} min {rest} s. {right} of {total} right.
+          </Trans>
+        ) : (
+          <Trans>
+            Done in {rest} s. {right} of {total} right.
+          </Trans>
+        )}
       </h2>
       <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
         <section className={cn([focus.card, "flex flex-col gap-2"])}>
@@ -589,13 +604,9 @@ function WrapUp({
             <button type="button" className={focus.quiet} onClick={onClose}>
               <Trans>Back to the study sheet</Trans>
             </button>
-            {canGoLonger ? (
-              <button
-                type="button"
-                className={focus.primary}
-                onClick={onLonger}
-              >
-                <Trans>Play the 10-minute review</Trans>
+            {moreLeft ? (
+              <button type="button" className={focus.primary} onClick={onMore}>
+                <Trans>5 more minutes</Trans>
               </button>
             ) : null}
           </div>

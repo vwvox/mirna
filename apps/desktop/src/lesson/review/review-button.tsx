@@ -9,7 +9,7 @@ import { useLessonDocument } from "../documents";
 import { useLessonSheet } from "../queries";
 import { parseLessonPractice } from "../schema";
 import { requestReviewPlan, useReviewPlanStatus } from "./auto";
-import { useReviewPlan } from "./document";
+import { useReviewPlanQuery } from "./document";
 import { ReviewPlayer } from "./review-player";
 import { piecesFor, type ReviewLength } from "./types";
 
@@ -25,19 +25,27 @@ export function ReviewButton({
 }) {
   const { t } = useLingui();
   const sheet = useLessonSheet(sessionId);
-  const document = useReviewPlan(sessionId);
+  const { data: document, isLoading: planLoading } =
+    useReviewPlanQuery(sessionId);
   const writing = useReviewPlanStatus((state) =>
     Boolean(state.bySession[sessionId]),
   );
   const model = useLanguageModel("enhance");
-  const [playing, setPlaying] = useState<ReviewLength | null>(null);
+  const [playing, setPlaying] = useState<{
+    length: ReviewLength;
+    extra: boolean;
+  } | null>(null);
   const hasSheet = Boolean(sheet);
   const hasPlan = Boolean(document);
 
-  // Lessons written up before reviews get theirs the first time they're opened.
+  // Lessons written up before reviews get theirs the first time they're
+  // opened. Only once the stored plan has loaded: asking while it loads would
+  // remake a plan that is there, with an AI call, whenever its inputs changed.
   useEffect(() => {
-    if (hasSheet && !hasPlan) void requestReviewPlan(sessionId, model);
-  }, [hasPlan, hasSheet, model, sessionId]);
+    if (hasSheet && !planLoading && !hasPlan) {
+      void requestReviewPlan(sessionId, model);
+    }
+  }, [hasPlan, hasSheet, model, planLoading, sessionId]);
 
   if (!sheet) return null;
   const short = document ? piecesFor(document.plan, 5) : [];
@@ -48,7 +56,7 @@ export function ReviewButton({
       <div className="flex items-center gap-1">
         <Button
           size="sm"
-          onClick={() => setPlaying(5)}
+          onClick={() => setPlaying({ length: 5, extra: false })}
           disabled={short.length === 0}
           title={
             short.length === 0
@@ -64,19 +72,24 @@ export function ReviewButton({
           <Trans>Review · 5 min</Trans>
         </Button>
         {long.length > short.length ? (
-          <Button size="sm" variant="outline" onClick={() => setPlaying(10)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setPlaying({ length: 10, extra: false })}
+          >
             <Trans>10 min</Trans>
           </Button>
         ) : null}
       </div>
       {playing && document ? (
         <ReviewPlayer
-          key={playing}
+          key={`${playing.length}:${playing.extra}`}
           sessionId={sessionId}
           title={title}
           document={document}
-          length={playing}
-          onLength={setPlaying}
+          length={playing.length}
+          extra={playing.extra}
+          onMore={() => setPlaying({ length: 5, extra: true })}
           onClose={() => setPlaying(null)}
         />
       ) : null}

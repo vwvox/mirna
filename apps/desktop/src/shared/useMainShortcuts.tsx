@@ -127,6 +127,10 @@ export function getEscapeShortcutContext(target: EventTarget | null) {
     hadEditorEscapeConsumer:
       fromProseMirrorEditor &&
       document.querySelector("[data-editor-escape-consumer]") !== null,
+    // A full-window overlay, like a lesson review, closes itself on Escape
+    // even when focus has fallen back to the page.
+    hadOverlayEscapeConsumer:
+      document.querySelector("[data-escape-consumer]") !== null,
     hadMeaningfulFocus: hasMeaningfulFocus(target),
   };
 }
@@ -139,6 +143,7 @@ export function shouldSkipEscapeShortcut(
     fromSessionSurface,
     fromTranscriptEditor,
     hadEditorEscapeConsumer,
+    hadOverlayEscapeConsumer,
     hadMeaningfulFocus,
   }: {
     fromProseMirrorEditor: boolean;
@@ -146,11 +151,16 @@ export function shouldSkipEscapeShortcut(
     fromSessionSurface: boolean;
     fromTranscriptEditor: boolean;
     hadEditorEscapeConsumer: boolean;
+    hadOverlayEscapeConsumer: boolean;
     hadMeaningfulFocus: boolean;
   },
 ) {
   if (!event.defaultPrevented) {
     return false;
+  }
+
+  if (hadOverlayEscapeConsumer) {
+    return true;
   }
 
   if (!hadMeaningfulFocus) {

@@ -1,4 +1,4 @@
-import { useLessonDocument } from "../documents";
+import { useLessonDocument, useLessonDocumentQuery } from "../documents";
 import type { ReviewPlanDocument } from "./types";
 
 /**
@@ -25,6 +25,15 @@ export function useReviewPlan(
   sessionId: string | null | undefined,
 ): ReviewPlanDocument | null {
   return useLessonDocument(
+    sessionId ?? "",
+    "lesson_review",
+    parseReviewPlanDocument,
+  );
+}
+
+/** The stored plan, and whether it is still loading. */
+export function useReviewPlanQuery(sessionId: string | null | undefined) {
+  return useLessonDocumentQuery(
     sessionId ?? "",
     "lesson_review",
     parseReviewPlanDocument,

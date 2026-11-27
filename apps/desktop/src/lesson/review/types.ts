@@ -213,6 +213,14 @@ export function piecesFor(
     : plan.pieces.filter((piece) => piece.core);
 }
 
+/**
+ * "5 more minutes" after a 5-minute review: only the pieces it left out, so
+ * nothing just answered comes round again (as on the phone).
+ */
+export function morePieces(plan: ReviewPlan): ReviewPiece[] {
+  return plan.pieces.filter((piece) => !piece.core);
+}
+
 export function reviewSeconds(pieces: ReviewPiece[]): number {
   return (
     pieces.reduce((total, piece) => total + piece.seconds, 0) + WRAP_UP_SECONDS

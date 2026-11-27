@@ -12,8 +12,8 @@ import {
 import { inlineMathToText, latexToText } from "./latex-text";
 import { assemblePlan } from "./plan";
 import { applyReviewRun, cardsOutcome, intoPractice } from "./results";
-import { piecesFor, reviewSeconds, type ReviewRun } from "./types";
-import { reviewMaterial, writtenDrafts } from "./written";
+import { morePieces, piecesFor, reviewSeconds, type ReviewRun } from "./types";
+import { namesItsGroup, reviewMaterial, writtenDrafts } from "./written";
 
 function sheetOf(partial: Partial<LessonSheet>): LessonSheet {
   return {
@@ -217,6 +217,79 @@ describe("a language review from the sheet alone", () => {
     expect(reviewSeconds(piecesFor(plan, 5))).toBeLessThanOrEqual(300);
     expect(reviewSeconds(piecesFor(plan, 10))).toBeLessThanOrEqual(600);
     expect(piecesFor(plan, 5).length).toBeGreaterThan(2);
+  });
+
+  it("goes on for 5 more minutes with only what the 5 minutes left out", () => {
+    const first = piecesFor(plan, 5).map((piece) => piece.id);
+    const more = morePieces(plan).map((piece) => piece.id);
+    expect(more.length).toBeGreaterThan(0);
+    expect(more.filter((id) => first.includes(id))).toEqual([]);
+    expect([...first, ...more].sort()).toEqual(
+      plan.pieces.map((piece) => piece.id).sort(),
+    );
+  });
+
+  it("drops sort cards that name their own group", () => {
+    expect(namesItsGroup("一碗汤面", "碗")).toBe(true);
+    expect(namesItsGroup("一碗面条", "盘")).toBe(false);
+    expect(namesItsGroup("A sudden supply shock", "Supply")).toBe(true);
+    expect(namesItsGroup("Start a business", "Art")).toBe(false);
+    expect(namesItsGroup("a card", "A")).toBe(false);
+
+    const { ids } = reviewMaterial(LANGUAGE_SHEET);
+    const sorted = (cards: { text: string; group: number }[]) =>
+      writtenDrafts(
+        {
+          pieces: [
+            {
+              piece: "sort_it",
+              from: ["word:1"],
+              ask: "Sort these measure-word phrases.",
+              situation: "",
+              options: [],
+              answer: 0,
+              formula: "",
+              why: "",
+              groups: ["碗", "盘"],
+              cards: cards.map((card) => ({ ...card, why: "" })),
+              lines: [],
+              wrongLine: -1,
+              fix: "",
+              answerExpr: "",
+              steps: [],
+              clipAt: "",
+            },
+          ],
+        },
+        {
+          sheet: LANGUAGE_SHEET,
+          subject: "language",
+          ids,
+          clips: CLIPS,
+          teacher: "",
+        },
+      );
+
+    expect(
+      sorted([
+        { text: "一碗汤面", group: 0 },
+        { text: "一盘炒面", group: 1 },
+        { text: "一碗面条", group: 0 },
+        { text: "一盘饺子", group: 1 },
+      ]),
+    ).toEqual([]);
+    const kept = sorted([
+      { text: "汤面", group: 0 },
+      { text: "炒面", group: 1 },
+      { text: "面条", group: 0 },
+      { text: "饺子", group: 1 },
+      { text: "一碗米饭", group: 0 },
+    ]);
+    expect(kept).toHaveLength(1);
+    expect(
+      kept[0]!.body.type === "sort" &&
+        kept[0]!.body.cards.map((card) => card.text).sort(),
+    ).toEqual(["汤面", "炒面", "面条", "饺子"].sort());
   });
 
   it("starts with the ear and puts slips early", () => {

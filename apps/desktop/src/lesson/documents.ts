@@ -38,13 +38,22 @@ export function useLessonDocument<T>(
   kind: LessonDocumentKind,
   parse: (raw: unknown) => T | null,
 ): T | null {
-  const { data = null } = useLiveQuery<BodyRow, T | null>({
+  return useLessonDocumentQuery(sessionId, kind, parse).data;
+}
+
+/** The document, and whether it is still loading: null alone can't tell. */
+export function useLessonDocumentQuery<T>(
+  sessionId: string | null | undefined,
+  kind: LessonDocumentKind,
+  parse: (raw: unknown) => T | null,
+): { data: T | null; isLoading: boolean } {
+  const { data = null, isLoading } = useLiveQuery<BodyRow, T | null>({
     sql: SELECT_SQL,
     params: [lessonDocumentId(sessionId ?? "", kind), kind],
     enabled: Boolean(sessionId),
     mapRows: (rows) => (rows[0] ? parseBody(rows[0].body, parse) : null),
   });
-  return sessionId ? data : null;
+  return sessionId ? { data, isLoading } : { data: null, isLoading: false };
 }
 
 export async function loadLessonDocument<T>(
