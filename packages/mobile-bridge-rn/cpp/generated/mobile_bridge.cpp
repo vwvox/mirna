@@ -414,6 +414,9 @@ extern "C" {
     /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_complete(
         RustBuffer request_json
     );
+    /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_download_clip(
+        RustBuffer request_json
+    );
     /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_file_sha256(
         RustBuffer file
     );
@@ -439,6 +442,9 @@ extern "C" {
         RustBuffer request_json
     );
     /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_send(
+        RustBuffer request_json
+    );
+    /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_send_reviews(
         RustBuffer request_json
     );
     /*handle*/ uint64_t uniffi_mobile_bridge_fn_func_phone_link_statuses(
@@ -659,6 +665,8 @@ extern "C" {
     );
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_complete(
     );
+    uint16_t uniffi_mobile_bridge_checksum_func_phone_link_download_clip(
+    );
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_file_sha256(
     );
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_info(
@@ -676,6 +684,8 @@ extern "C" {
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_retry(
     );
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_send(
+    );
+    uint16_t uniffi_mobile_bridge_checksum_func_phone_link_send_reviews(
     );
     uint16_t uniffi_mobile_bridge_checksum_func_phone_link_statuses(
     );
@@ -3712,6 +3722,14 @@ NativeMobileBridge::NativeMobileBridge(
             return this->cpp_uniffi_mobile_bridge_fn_func_phone_link_complete(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_mobile_bridge_fn_func_phone_link_download_clip"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_fn_func_phone_link_download_clip"),
+        1,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_mobile_bridge_fn_func_phone_link_download_clip(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_mobile_bridge_fn_func_phone_link_file_sha256"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_fn_func_phone_link_file_sha256"),
@@ -3782,6 +3800,14 @@ NativeMobileBridge::NativeMobileBridge(
         1,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_mobile_bridge_fn_func_phone_link_send(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_mobile_bridge_fn_func_phone_link_send_reviews"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_fn_func_phone_link_send_reviews"),
+        1,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_mobile_bridge_fn_func_phone_link_send_reviews(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_mobile_bridge_fn_func_phone_link_statuses"] = jsi::Function::createFromHostFunction(
@@ -4224,6 +4250,14 @@ NativeMobileBridge::NativeMobileBridge(
             return this->cpp_uniffi_mobile_bridge_checksum_func_phone_link_complete(rt, thisVal, args, count);
         }
     );
+    props["ubrn_uniffi_mobile_bridge_checksum_func_phone_link_download_clip"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_checksum_func_phone_link_download_clip"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_mobile_bridge_checksum_func_phone_link_download_clip(rt, thisVal, args, count);
+        }
+    );
     props["ubrn_uniffi_mobile_bridge_checksum_func_phone_link_file_sha256"] = jsi::Function::createFromHostFunction(
         rt,
         jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_checksum_func_phone_link_file_sha256"),
@@ -4294,6 +4328,14 @@ NativeMobileBridge::NativeMobileBridge(
         0,
         [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
             return this->cpp_uniffi_mobile_bridge_checksum_func_phone_link_send(rt, thisVal, args, count);
+        }
+    );
+    props["ubrn_uniffi_mobile_bridge_checksum_func_phone_link_send_reviews"] = jsi::Function::createFromHostFunction(
+        rt,
+        jsi::PropNameID::forAscii(rt, "ubrn_uniffi_mobile_bridge_checksum_func_phone_link_send_reviews"),
+        0,
+        [this](jsi::Runtime &rt, const jsi::Value &thisVal, const jsi::Value *args, size_t count) -> jsi::Value {
+            return this->cpp_uniffi_mobile_bridge_checksum_func_phone_link_send_reviews(rt, thisVal, args, count);
         }
     );
     props["ubrn_uniffi_mobile_bridge_checksum_func_phone_link_statuses"] = jsi::Function::createFromHostFunction(
@@ -5370,6 +5412,13 @@ jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_compl
         
         return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_download_clip(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_mobile_bridge_fn_func_phone_link_download_clip(uniffi::mobile_bridge::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0])
+        );
+
+        
+        return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_file_sha256(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_mobile_bridge_fn_func_phone_link_file_sha256(uniffi::mobile_bridge::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0])
         );
@@ -5433,6 +5482,13 @@ jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_retry
 }
 jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_send(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_mobile_bridge_fn_func_phone_link_send(uniffi::mobile_bridge::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0])
+        );
+
+        
+        return uniffi_jsi::Bridging</*handle*/ uint64_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_fn_func_phone_link_send_reviews(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_mobile_bridge_fn_func_phone_link_send_reviews(uniffi::mobile_bridge::Bridging<RustBuffer>::fromJs(rt, callInvoker, args[0])
         );
 
         
@@ -5862,6 +5918,13 @@ jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link
         
         return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
 }
+jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link_download_clip(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_mobile_bridge_checksum_func_phone_link_download_clip(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
 jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link_file_sha256(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_mobile_bridge_checksum_func_phone_link_file_sha256(
         );
@@ -5920,6 +5983,13 @@ jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link
 }
 jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link_send(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
         auto value = uniffi_mobile_bridge_checksum_func_phone_link_send(
+        );
+
+        
+        return uniffi_jsi::Bridging<uint16_t>::toJs(rt, callInvoker, value);
+}
+jsi::Value NativeMobileBridge::cpp_uniffi_mobile_bridge_checksum_func_phone_link_send_reviews(jsi::Runtime& rt, const jsi::Value& thisVal, const jsi::Value* args, size_t count) {
+        auto value = uniffi_mobile_bridge_checksum_func_phone_link_send_reviews(
         );
 
         

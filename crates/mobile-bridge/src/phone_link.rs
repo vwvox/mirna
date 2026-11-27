@@ -268,6 +268,7 @@ struct NoteChangesReply {
     notes: Vec<anlg_phone_link::protocol::NoteSnapshot>,
     cursor: u64,
     more: bool,
+    courses: Vec<anlg_phone_link::protocol::CourseInfo>,
     working_host: Option<String>,
 }
 
@@ -284,8 +285,84 @@ pub async fn phone_link_note_changes(request_json: String) -> Result<String, Pho
         notes: changes.notes,
         cursor: changes.cursor,
         more: changes.more,
+        courses: changes.courses,
         working_host: client.working_host(),
     })
+}
+
+#[derive(Deserialize)]
+struct DownloadClipCall {
+    #[serde(flatten)]
+    connection: Connection,
+    session_id: String,
+    clip_id: String,
+    /// Where to keep it.
+    file: String,
+    /// The checksum the Mac listed, to check the download against.
+    #[serde(default)]
+    sha256: Option<String>,
+}
+
+/// Downloads one of a lesson's teacher clips into `file`. A download that
+/// doesn't match the checksum the Mac listed is thrown away.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_download_clip(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: DownloadClipCall = from_json(&request_json)?;
+    let path = local_path(&request.file)?;
+    let client = request.connection.client()?;
+    let bytes = client
+        .download_clip(&request.session_id, &request.clip_id)
+        .await?;
+    let size = bytes.len();
+    let expected = request.sha256.map(|sha| sha.to_ascii_lowercase());
+    tokio::task::spawn_blocking(move || {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let partial = path.with_extension("part");
+        std::fs::write(&partial, &bytes)?;
+        if let Some(expected) = expected {
+            let actual = anlg_phone_link::sha256_file(&partial)?;
+            if actual != expected {
+                let _ = std::fs::remove_file(&partial);
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "clip checksum mismatch",
+                ));
+            }
+        }
+        std::fs::rename(&partial, &path)
+    })
+    .await
+    .map_err(io_error)?
+    .map_err(io_error)?;
+    to_json(&serde_json::json!({
+        "size": size,
+        "working_host": client.working_host(),
+    }))
+}
+
+#[derive(Deserialize)]
+struct SendReviewsCall {
+    #[serde(flatten)]
+    connection: Connection,
+    session_id: String,
+    /// Each the JSON of one review played on this phone.
+    reviews: Vec<String>,
+}
+
+/// Sends reviews played on this phone to the Mac, which counts each once.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn phone_link_send_reviews(request_json: String) -> Result<String, PhoneLinkError> {
+    let request: SendReviewsCall = from_json(&request_json)?;
+    let client = request.connection.client()?;
+    let accepted = client
+        .send_reviews(&request.session_id, request.reviews)
+        .await?;
+    to_json(&serde_json::json!({
+        "accepted": accepted.accepted,
+        "working_host": client.working_host(),
+    }))
 }
 
 #[derive(Deserialize)]
