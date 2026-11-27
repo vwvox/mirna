@@ -9,6 +9,7 @@ import {
   FontFamily,
   Spacing,
 } from "@/constants/theme";
+import { useIsLesson } from "@/lesson/use-lesson";
 import { usePairedMac } from "@/mac-link/pairing";
 import { useSendMode } from "@/mac-link/schedule";
 import { retryRecordingOnMac, sendRecordingsToMac } from "@/mac-link/sender";
@@ -56,25 +57,35 @@ export function RecordingSyncCard({
     );
   }
   if (!isOnItsWay(status)) return null;
-  return <ProgressCard status={status} macName={mac.mac_name} saved={saved} />;
+  return (
+    <ProgressCard
+      sessionId={sessionId}
+      status={status}
+      macName={mac.mac_name}
+      saved={saved}
+    />
+  );
 }
 
 function ProgressCard({
+  sessionId,
   status,
   macName,
   saved,
 }: {
+  sessionId: string;
   status: MacLinkStatus;
   macName: string;
   saved: { lengthMs: number | null; sizeBytes: number | null };
 }) {
+  const lesson = useIsLesson(sessionId);
   const styles = useStyles();
   const Colors = useColors();
   const sendMode = useSendMode();
   const sendNow = useMutation({
     mutationFn: () => sendRecordingsToMac("user"),
   });
-  const steps = progressSteps(status, macName, saved, sendMode);
+  const steps = progressSteps(status, macName, saved, sendMode, lesson);
 
   return (
     <View accessibilityLabel="Progress" style={styles.card}>

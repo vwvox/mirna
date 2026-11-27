@@ -3,6 +3,7 @@
 // TLS pinned to each side's certificate, chunked upload, checksums.
 import {
   phoneLinkComplete,
+  phoneLinkDownloadClip,
   phoneLinkFileSha256,
   phoneLinkInfo,
   phoneLinkNewIdentity,
@@ -12,12 +13,13 @@ import {
   phoneLinkParseOffer,
   phoneLinkRetry,
   phoneLinkSend,
+  phoneLinkSendReviews,
   phoneLinkStatuses,
   phoneLinkTrimWav,
   phoneLinkUploadDiagnostics,
 } from "@anlg/mobile-bridge";
 
-import type { RemoteNote } from "./model";
+import type { CourseInfo, LessonTag, RemoteNote } from "./model";
 
 export type PhoneIdentity = {
   cert_pem: string;
@@ -60,7 +62,9 @@ export type NoteJob =
    * More was recorded on the phone: the Mac drops its copy, takes the longer
    * file and makes the note again from it.
    */
-  | { type: "extend"; update_summary: boolean };
+  | { type: "extend"; update_summary: boolean }
+  /** Make the note a lesson with these settings, or a normal note with none. */
+  | { type: "set_lesson"; lesson: LessonTag | null };
 
 export type RemoteStatus = {
   id: string;
@@ -80,6 +84,8 @@ export type RecordingMeta = {
   duration_ms: number | null;
   ext: string;
   notes_md: string | null;
+  /** Set when the recording is a lesson: the Mac files it and writes its sheet. */
+  lesson?: LessonTag | null;
 };
 
 export type LinkErrorCode =
@@ -277,6 +283,8 @@ export function noteChanges(
   notes: RemoteNote[];
   cursor: number;
   more: boolean;
+  /** The Mac's courses; missing from a Mac that predates lessons. */
+  courses?: CourseInfo[];
   working_host: string | null;
 }> {
   return call(() =>
@@ -302,6 +310,37 @@ export function complete(
         file: input.file,
         meta: input.meta,
       }),
+    ),
+  );
+}
+
+/** Downloads one of a lesson's teacher clips into `file`, checked against `sha256`. */
+export function downloadClip(
+  connection: Connection,
+  input: { sessionId: string; clipId: string; file: string; sha256: string },
+): Promise<{ size: number; working_host: string | null }> {
+  return call(() =>
+    phoneLinkDownloadClip(
+      JSON.stringify({
+        ...connection,
+        session_id: input.sessionId,
+        clip_id: input.clipId,
+        file: input.file,
+        sha256: input.sha256,
+      }),
+    ),
+  );
+}
+
+/** Sends reviews played on this phone (each the JSON of one run) to the Mac. */
+export function sendReviews(
+  connection: Connection,
+  sessionId: string,
+  reviews: string[],
+): Promise<{ accepted: string[]; working_host: string | null }> {
+  return call(() =>
+    phoneLinkSendReviews(
+      JSON.stringify({ ...connection, session_id: sessionId, reviews }),
     ),
   );
 }

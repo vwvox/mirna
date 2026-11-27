@@ -126,7 +126,7 @@ export function summarySnippet(
 export type ProgressStepState = "done" | "active" | "waiting" | "todo";
 
 export type ProgressStep = {
-  key: "saved" | "send" | "transcribe" | "summary";
+  key: "saved" | "send" | "transcribe" | "summary" | "lesson";
   state: ProgressStepState;
   label: string;
   detail: string;
@@ -134,30 +134,38 @@ export type ProgressStep = {
   percent?: number;
 };
 
+const DONE = 7;
+
 const STAGE: Partial<Record<MacLinkStatus["state"], number>> = {
   waiting: 0,
   sending: 1,
   on_mac: 2,
   transcribing: 3,
   summarizing: 4,
-  done: 5,
+  writing_sheet: 5,
+  planning_review: 6,
+  done: DONE,
 };
 
 /** Whether the note shows the step-by-step progress card for this status. */
 export function isOnItsWay(status: MacLinkStatus | null | undefined) {
-  return !!status && (STAGE[status.state] ?? 5) < 5;
+  return !!status && (STAGE[status.state] ?? DONE) < DONE;
 }
 
-/** The four steps from this phone to a summary, for the note's progress card. */
+/**
+ * The steps from this phone to a summary, for the note's progress card; a
+ * lesson has one more, its study sheet and review.
+ */
 export function progressSteps(
   status: MacLinkStatus,
   macName: string,
   saved: { lengthMs: number | null; sizeBytes: number | null },
   sendMode: "auto" | "manual" = "auto",
+  lesson = false,
 ): ProgressStep[] {
   const at = STAGE[status.state] ?? 0;
   const percent = sendPercent(status);
-  return [
+  const steps: ProgressStep[] = [
     {
       key: "saved",
       state: "done",
@@ -239,9 +247,40 @@ export function progressSteps(
             key: "summary",
             state: "done",
             label: "Summary written",
-            detail: "It’s here now",
+            detail: lesson ? "Your notes from class too" : "It’s here now",
           },
   ];
+  if (!lesson) return steps;
+  steps.push(
+    at < 5
+      ? {
+          key: "lesson",
+          state: "todo",
+          label: "Study sheet and review",
+          detail: "Written on your Mac, then sent back here",
+        }
+      : at === 5
+        ? {
+            key: "lesson",
+            state: "active",
+            label: "Writing the study sheet",
+            detail: "About a minute",
+          }
+        : at === 6
+          ? {
+              key: "lesson",
+              state: "active",
+              label: "Planning the review",
+              detail: "5 and 10 minutes",
+            }
+          : {
+              key: "lesson",
+              state: "done",
+              label: "Back on this phone",
+              detail: "The sheet, the review and the teacher’s clips",
+            },
+  );
+  return steps;
 }
 
 export type RetryOutcome =

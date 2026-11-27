@@ -16,6 +16,7 @@ export function sessionView({
   hasRecordingHistory,
   hasSummary,
   hasTranscript,
+  hasLesson = false,
   selection,
 }: {
   sessionId: string;
@@ -23,12 +24,19 @@ export function sessionView({
   hasRecordingHistory: boolean;
   hasSummary: boolean;
   hasTranscript: boolean;
+  /** A lesson with its study sheet: the sheet comes first, as on the Mac. */
+  hasLesson?: boolean;
   selection: SessionViewSelection | null;
 }) {
   const enhancedNoteIds =
     hasSummary || (!active && hasRecordingHistory) ? ["summary"] : [];
   const canShowTranscript = active || hasRecordingHistory || hasTranscript;
-  const tabs = createEditorTabs({ enhancedNoteIds, canShowTranscript });
+  const showLesson = hasLesson && !active;
+  const tabs = createEditorTabs({
+    enhancedNoteIds,
+    canShowTranscript,
+    hasLesson: showLesson,
+  });
   const current = computeCurrentNoteTab(
     selection?.sessionId === sessionId && selection.active === active
       ? selection.view
@@ -36,6 +44,8 @@ export function sessionView({
     active,
     enhancedNoteIds,
     canShowTranscript,
+    [],
+    showLesson,
   );
   return {
     tabs,

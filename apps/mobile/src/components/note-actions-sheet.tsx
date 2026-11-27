@@ -21,6 +21,10 @@ export type NoteActionsSheetProps = {
   onTrim?: () => void;
   /** Record onto the end of this phone's recording (when it can). */
   onRecordMore?: () => void;
+  /** Say whether this phone's recording is a lesson (when it has one). */
+  onLesson?: () => void;
+  /** The note is a lesson now. */
+  isLesson?: boolean;
   visible: boolean;
 };
 
@@ -37,6 +41,8 @@ export function NoteActionsSheet({
   onRetranscribe,
   onTrim,
   onRecordMore,
+  onLesson,
+  isLesson = false,
   visible,
 }: NoteActionsSheetProps) {
   const styles = useStyles();
@@ -114,6 +120,21 @@ export function NoteActionsSheet({
             <Ionicons name="time-outline" size={20} color={Colors.ink} />
             <Text style={styles.actionLabel}>Version history</Text>
           </Pressable>
+          {!listening && onLesson && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => select(onLesson)}
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.actionPressed,
+              ]}
+            >
+              <Ionicons name="school-outline" size={20} color={Colors.ink} />
+              <Text style={styles.actionLabel}>
+                {isLesson ? "Lesson or note" : "Make it a lesson"}
+              </Text>
+            </Pressable>
+          )}
           {!listening && onRetranscribe && (
             <Pressable
               accessibilityRole="button"

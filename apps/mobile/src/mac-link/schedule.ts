@@ -4,9 +4,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 
+import type { QueuedReview } from "@/lesson/lesson-model";
+
 import {
   type Backoff,
   backoffAfterFailure,
+  type CourseInfo,
   rememberNetwork,
   type SendMode,
 } from "./model";
@@ -18,6 +21,8 @@ const NOTES_CURSOR_KEY = "mirna.mac_link.notes_cursor";
 const MAC_NOTES_KEY = "mirna.mac_link.include_mac_notes";
 const LAST_SYNC_KEY = "mirna.mac_link.last_sync";
 const DIAGNOSTICS_SENT_KEY = "mirna.mac_link.diagnostics_sent";
+const COURSES_KEY = "mirna.mac_link.courses";
+const REVIEW_OUTBOX_KEY = "mirna.mac_link.review_outbox";
 
 /** Tiny observable value kept in AsyncStorage, for settings the UI shows. */
 function storedValue<T>(key: string, fallback: T) {
@@ -78,6 +83,33 @@ const lastSync = storedValue<LastSync | null>(LAST_SYNC_KEY, null);
 export const loadLastSync = lastSync.load;
 export const recordLastSync = lastSync.set;
 export const useLastSync = lastSync.use;
+
+// --- The Mac's courses, for filing a recording as a lesson -----------------
+
+const courses = storedValue<CourseInfo[]>(COURSES_KEY, []);
+
+export const loadMacCourses = courses.load;
+export const saveMacCourses = courses.set;
+export const useMacCourses = courses.use;
+
+// --- Reviews played on this phone, on their way to the Mac -----------------
+
+const reviewOutbox = storedValue<QueuedReview[]>(REVIEW_OUTBOX_KEY, []);
+let outboxWrites: Promise<unknown> = Promise.resolve();
+
+export const loadReviewOutbox = reviewOutbox.load;
+export const useReviewOutbox = reviewOutbox.use;
+
+/** Changes the outbox one change at a time, so a review saved mid-sync stays. */
+export function updateReviewOutbox(
+  change: (current: QueuedReview[]) => QueuedReview[],
+): Promise<void> {
+  const write = outboxWrites.then(async () => {
+    await reviewOutbox.set(change(await reviewOutbox.load()));
+  });
+  outboxWrites = write.catch(() => {});
+  return write;
+}
 
 // --- The problem log the Mac last received ---------------------------------
 
@@ -209,5 +241,6 @@ export async function resetMacSchedule() {
     writeJson(BACKOFF_KEY, null),
     writeJson(NETWORKS_KEY, null),
     writeJson(NOTES_CURSOR_KEY, null),
+    courses.set([]),
   ]);
 }

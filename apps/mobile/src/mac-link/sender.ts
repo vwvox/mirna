@@ -34,13 +34,24 @@ import {
 import * as bridge from "./bridge";
 import { LinkError, type NoteJob, type RemoteStatus } from "./bridge";
 import {
+  downloadLessonClips,
+  loadLessonTag,
+  markLessonTagSent,
+  saveLessonTag,
+  sendPendingLessonTags,
+  sendQueuedReviews,
+} from "./lessons";
+import {
+  type CourseInfo,
   hotspotCandidates,
   isBackingOff,
   isHomeNetwork,
   keepSyncedFields,
+  type LessonTag,
   type MacLinkStatus,
   needsMacContact,
   parseMacLink,
+  processingState,
   proseMirrorToMarkdown,
   type SendTrigger,
   strongerTrigger,
@@ -66,6 +77,7 @@ import {
   recordLastSync,
   rememberMacNetwork,
   saveDiagnosticsSent,
+  saveMacCourses,
   saveNotesCursor,
 } from "./schedule";
 import { attachmentIdFor, loadMacLinkStatus, setMacLinkStatus } from "./status";
@@ -274,6 +286,16 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
     }
   }
 
+  // Lesson or note, said after the Mac had the recording.
+  try {
+    await sendPendingLessonTags(connection);
+  } catch (error) {
+    if (error instanceof LinkError && error.code === "unreachable") {
+      return "mac_unreachable";
+    }
+    console.warn("[mac-link] lesson choices not sent", error);
+  }
+
   let pulled: PullResult = { updated: 0, failed: 0, error: null };
   // A note the Mac just finished (or worked on again) comes back right away.
   if (fresh || finished > 0) {
@@ -290,6 +312,7 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
         failed: pulled.failed,
       });
     }
+    await syncLessons(connection);
     await sendDiagnostics(connection);
   }
   await recordLastSync({
@@ -414,6 +437,42 @@ export async function requestNoteJob(
       : "queued";
 }
 
+/**
+ * Reviews played here go to the Mac, then the teacher clips of the newest
+ * lessons come back (in the same sync that brought their sheet and review).
+ */
+async function syncLessons(connection: Connection) {
+  try {
+    await sendQueuedReviews(connection);
+  } catch (error) {
+    console.warn("[mac-link] reviews not sent", error);
+    logDiagnosticError("lesson_reviews_failed", error, {}, "warning");
+  }
+  try {
+    await downloadLessonClips(connection);
+  } catch (error) {
+    console.warn("[mac-link] clips not fetched", error);
+    logDiagnosticError("lesson_clips_failed", error, {}, "warning");
+  }
+}
+
+/**
+ * Says what a recording made on this phone is, a lesson or a note. It's
+ * saved here at once; then, unless it's still recording, the phone syncs so
+ * the Mac hears it now if it's near (with the recording, or as a change to
+ * the note it made). Returns whether the Mac has it.
+ */
+export async function tagRecording(
+  sessionId: string,
+  lesson: LessonTag | null,
+  options: { sync: boolean },
+): Promise<{ sent: boolean; outcome: SendOutcome | null }> {
+  const saved = await saveLessonTag(sessionId, lesson);
+  if (saved.sent || !options.sync) return { sent: saved.sent, outcome: null };
+  const outcome = await sendRecordingsToMac("user");
+  return { sent: (await loadLessonTag(sessionId))?.sent ?? false, outcome };
+}
+
 /** Sends the problem log to the Mac when it has changed since last time. */
 async function sendDiagnostics(connection: Connection) {
   try {
@@ -507,8 +566,11 @@ async function pullNoteChanges(
   const includeMacNotes = await loadIncludeMacNotes();
   let cursor = await loadNotesCursor(mac.mac_id, includeMacNotes);
   const result: PullResult = { updated: 0, failed: 0, error: null };
+  let courses: CourseInfo[] | undefined;
   for (let page = 0; page < 20; page += 1) {
     const reply = await bridge.noteChanges(connection, cursor, includeMacNotes);
+    // Every answer lists the Mac's courses (a Mac without lessons, none).
+    courses = reply.courses ?? courses;
     for (const note of reply.notes) {
       try {
         if (await applyRemoteNote(note)) result.updated += 1;
@@ -523,6 +585,7 @@ async function pullNoteChanges(
     await saveNotesCursor(mac.mac_id, cursor, includeMacNotes);
     if (!reply.more) break;
   }
+  if (courses) await saveMacCourses(courses);
   return result;
 }
 
@@ -559,7 +622,7 @@ async function advance(
       return false;
     case "processing":
       await update(row.session_id, local, {
-        state: status.stage === "summarizing" ? "summarizing" : "transcribing",
+        state: processingState(status.stage),
         mac_session_id: status.session_id,
         job,
       });
@@ -690,6 +753,8 @@ async function upload(
     });
   }
 
+  // A lesson goes with what it is, so the Mac files it and writes its sheet.
+  const tag = await loadLessonTag(row.session_id);
   const reply = await bridge.complete(connection, {
     recordingId: row.session_id,
     file: file.uri,
@@ -699,9 +764,12 @@ async function upload(
       duration_ms: wavDurationMs(row.filename, total),
       ext: extensionOf(row.filename),
       notes_md: await noteMarkdown(row.session_id),
+      lesson: tag?.lesson ?? null,
     },
   });
   await rememberWorkingHost(reply.working_host);
+  // Changed while it went: the later choice goes as a change after this.
+  if (tag) await markLessonTagSent(row.session_id, tag.at);
   logDiagnostic("recording_sent", {
     bytes: total,
     ms: Date.now() - sendStartedAt,

@@ -7,6 +7,8 @@ export type MacLinkState =
   | "on_mac" // all audio arrived, waiting its turn
   | "transcribing"
   | "summarizing"
+  | "writing_sheet" // a lesson: its study sheet
+  | "planning_review" // a lesson: its review
   | "done"
   | "failed"; // the Mac could not make a note of it
 
@@ -25,7 +27,7 @@ export type MacLinkStatus = {
   /** When the Mac last changed this note after it first came back. */
   updated_on_mac_at?: string | null;
   /** Work the phone asked the Mac for on this note, while it's under way. */
-  job?: "retranscribe" | "trim" | "extend" | null;
+  job?: "retranscribe" | "trim" | "extend" | "set_lesson" | null;
   /**
    * More was recorded after the Mac had (some of) this recording: the Mac
    * drops what it has and takes the longer file. Progress updates clear it.
@@ -36,7 +38,21 @@ export type MacLinkStatus = {
     title?: string | null;
     summary_hash?: string | null;
     transcripts_hash?: string | null;
+    lesson_hash?: string | null;
   };
+};
+
+/**
+ * What the phone keeps of a lesson besides its sheet and review documents:
+ * the Mac's id for it, where it sits in its course, the clips to fetch and
+ * the reviews the Mac has counted. In `sessions.metadata_json.$.mac_lesson`.
+ */
+export type MacLesson = {
+  mac_session_id: string;
+  course: string | null;
+  number: number | null;
+  clips: RemoteClip[];
+  reviews: RemoteReviewSummary[];
 };
 
 /** Fields that survive progress updates (they describe the finished note). */
@@ -105,9 +121,23 @@ export function needsMacContact(status: MacLinkStatus, mode: SendMode) {
     case "on_mac":
     case "transcribing":
     case "summarizing":
+    case "writing_sheet":
+    case "planning_review":
       return true;
     default:
       return false;
+  }
+}
+
+/** The phone's state for a recording the Mac is working on, from its stage. */
+export function processingState(stage: string | null | undefined) {
+  switch (stage) {
+    case "summarizing":
+    case "writing_sheet":
+    case "planning_review":
+      return stage;
+    default:
+      return "transcribing";
   }
 }
 
@@ -213,6 +243,49 @@ export type RemoteNote = {
   transcripts: RemoteTranscript[];
   /** When a note recorded on the Mac was made. */
   created_at?: string | null;
+  /** Set when the note is a lesson: its sheet, review and clips. */
+  lesson?: RemoteLesson | null;
+};
+
+/** What the phone says about a lesson when it sends the recording. */
+export type LessonTag = {
+  course: string;
+  subject: "language" | "topic" | "maths";
+  learning: string;
+  explain_in: string;
+  subject_name?: string | null;
+};
+
+/** A course on the Mac, for filing a recording as a lesson. */
+export type CourseInfo = {
+  name: string;
+  subject: string;
+  learning: string;
+  explain_in: string;
+  subject_name?: string | null;
+  next_number: number;
+};
+
+export type RemoteClip = { id: string; size: number; sha256: string };
+
+export type RemoteReviewSummary = {
+  id: string;
+  ended_at: string;
+  device: string;
+  length: number;
+  right: number;
+  total: number;
+};
+
+/** A lesson as the Mac made it: JSON in the Mac app's own formats. */
+export type RemoteLesson = {
+  settings_json: string;
+  course: string | null;
+  number: number | null;
+  sheet_json: string | null;
+  review_json: string | null;
+  clips: RemoteClip[];
+  reviews: RemoteReviewSummary[];
 };
 
 /** The phone's id for a note that was recorded on the Mac. */
@@ -293,6 +366,10 @@ export function describeMacLink(status: MacLinkStatus, macName?: string) {
       return `Transcribing on ${mac}`;
     case "summarizing":
       return `Summarizing on ${mac}`;
+    case "writing_sheet":
+      return `Writing the study sheet on ${mac}`;
+    case "planning_review":
+      return `Planning the review on ${mac}`;
     case "done":
       return `Transcribed on ${mac}`;
     case "failed":

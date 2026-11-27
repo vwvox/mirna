@@ -174,6 +174,10 @@ function cardStatus(
       return { text: `Transcribing on ${mac}`, tone: "mac" };
     case "summarizing":
       return { text: `Summarizing on ${mac}`, tone: "mac" };
+    case "writing_sheet":
+      return { text: `Writing the study sheet on ${mac}`, tone: "mac" };
+    case "planning_review":
+      return { text: `Planning the review on ${mac}`, tone: "mac" };
     case "failed":
       return { text: "Couldn’t transcribe", tone: "problem" };
     default:

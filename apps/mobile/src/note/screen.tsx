@@ -34,6 +34,10 @@ import {
   loadSessionTranscripts,
   useSessionHasTranscript,
 } from "@/data/transcripts";
+import { LessonLine, lessonLabel } from "@/lesson/lesson-line";
+import { LessonSheetView } from "@/lesson/lesson-sheet";
+import { LessonTagSheet } from "@/lesson/lesson-tag-sheet";
+import { useLesson } from "@/lesson/use-lesson";
 import { captureAnalytics } from "@/lib/analytics";
 import { confirmDestructive } from "@/lib/confirm";
 import { captureOperationalError } from "@/lib/error-reporting";
@@ -95,10 +99,17 @@ export function NoteScreen({
   );
   const [editorFocused, setEditorFocused] = useState(false);
   const [sheet, setSheet] = useState<
-    "actions" | "folders" | "versions" | "retranscribe" | "trim" | null
+    | "actions"
+    | "folders"
+    | "versions"
+    | "retranscribe"
+    | "trim"
+    | "lesson"
+    | null
   >(null);
   const macLink = useMacLinkStatus(id);
   const { mac } = usePairedMac();
+  const lesson = useLesson(id);
   // The Mac has this recording as a note (or tried to): it can do it again.
   const macHasNote =
     Boolean(mac) &&
@@ -137,12 +148,19 @@ export function NoteScreen({
     audio.availableLocally &&
     Boolean(audio.data?.filename.toLowerCase().endsWith(".wav"));
   const leavingRef = useRef(false);
+  const hasLesson = Boolean(
+    lesson?.isLesson && (lesson.sheet || lesson.review),
+  );
+  // Recorded here, with a Mac to make it: it can be said to be a lesson.
+  const canTagLesson =
+    Boolean(mac) && (recordingHere || Boolean(audio.data)) && !partOfThis;
   const { tabs, current, selectedIndex } = sessionView({
     sessionId: id,
     active,
     hasRecordingHistory,
     hasSummary: Boolean(data?.summary),
     hasTranscript: transcriptState.data === true,
+    hasLesson,
     selection,
   });
   const showMemos = current.type === "raw";
@@ -346,6 +364,15 @@ export function NoteScreen({
           onStop={() => void handleStop()}
           onRetry={() => void handleRetryRecording()}
           onOpenSettings={() => void handleOpenSettings()}
+          lessonLabel={lessonLabel(lesson)}
+          onLesson={canTagLesson ? () => setSheet("lesson") : undefined}
+        />
+        <LessonTagSheet
+          sessionId={id}
+          lesson={lesson}
+          recording
+          visible={sheet === "lesson"}
+          onClose={() => closeSheet("lesson")}
         />
       </SafeAreaView>
     );
@@ -398,6 +425,11 @@ export function NoteScreen({
         {!isLoading && data && (
           <NoteMeta sessionId={id} createdAt={data.createdAt} audio={audio} />
         )}
+        <LessonLine
+          lesson={lesson}
+          macName={mac?.mac_name || "your Mac"}
+          onPress={canTagLesson ? () => setSheet("lesson") : undefined}
+        />
         <MacJobBanner sessionId={id} />
       </View>
 
@@ -407,11 +439,13 @@ export function NoteScreen({
             <View style={styles.tabs}>
               <NoteTabs
                 labels={tabs.map((tab) =>
-                  tab.type === "enhanced"
-                    ? "Summary"
-                    : tab.type === "raw"
-                      ? "Notes"
-                      : "Transcript",
+                  tab.type === "lesson"
+                    ? "Study sheet"
+                    : tab.type === "enhanced"
+                      ? "Summary"
+                      : tab.type === "raw"
+                        ? "Notes"
+                        : "Transcript",
                 )}
                 selectedIndex={selectedIndex}
                 onChange={(index) => {
@@ -423,6 +457,9 @@ export function NoteScreen({
                 }}
               />
             </View>
+          )}
+          {current.type === "lesson" && lesson && (
+            <LessonSheetView sessionId={id} lesson={lesson} />
           )}
           <NoteSummary
             sessionId={id}
@@ -524,7 +561,17 @@ export function NoteScreen({
         onVersionHistory={() => setSheet("versions")}
         onRetranscribe={macHasNote ? () => setSheet("retranscribe") : undefined}
         onTrim={canTrim ? () => setSheet("trim") : undefined}
+        onLesson={canTagLesson ? () => setSheet("lesson") : undefined}
+        isLesson={lesson?.isLesson ?? false}
         visible={sheet === "actions"}
+      />
+
+      <LessonTagSheet
+        sessionId={id}
+        lesson={lesson}
+        recording={false}
+        visible={sheet === "lesson"}
+        onClose={() => closeSheet("lesson")}
       />
 
       <RetranscribeSheet

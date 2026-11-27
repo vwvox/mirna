@@ -72,3 +72,43 @@ test("a plain note has only memos and does not inherit another meeting's selecti
   assert.deepEqual(view.tabs, [{ type: "raw" }]);
   assert.equal(view.current.type, "raw");
 });
+
+test("a lesson opens on its study sheet, first of the tabs, as on the Mac", () => {
+  const view = sessionView({
+    ...meeting,
+    active: false,
+    hasRecordingHistory: true,
+    hasSummary: true,
+    hasTranscript: true,
+    hasLesson: true,
+  });
+  assert.deepEqual(
+    view.tabs.map((tab) => tab.type),
+    ["lesson", "enhanced", "raw", "transcript"],
+  );
+  assert.equal(view.current.type, "lesson");
+  assert.equal(view.selectedIndex, 0);
+
+  // Another tab chosen stays chosen.
+  const transcript = sessionView({
+    ...meeting,
+    active: false,
+    hasRecordingHistory: true,
+    hasSummary: true,
+    hasTranscript: true,
+    hasLesson: true,
+    selection: {
+      sessionId: meeting.sessionId,
+      active: false,
+      view: { type: "transcript" },
+    },
+  });
+  assert.equal(transcript.current.type, "transcript");
+
+  // While recording more, no sheet.
+  assert.ok(
+    !sessionView({ ...meeting, hasLesson: true }).tabs.some(
+      (tab) => tab.type === "lesson",
+    ),
+  );
+});

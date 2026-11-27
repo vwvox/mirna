@@ -154,6 +154,26 @@ test("the progress card follows the recording from the phone to a summary", () =
   );
 });
 
+test("a lesson has one more step: its study sheet and review", () => {
+  const saved = { lengthMs: 52 * 60_000, sizeBytes: 48 * 1024 * 1024 };
+  const steps = (state) =>
+    progressSteps({ state }, "MacBook Air", saved, "auto", true);
+  assert.equal(
+    progressSteps({ state: "summarizing" }, "MacBook Air", saved).length,
+    4,
+  );
+  assert.deepEqual(
+    steps("summarizing").map((step) => step.state),
+    ["done", "done", "done", "active", "todo"],
+  );
+  assert.equal(steps("writing_sheet")[4].label, "Writing the study sheet");
+  assert.equal(steps("writing_sheet")[3].state, "done");
+  assert.equal(steps("planning_review")[4].label, "Planning the review");
+  assert.equal(steps("done")[4].label, "Back on this phone");
+  assert.equal(isOnItsWay({ state: "writing_sheet" }), true);
+  assert.equal(isOnItsWay({ state: "planning_review" }), true);
+});
+
 test("only recordings still on their way get the progress card", () => {
   assert.equal(isOnItsWay({ state: "waiting" }), true);
   assert.equal(isOnItsWay({ state: "summarizing" }), true);

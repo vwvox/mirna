@@ -11,6 +11,7 @@ import { nowIso } from "@/lib/ids";
 
 import {
   hashText,
+  type MacLesson,
   type MacLinkStatus,
   macNoteSessionId,
   macOnlyRecordings,
@@ -113,7 +114,8 @@ async function applyMacNote(note: RemoteNote) {
 
   let state: MacNoteState = { session_id: note.session_id };
   try {
-    if (existing?.mac_note) state = JSON.parse(existing.mac_note) as MacNoteState;
+    if (existing?.mac_note)
+      state = JSON.parse(existing.mac_note) as MacNoteState;
   } catch {
     // Start the sync record over.
   }
@@ -238,6 +240,18 @@ function contentStatements(
     if (!firstCopy) changedOnMac = true;
   }
 
+  const lesson = lessonStatements(
+    sessionId,
+    note,
+    previous.lesson_hash ?? null,
+    now,
+  );
+  if (lesson.statements.length > 0) {
+    statements.push(...lesson.statements);
+    // A review counted or clips cut again isn't news; a new sheet is.
+    if (!firstCopy && lesson.contentChanged) changedOnMac = true;
+  }
+
   return {
     statements,
     changedOnMac,
@@ -246,6 +260,138 @@ function contentStatements(
       title: title || previous.title || null,
       summary_hash: summaryHash ?? previous.summary_hash ?? null,
       transcripts_hash: transcriptsHash ?? previous.transcripts_hash ?? null,
+      lesson_hash: lesson.hash,
     } satisfies Synced,
   };
+}
+
+// --- Lessons: the sheet and review the Mac made, and what to fetch -----------
+
+const LESSON_DOCUMENT_UPSERT = `
+  INSERT INTO session_documents (
+    id, workspace_id, session_id, kind, template_id, title,
+    body_format, body, source_hash, generation_metadata_json,
+    sort_order, created_by, updated_by, created_at, updated_at,
+    deleted_at
+  )
+  SELECT ?, session.workspace_id, session.id, ?, '', '', 'json', ?, ?,
+    '{}', 0, session.owner_user_id, session.owner_user_id, ?, ?, NULL
+  FROM sessions AS session
+  WHERE session.id = ? AND session.deleted_at IS NULL
+  ON CONFLICT(id) DO UPDATE SET
+    body = excluded.body,
+    source_hash = excluded.source_hash,
+    updated_at = excluded.updated_at,
+    deleted_at = NULL`;
+
+function validJson(text: string | null | undefined): string | null {
+  if (!text) return null;
+  try {
+    JSON.parse(text);
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A lesson is kept the way the Mac keeps it (kind `lesson`, its settings in
+ * `$.lesson`, the sheet and review as `<id>:lesson_sheet` / `<id>:lesson_review`
+ * documents), so the phone shows exactly what the Mac made.
+ */
+export function lessonStatements(
+  sessionId: string,
+  note: RemoteNote,
+  previousHash: string | null,
+  now: string,
+): { statements: Statement[]; hash: string | null; contentChanged: boolean } {
+  const lesson = note.lesson ?? null;
+  // "<what it says>:<its clips and counted reviews>", so each can tell.
+  const hash = lesson
+    ? `${hashText(JSON.stringify({ ...lesson, clips: [], reviews: [] }))}:${hashText(
+        JSON.stringify([lesson.clips, lesson.reviews]),
+      )}`
+    : null;
+  if (hash === previousHash) {
+    return { statements: [], hash, contentChanged: false };
+  }
+  const contentChanged =
+    hash?.split(":")[0] !== (previousHash?.split(":")[0] ?? null);
+  if (!lesson) {
+    // Made a normal note again on the Mac.
+    return {
+      hash: null,
+      contentChanged: true,
+      statements: [
+        {
+          // This phone's own choice goes too once the Mac has had it.
+          sql: `UPDATE sessions
+            SET kind = 'meeting',
+              metadata_json = CASE
+                WHEN json_extract(metadata_json, '$.lesson_tag.sent') = 1
+                  THEN json_remove(COALESCE(metadata_json, '{}'), '$.lesson', '$.mac_lesson', '$.lesson_tag')
+                ELSE json_remove(COALESCE(metadata_json, '{}'), '$.lesson', '$.mac_lesson')
+              END,
+              updated_at = ?
+            WHERE id = ? AND kind = 'lesson' AND deleted_at IS NULL`,
+          params: [now, sessionId],
+        },
+        {
+          sql: `UPDATE session_documents SET deleted_at = ?, updated_at = ?
+            WHERE session_id = ? AND kind IN ('lesson_sheet', 'lesson_review')
+              AND deleted_at IS NULL`,
+          params: [now, now, sessionId],
+        },
+      ],
+    };
+  }
+  const extra: MacLesson = {
+    mac_session_id: note.session_id,
+    course: lesson.course,
+    number: lesson.number,
+    clips: lesson.clips,
+    reviews: lesson.reviews,
+  };
+  const statements: Statement[] = [
+    {
+      sql: `UPDATE sessions
+        SET kind = 'lesson',
+          metadata_json = json_set(COALESCE(metadata_json, '{}'),
+            '$.lesson', json(?), '$.mac_lesson', json(?)),
+          updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+      params: [
+        validJson(lesson.settings_json) ?? "{}",
+        JSON.stringify(extra),
+        now,
+        sessionId,
+      ],
+    },
+  ];
+  for (const [kind, body] of [
+    ["lesson_sheet", validJson(lesson.sheet_json)],
+    ["lesson_review", validJson(lesson.review_json)],
+  ] as const) {
+    if (body) {
+      statements.push({
+        sql: LESSON_DOCUMENT_UPSERT,
+        params: [
+          `${sessionId}:${kind}`,
+          kind,
+          body,
+          hashText(body),
+          now,
+          now,
+          sessionId,
+        ],
+      });
+    } else {
+      statements.push({
+        sql: `UPDATE session_documents SET deleted_at = ?, updated_at = ?
+          WHERE id = ? AND deleted_at IS NULL`,
+        params: [now, now, `${sessionId}:${kind}`],
+      });
+    }
+  }
+  return { statements, hash, contentChanged };
 }

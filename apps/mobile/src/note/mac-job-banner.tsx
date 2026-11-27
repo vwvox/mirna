@@ -32,7 +32,9 @@ export function MacJobBanner({ sessionId }: { sessionId: string }) {
               ? `${macName} couldn't trim this recording.`
               : status.job === "extend" || status.resend
                 ? `${macName} couldn't add what you recorded to this note.`
-                : `${macName} couldn't transcribe this again.`)}
+                : status.job === "set_lesson"
+                  ? `${macName} couldn't make the study sheet for this lesson.`
+                  : `${macName} couldn't transcribe this again.`)}
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -49,16 +51,32 @@ export function MacJobBanner({ sessionId }: { sessionId: string }) {
   }
 
   const text =
-    status.state === "summarizing"
-      ? `Writing the summary again on ${macName}…`
-      : status.state === "on_mac"
-        ? `Waiting for ${macName}…`
-        : status.job === "trim"
-          ? `Trimming on ${macName}…`
-          : status.job === "extend"
-            ? `Adding what you recorded on ${macName}…`
-            : `Transcribing again on ${macName}…`;
-  if (!["on_mac", "transcribing", "summarizing"].includes(status.state)) {
+    status.state === "writing_sheet"
+      ? `Writing the study sheet on ${macName}…`
+      : status.state === "planning_review"
+        ? `Planning the review on ${macName}…`
+        : status.job === "set_lesson"
+          ? status.state === "on_mac"
+            ? `Waiting for ${macName}…`
+            : `Making this a lesson on ${macName}…`
+          : status.state === "summarizing"
+            ? `Writing the summary again on ${macName}…`
+            : status.state === "on_mac"
+              ? `Waiting for ${macName}…`
+              : status.job === "trim"
+                ? `Trimming on ${macName}…`
+                : status.job === "extend"
+                  ? `Adding what you recorded on ${macName}…`
+                  : `Transcribing again on ${macName}…`;
+  if (
+    ![
+      "on_mac",
+      "transcribing",
+      "summarizing",
+      "writing_sheet",
+      "planning_review",
+    ].includes(status.state)
+  ) {
     return null;
   }
   return (

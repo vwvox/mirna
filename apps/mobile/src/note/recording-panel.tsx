@@ -80,6 +80,8 @@ export function RecordingPanel({
   onStop,
   onRetry,
   onOpenSettings,
+  lessonLabel,
+  onLesson,
 }: {
   recorder: Recorder;
   /** Null until the note has loaded. */
@@ -94,6 +96,10 @@ export function RecordingPanel({
   onStop: () => void;
   onRetry: () => void;
   onOpenSettings: () => void;
+  /** "A note", or the lesson it will be ("Lesson in Mandarin"). */
+  lessonLabel?: string;
+  /** Opens "What was this?", when a Mac will make the note. */
+  onLesson?: () => void;
 }) {
   const styles = useStyles();
   const Colors = useColors();
@@ -208,6 +214,35 @@ export function RecordingPanel({
               onCommit={onCommit}
               onMount={recorder.setNotificationTitle}
             />
+
+            {onLesson && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityHint="Choose whether this is a lesson, for a study sheet and a review"
+                onPress={onLesson}
+                style={({ pressed }) => [
+                  styles.lessonRow,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons
+                  name="school-outline"
+                  size={18}
+                  color={Colors.primary}
+                />
+                <View style={styles.lessonCopy}>
+                  <Text style={styles.label}>What is this?</Text>
+                  <Text style={styles.lessonValue}>
+                    {lessonLabel ?? "A note"}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={Colors.muted}
+                />
+              </Pressable>
+            )}
 
             <View style={styles.field}>
               <Text style={styles.label}>
@@ -479,6 +514,26 @@ const useStyles = createStyleHook((Colors) => ({
     paddingTop: 18,
   },
   field: { gap: 6 },
+  lessonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    minHeight: 52,
+    paddingHorizontal: Spacing.compact,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.control,
+    borderCurve: CornerCurve.squircle,
+    backgroundColor: Colors.surface,
+  },
+  lessonCopy: { flex: 1, gap: 2 },
+  lessonValue: {
+    fontFamily: FontFamily.text,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: "500",
+    color: Colors.ink,
+  },
   label: {
     fontFamily: FontFamily.text,
     fontSize: 12,
