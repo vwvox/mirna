@@ -15,7 +15,8 @@
 
 - Hooks must be installed through `SqlitePoolOptions::after_connect` before connections exist. Attaching later misses writes.
 - Signals are best-effort for writes executed through hooked pooled connections only. External writers and unhooked connections are invisible.
-- Emit only after commit. Rollback must clear pending state without broadcasting.
+- Emit only once the commit is visible to other connections. SQLite's commit hook runs before the WAL is written, so it only stages changes; `commit_trace` publishes them when the committing statement finishes (`SQLITE_TRACE_PROFILE`) or, for a commit made inside `sqlite3_reset` (e.g. `INSERT ... RETURNING` read with `fetch_one`/`fetch_optional`), at the connection's next statement. Prefer `execute`/`fetch_all` or a transaction for writes to watched tables. The cloudsync path publishes from the WAL hook, which is already post-commit.
+- Rollback must clear pending and staged state without broadcasting.
 - One committed transaction gets one monotonically increasing `seq`; every table event flushed from that transaction shares it.
 - Multiple writes to the same table inside one transaction coalesce. `TableChangeKind` is last-write metadata, not a full mutation history.
 - Consumers should treat `table + seq` as the invalidation signal. Do not build correctness on the exact `Insert`/`Update`/`Delete` mix.

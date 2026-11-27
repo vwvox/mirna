@@ -1,5 +1,9 @@
+mod commit_trace;
 mod notifier;
 mod tracker;
+
+#[cfg(test)]
+mod tests;
 
 pub use notifier::ChangeNotifier;
 

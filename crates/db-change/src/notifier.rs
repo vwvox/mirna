@@ -5,6 +5,7 @@ use tokio::sync::broadcast;
 
 use sqlx::sqlite::SqliteOperation;
 
+use crate::commit_trace;
 use crate::tracker::{ChangeTracker, HookState};
 use crate::{TableChange, TableChangeKind};
 
@@ -73,21 +74,29 @@ impl ChangeNotifier {
 
                 let commit_state = Arc::clone(&hook_state);
                 if cloudsync_enabled {
+                    // The observer reports commits from SQLite's WAL hook, which runs
+                    // once the commit is visible.
                     anlg_cloudsync::install_transaction_observer(
                         &mut handle,
-                        move || commit_state.flush(),
+                        move || commit_state.publish_all(),
                         move || hook_state.clear(),
                     )
                     .map_err(|error| sqlx::Error::Configuration(Box::new(error)))?;
                 } else {
                     handle.set_commit_hook(move || {
-                        commit_state.flush();
+                        commit_state.stage_commit();
+                        #[cfg(test)]
+                        commit_state.pause_at_test_commit_gate();
                         true
                     });
 
+                    let rollback_state = Arc::clone(&hook_state);
                     handle.set_rollback_hook(move || {
-                        hook_state.clear();
+                        rollback_state.clear();
                     });
+
+                    commit_trace::install(&mut handle, hook_state)
+                        .map_err(|error| sqlx::Error::Configuration(Box::new(error)))?;
                 }
                 drop(handle);
 
@@ -115,5 +124,13 @@ impl ChangeNotifier {
 
     pub fn latest_table_seq(&self, table: &str) -> Option<u64> {
         self.change_tracker.latest_table_seq(table)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pause_next_commit(&self) -> Arc<crate::tests::CommitGate> {
+        let gate = Arc::new(crate::tests::CommitGate::default());
+        self.change_tracker
+            .install_test_commit_gate(Arc::clone(&gate));
+        gate
     }
 }

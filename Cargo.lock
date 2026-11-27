@@ -4405,7 +4405,9 @@ name = "db-change"
 version = "0.1.0"
 dependencies = [
  "cloudsync",
+ "libsqlite3-sys",
  "sqlx",
+ "tempfile",
  "tokio",
 ]
 
