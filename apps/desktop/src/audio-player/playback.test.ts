@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { configureCenteredPlayback, shouldResumeBeforePlay } from "./playback";
+import {
+  configureCenteredPlayback,
+  routeCentered,
+  shouldResumeBeforePlay,
+} from "./playback";
 
 function createFakeContext() {
   const destination = {};
@@ -94,5 +98,61 @@ describe("shouldResumeBeforePlay", () => {
 
   it("returns false without a context", () => {
     expect(shouldResumeBeforePlay(null)).toBe(false);
+  });
+});
+
+describe("routeCentered", () => {
+  function graph() {
+    const destination = {};
+    const mono = {
+      channelCount: 2,
+      channelCountMode: "max",
+      channelInterpretation: "discrete",
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    const splitter = { connect: vi.fn(), disconnect: vi.fn() };
+    const source = { connect: vi.fn(), disconnect: vi.fn() };
+    const context = {
+      createGain: vi.fn(() => mono),
+      createChannelSplitter: vi.fn(() => splitter),
+      destination,
+    };
+    return { context, destination, mono, source, splitter };
+  }
+
+  it("mixes both channels into one voice in both ears", () => {
+    const { context, destination, mono, source } = graph();
+    const route = routeCentered(
+      context as unknown as AudioContext,
+      source as unknown as AudioNode,
+    );
+    expect(route.output).toBe(mono);
+    expect(source.connect).toHaveBeenCalledWith(mono);
+    expect(mono.connect).toHaveBeenCalledWith(destination);
+    expect(context.createChannelSplitter).not.toHaveBeenCalled();
+    expect(mono).toMatchObject({
+      channelCount: 1,
+      channelCountMode: "explicit",
+      channelInterpretation: "speakers",
+    });
+  });
+
+  it("plays only the chosen channel, in both ears", () => {
+    const { context, mono, source, splitter } = graph();
+    const route = routeCentered(
+      context as unknown as AudioContext,
+      source as unknown as AudioNode,
+      1,
+    );
+    expect(context.createChannelSplitter).toHaveBeenCalledWith(2);
+    expect(source.connect).toHaveBeenCalledWith(splitter);
+    expect(source.connect).not.toHaveBeenCalledWith(mono);
+    expect(splitter.connect).toHaveBeenCalledWith(mono, 1);
+
+    route.disconnect();
+    expect(source.disconnect).toHaveBeenCalled();
+    expect(splitter.disconnect).toHaveBeenCalled();
+    expect(mono.disconnect).toHaveBeenCalled();
   });
 });

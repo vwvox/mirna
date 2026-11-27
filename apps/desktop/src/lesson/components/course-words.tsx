@@ -467,8 +467,7 @@ function WordCard({
                           ? stopClip()
                           : void playSessionClip(
                               place.lesson.sessionId,
-                              place.clip.startMs,
-                              place.clip.endMs,
+                              place.clip,
                               1,
                               place.id,
                             )

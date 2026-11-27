@@ -4,6 +4,10 @@
  * has to be decoded whole.
  */
 
+import type { ClipRange } from "./clips";
+
+import { routeCentered } from "~/audio-player/playback";
+
 const MIN_HZ = 70;
 const MAX_HZ = 500;
 const SILENCE_RMS = 0.01;
@@ -165,8 +169,7 @@ function audioContext() {
 /** Plays a stretch of an audio file and returns its pitch frames. */
 export async function samplePlayedClip(
   url: string,
-  startMs: number,
-  endMs: number,
+  { startMs, endMs, channel }: ClipRange,
 ): Promise<Array<number | null>> {
   const context = audioContext();
   const audio = new Audio();
@@ -178,17 +181,22 @@ export async function samplePlayedClip(
       once: true,
     });
   });
-  const source = context.createMediaElementSource(audio);
-  source.connect(context.destination);
+  // Heard in both ears, and only the teacher's side of a call, so the pitch
+  // line follows their voice alone.
+  const route = routeCentered(
+    context,
+    context.createMediaElementSource(audio),
+    channel ?? null,
+  );
   audio.currentTime = startMs / 1000;
-  const sampler = sampleFrom(context, source);
+  const sampler = sampleFrom(context, route.output);
   await audio.play();
   await new Promise((resolve) =>
     window.setTimeout(resolve, Math.max(300, endMs - startMs)),
   );
   audio.pause();
   const frames = sampler.stop();
-  source.disconnect();
+  route.disconnect();
   return frames;
 }
 

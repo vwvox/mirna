@@ -3,10 +3,33 @@ import type { RenderedTranscriptSegment } from "@anlg/plugin-transcription";
 import { countSyllables } from "./language";
 import { type LessonRoleOf, lessonRoles } from "./roles";
 
+/**
+ * The side of the recording a voice is on: 0 is the mic, 1 the call. Only a call
+ * recorded on the Mac keeps them apart; otherwise it's null and both are played.
+ */
+export type ClipChannel = 0 | 1 | null;
+export type ChannelOf = (segment: RenderedTranscriptSegment) => ClipChannel;
+
+export function recordingChannels(
+  segments: readonly RenderedTranscriptSegment[],
+): ChannelOf {
+  const channels = new Set(segments.map((segment) => segment.key.channel));
+  if (!channels.has("DirectMic") || !channels.has("RemoteParty")) {
+    return () => null;
+  }
+  return (segment) =>
+    segment.key.channel === "DirectMic"
+      ? 0
+      : segment.key.channel === "RemoteParty"
+        ? 1
+        : null;
+}
+
 export type TermOccurrence = {
   startMs: number;
   endMs: number;
   byTeacher: boolean;
+  channel: ClipChannel;
 };
 
 const CLIP_LEAD_MS = 300;
@@ -90,6 +113,7 @@ export function findTermOccurrences(
   segments: RenderedTranscriptSegment[],
   term: string,
   roleOf: LessonRoleOf = lessonRoles(segments, null),
+  channelOf: ChannelOf = recordingChannels(segments),
 ): TermOccurrence[] {
   const needle = normalize(term);
   if (!needle) return [];
@@ -123,6 +147,7 @@ export function findTermOccurrences(
           startMs: covered[0]!.start,
           endMs: covered[covered.length - 1]!.end,
           byTeacher: roleOf(segment) === "teacher",
+          channel: channelOf(segment),
         });
       }
       index = text.indexOf(needle, until);
@@ -138,7 +163,7 @@ export function findTermOccurrences(
 export function pickTermClip(
   occurrences: TermOccurrence[],
   aroundMs: number | null,
-): { startMs: number; endMs: number } | null {
+): ClipRange | null {
   if (occurrences.length === 0) return null;
   const teacher = occurrences.filter((occurrence) => occurrence.byTeacher);
   const pool = teacher.length > 0 ? teacher : occurrences;
@@ -154,10 +179,16 @@ export function pickTermClip(
   return {
     startMs: Math.max(0, best.startMs - CLIP_LEAD_MS),
     endMs: best.endMs + CLIP_TAIL_MS,
+    channel: best.channel,
   };
 }
 
-type ClipRange = { startMs: number; endMs: number };
+/** A stretch of a recording to play, and which side of it, when that's known. */
+export type ClipRange = {
+  startMs: number;
+  endMs: number;
+  channel?: ClipChannel;
+};
 
 /**
  * For a correction at `atMs`: the student's line just before it and the
@@ -187,11 +218,13 @@ export function correctionClips(
       segment.start_ms <= atMs + 15_000 &&
       (!you || segment.start_ms >= you.end_ms - 500),
   );
+  const channelOf = recordingChannels(segments);
   const range = (segment: RenderedTranscriptSegment | undefined) =>
     segment
       ? {
           startMs: Math.max(0, segment.start_ms - 200),
           endMs: Math.min(segment.end_ms + 300, segment.start_ms + 12_000),
+          channel: channelOf(segment),
         }
       : null;
   return { you: range(you), teacher: range(teacher) };

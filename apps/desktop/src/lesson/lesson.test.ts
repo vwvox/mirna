@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RenderedTranscriptSegment } from "@anlg/plugin-transcription";
 import { computeCurrentNoteTab, createEditorTabs } from "@anlg/utils/session";
 
-import { findTermOccurrences, pickTermClip } from "./clips";
+import { findTermOccurrences, pickTermClip, recordingChannels } from "./clips";
 import { summarizeTalk } from "./components/talk-strip";
 import { buildAnkiText, buildPlecoText } from "./export";
 import {
@@ -84,9 +84,27 @@ describe("term clips", () => {
     expect(pickTermClip(found, 29_000)).toEqual({
       startMs: 29_700,
       endMs: 32_250,
+      channel: 1,
     });
     expect(pickTermClip(found, null)?.startMs).toBe(1_800);
     expect(pickTermClip([], 0)).toBeNull();
+  });
+
+  it("plays only the speaker's side of a call recorded on the Mac", () => {
+    const found = findTermOccurrences(segments, "饺子");
+    // The mic is the left channel, the call the right.
+    expect(found.map((item) => item.channel)).toEqual([1, 0, 1]);
+  });
+
+  it("plays both sides when the voices share one channel", () => {
+    const phone = segments.map((item) => ({
+      ...item,
+      key: { ...item.key, channel: "DirectMic" as const },
+    }));
+    expect(
+      findTermOccurrences(phone, "饺子").map((item) => item.channel),
+    ).toEqual([null, null, null]);
+    expect(recordingChannels(phone)(phone[0]!)).toBeNull();
   });
 });
 

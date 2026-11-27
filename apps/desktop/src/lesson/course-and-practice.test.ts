@@ -226,8 +226,12 @@ describe("corrections and sentences", () => {
       lessonRoles(segments, "me"),
       10_500,
     );
-    expect(clips.you).toEqual({ startMs: 9_800, endMs: 11_300 });
-    expect(clips.teacher).toEqual({ startMs: 11_000, endMs: 13_300 });
+    expect(clips.you).toEqual({ startMs: 9_800, endMs: 11_300, channel: null });
+    expect(clips.teacher).toEqual({
+      startMs: 11_000,
+      endMs: 13_300,
+      channel: null,
+    });
   });
 
   it("finds the sentence a word was said in", () => {

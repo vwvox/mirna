@@ -18,7 +18,12 @@ import {
   stopClip,
   usePlayingClip,
 } from "../clip-player";
-import { findTermOccurrences, pickTermClip } from "../clips";
+import {
+  type ClipRange,
+  findTermOccurrences,
+  pickTermClip,
+  recordingChannels,
+} from "../clips";
 import { LessonLanguageProvider } from "../language-context";
 import { looksLikeLanguage, usesPinyin } from "../languages";
 import {
@@ -73,7 +78,7 @@ function inMode(card: Pick<PracticeCard, "kind">, mode: Mode) {
 const MODE_KEY = "mirna:practice-mode";
 const MAX_SENTENCE_SYLLABLES = 16;
 
-type Range = { startMs: number; endMs: number };
+type Range = ClipRange;
 /** A sentence picked from the rail to shadow, by where it was said. */
 type ShadowPick = { sessionId: string; text: string; atMs: number };
 type Sentence = { sessionId: string; text: string; clip: Range | null };
@@ -112,7 +117,8 @@ export function sentenceAround(
     .filter(Boolean);
   const piece =
     pieces.find((item) => item.includes(term)) ?? segment.text.trim();
-  const found = findTermOccurrences([segment], piece, roleOf)[0];
+  const channelOf = recordingChannels(segments);
+  const found = findTermOccurrences([segment], piece, roleOf, channelOf)[0];
   const range = found
     ? { startMs: found.startMs, endMs: found.endMs }
     : { startMs: segment.start_ms, endMs: segment.end_ms };
@@ -121,6 +127,7 @@ export function sentenceAround(
     clip: {
       startMs: Math.max(0, range.startMs - 200),
       endMs: Math.min(range.endMs + 400, range.startMs + 15_000),
+      channel: channelOf(segment),
     },
   };
 }
@@ -146,6 +153,7 @@ function locatePick(
   return {
     startMs: Math.max(0, nearest.startMs - 200),
     endMs: nearest.endMs + 400,
+    channel: nearest.channel,
   };
 }
 
@@ -470,8 +478,8 @@ export function LessonPracticeDialog({
                   </Trans>
                 ) : (
                   <Trans>
-                    Say it out loud, then show the answer. Rating yourself
-                    takes you to the next word.
+                    Say it out loud, then show the answer. Rating yourself takes
+                    you to the next word.
                   </Trans>
                 )}
               </p>
@@ -482,13 +490,11 @@ export function LessonPracticeDialog({
                 <p className="text-muted-foreground text-xs">
                   {isSubjectMode(mode) ? (
                     <Trans>
-                      How well did you know it? Pick one to go to the next
-                      card.
+                      How well did you know it? Pick one to go to the next card.
                     </Trans>
                   ) : (
                     <Trans>
-                      How well did you know it? Pick one to go to the next
-                      word.
+                      How well did you know it? Pick one to go to the next word.
                     </Trans>
                   )}
                 </p>
@@ -550,40 +556,40 @@ export function LessonPracticeDialog({
             </RailPanel>
 
             {practisesChinese ? (
-            <RailPanel title={t`Tones you miss most`}>
-              {missed.length > 0 ? (
-                <>
-                  {missed.map((item) => (
-                    <div
-                      key={item.tone}
-                      className="flex justify-between gap-2 text-sm"
+              <RailPanel title={t`Tones you miss most`}>
+                {missed.length > 0 ? (
+                  <>
+                    {missed.map((item) => (
+                      <div
+                        key={item.tone}
+                        className="flex justify-between gap-2 text-sm"
+                      >
+                        <b>{toneName[item.tone]}</b>
+                        <span className="text-muted-foreground">
+                          <Trans>
+                            {item.missed} of your last {item.of}
+                          </Trans>
+                        </span>
+                      </div>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!tools}
+                      onClick={() => drill(missed[0]!.tone)}
                     >
-                      <b>{toneName[item.tone]}</b>
-                      <span className="text-muted-foreground">
-                        <Trans>
-                          {item.missed} of your last {item.of}
-                        </Trans>
-                      </span>
-                    </div>
-                  ))}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!tools}
-                    onClick={() => drill(missed[0]!.tone)}
-                  >
-                    {drillName[missed[0]!.tone]}
-                  </Button>
-                </>
-              ) : (
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  <Trans>
-                    Say words out loud and Mirna keeps track of the tones you
-                    miss.
-                  </Trans>
-                </p>
-              )}
-            </RailPanel>
+                      {drillName[missed[0]!.tone]}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-xs leading-relaxed">
+                    <Trans>
+                      Say words out loud and Mirna keeps track of the tones you
+                      miss.
+                    </Trans>
+                  </p>
+                )}
+              </RailPanel>
             ) : null}
 
             {sentences.length > 0 && !isSubjectMode(mode) ? (
@@ -657,8 +663,7 @@ function ClipButton({
       aria-pressed={playing}
       onClick={() => {
         if (playing) stopClip();
-        else if (clip)
-          void playSessionClip(sessionId, clip.startMs, clip.endMs, rate, id);
+        else if (clip) void playSessionClip(sessionId, clip, rate, id);
       }}
     >
       {playing ? (
@@ -736,13 +741,7 @@ function PracticeCardView({
   useEffect(() => {
     if (mode !== "listen" || played.current || !own.ready || !clip) return;
     played.current = true;
-    void playSessionClip(
-      card.sessionId,
-      clip.startMs,
-      clip.endMs,
-      1,
-      "teacher",
-    );
+    void playSessionClip(card.sessionId, clip, 1, "teacher");
   }, [card.sessionId, clip, mode, own.ready]);
 
   const shadowing = mode === "shadow";
@@ -1032,9 +1031,7 @@ function YourTurn({
     const url = await sessionAudioUrl(teacherSessionId);
     if (!url) return;
     try {
-      const contour = contourOf(
-        await samplePlayedClip(url, teacherClip.startMs, teacherClip.endMs),
-      );
+      const contour = contourOf(await samplePlayedClip(url, teacherClip));
       setTeacher(contour.length > 3 ? contour : null);
       if (contour.length <= 3)
         setProblem(t`Couldn't hear a clear voice in the teacher's clip.`);
@@ -1186,7 +1183,7 @@ function RecallCardView({
         <ol className="flex flex-col gap-2">
           {steps.slice(0, stepsShown).map((step, index) => (
             <li key={index} className="flex items-start gap-2.5 text-sm">
-              <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss flex size-6 shrink-0 items-center justify-center rounded-pill text-xs font-bold">
+              <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss rounded-pill flex size-6 shrink-0 items-center justify-center text-xs font-bold">
                 {index + 1}
               </span>
               <MathText text={step} className="pt-0.5" />
@@ -1216,8 +1213,11 @@ function RecallCardView({
               {steps.length > 0 ? (
                 <ol className="flex flex-col gap-2">
                   {steps.map((step, index) => (
-                    <li key={index} className="flex items-start gap-2.5 text-sm">
-                      <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss flex size-6 shrink-0 items-center justify-center rounded-pill text-xs font-bold">
+                    <li
+                      key={index}
+                      className="flex items-start gap-2.5 text-sm"
+                    >
+                      <span className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss rounded-pill flex size-6 shrink-0 items-center justify-center text-xs font-bold">
                         {index + 1}
                       </span>
                       <MathText text={step} className="pt-0.5" />
