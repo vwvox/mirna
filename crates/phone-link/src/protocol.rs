@@ -102,7 +102,8 @@ pub struct RecordingStatus {
     pub id: String,
     pub state: RecordingState,
     pub received_bytes: u64,
-    /// `importing`, `transcribing` or `summarizing` while processing.
+    /// `importing`, `transcribing` or `summarizing` while processing; for a
+    /// lesson then `writing_sheet` and `planning_review`.
     #[serde(default)]
     pub stage: Option<String>,
     #[serde(default)]
