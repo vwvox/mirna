@@ -52,7 +52,27 @@ pub(super) struct SoniqoTranscriptNormalizer {
 pub(super) struct SoniqoChannelState {
     pub(super) active_start_ms: Option<i64>,
     pub(super) active_tokens: Vec<String>,
+    active_words: Vec<TimedWord>,
     committed_tokens: Vec<String>,
+}
+
+struct TimedWord {
+    token: String,
+    start_ms: i64,
+    end_ms: i64,
+}
+
+impl SoniqoChannelState {
+    fn set_active(&mut self, tokens: Vec<String>, words: &[Word]) {
+        self.active_tokens = tokens;
+        self.active_words = timed_words(words);
+    }
+
+    fn clear_active(&mut self) {
+        self.active_start_ms = None;
+        self.active_tokens.clear();
+        self.active_words.clear();
+    }
 }
 
 impl SoniqoTranscriptNormalizer {
@@ -99,8 +119,7 @@ impl SoniqoTranscriptNormalizer {
 
             if alternative.words.is_empty() {
                 if *is_final {
-                    state.active_start_ms = None;
-                    state.active_tokens.clear();
+                    state.clear_active();
                 }
                 return;
             }
@@ -112,7 +131,13 @@ impl SoniqoTranscriptNormalizer {
 
         if is_soniqo_cumulative_update(&state.active_tokens, &current_tokens) {
             let active_start_ms = state.active_start_ms.unwrap_or(current_start_ms);
-            retime_words(&mut alternative.words, active_start_ms, current_end_ms);
+            retime_active_words(
+                &mut alternative.words,
+                &state.active_words,
+                active_start_ms,
+                current_start_ms,
+                current_end_ms,
+            );
             *start = active_start_ms as f64 / 1000.0;
             *duration = ((current_end_ms - active_start_ms).max(50)) as f64 / 1000.0;
             state.active_start_ms = Some(active_start_ms);
@@ -120,16 +145,17 @@ impl SoniqoTranscriptNormalizer {
             let overlap = find_soniqo_overlap_prefix(&current_tokens, &state.active_tokens);
             if overlap > 0 {
                 let overlapped_tokens = current_tokens.clone();
+                let overlapped_words = timed_words(&alternative.words);
                 let overlapped_start_ms = current_start_ms;
                 drain_soniqo_prefix(alternative, &mut current_tokens, overlap);
 
                 if alternative.words.is_empty() {
                     if *is_final {
-                        state.active_start_ms = None;
-                        state.active_tokens.clear();
+                        state.clear_active();
                     } else {
                         state.active_start_ms = Some(overlapped_start_ms);
                         state.active_tokens = overlapped_tokens;
+                        state.active_words = overlapped_words;
                     }
                     return;
                 }
@@ -139,7 +165,13 @@ impl SoniqoTranscriptNormalizer {
                     word_start_ms(alternative.words.first().expect("checked non-empty"));
                 state.active_start_ms = Some(current_start_ms);
             } else if let Some(active_start_ms) = state.active_start_ms {
-                retime_words(&mut alternative.words, active_start_ms, current_end_ms);
+                retime_active_words(
+                    &mut alternative.words,
+                    &state.active_words,
+                    active_start_ms,
+                    current_start_ms,
+                    current_end_ms,
+                );
                 *start = active_start_ms as f64 / 1000.0;
                 *duration = ((current_end_ms - active_start_ms).max(50)) as f64 / 1000.0;
             } else {
@@ -149,10 +181,9 @@ impl SoniqoTranscriptNormalizer {
 
         if *is_final {
             extend_soniqo_committed_tokens(&mut state.committed_tokens, current_tokens);
-            state.active_start_ms = None;
-            state.active_tokens.clear();
+            state.clear_active();
         } else {
-            state.active_tokens = current_tokens;
+            state.set_active(current_tokens, &alternative.words);
         }
     }
 }
@@ -376,6 +407,51 @@ pub(super) fn normalize_tokens_for_overlap(words: &[Word]) -> Vec<String> {
         .map(normalize_word_token)
         .filter(|token| !token.is_empty())
         .collect()
+}
+
+fn timed_words(words: &[Word]) -> Vec<TimedWord> {
+    words
+        .iter()
+        .map(|word| TimedWord {
+            token: normalize_word_token(word),
+            start_ms: word_start_ms(word),
+            end_ms: word_end_ms(word),
+        })
+        .collect()
+}
+
+/// Soniqo resends the whole utterance with every partial. Words it already
+/// sent keep their earlier times; only new or changed words are spread over
+/// the latest audio. Re-spreading the whole utterance on every update moves
+/// words the processor has already committed (it commits partials older than
+/// its window), so they would slip past its watermark and be committed again.
+fn retime_active_words(
+    words: &mut [Word],
+    previous: &[TimedWord],
+    utterance_start_ms: i64,
+    window_start_ms: i64,
+    end_ms: i64,
+) {
+    let kept = words
+        .iter()
+        .zip(previous)
+        .take_while(|(word, timed)| normalize_word_token(word) == timed.token)
+        .count();
+
+    for (word, timed) in words.iter_mut().zip(previous).take(kept) {
+        word.start = timed.start_ms as f64 / 1000.0;
+        word.end = timed.end_ms as f64 / 1000.0;
+    }
+
+    let rest_start_ms = match kept.checked_sub(1) {
+        Some(last_kept) => previous[last_kept].end_ms.max(window_start_ms),
+        None => utterance_start_ms,
+    };
+    retime_words(
+        &mut words[kept..],
+        rest_start_ms,
+        end_ms.max(rest_start_ms + 50),
+    );
 }
 
 fn retime_words(words: &mut [Word], start_ms: i64, end_ms: i64) {

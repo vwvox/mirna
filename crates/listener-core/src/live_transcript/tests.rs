@@ -1086,3 +1086,82 @@ fn nari_empty_final_clears_only_its_preview_and_never_persists_unconfirmed_text(
     let flushed = engine.flush();
     assert!(flushed.is_none_or(|update| update.transcript_delta.new_words.is_empty()));
 }
+
+/// Streams one utterance the way the Soniqo live engine does when it never
+/// hears an end of utterance (e.g. a language it can't transcribe): the same
+/// cumulative partial every 250 ms, growing now and then, for longer than the
+/// processor's partial window.
+fn stream_unending_soniqo_utterance(engine: &mut LiveTranscriptEngine) -> Vec<String> {
+    let growth = [
+        (1.5, "to push"),
+        (1.75, "to push and abro"),
+        (2.0, "to push and abroad"),
+        (2.75, "to push and abroad what we achieved"),
+        (90.75, "to push and abroad what we achieved losing"),
+        (
+            91.5,
+            "to push and abroad what we achieved losing sanctuaries",
+        ),
+        (
+            140.25,
+            "to push and abroad what we achieved losing sanctuaries and they are facing",
+        ),
+        (
+            212.0,
+            "to push and abroad what we achieved losing sanctuaries and they are facing the report",
+        ),
+    ];
+    let mut words = Vec::new();
+    let mut text = "";
+    let mut window_start = 1.5;
+    while window_start < 246.5 {
+        if let Some((_, next)) = growth.iter().rev().find(|(at, _)| *at <= window_start) {
+            text = next;
+        }
+        let response = transcript_response_at(
+            text,
+            words_from_text(text, window_start, 0.25),
+            false,
+            1,
+            window_start,
+            0.25,
+        );
+        if let Some(update) = engine.process(&response) {
+            words.extend(
+                update
+                    .transcript_delta
+                    .new_words
+                    .into_iter()
+                    .map(|w| w.text),
+            );
+        }
+        window_start += 0.25;
+    }
+    if let Some(update) = engine.flush() {
+        words.extend(
+            update
+                .transcript_delta
+                .new_words
+                .into_iter()
+                .map(|w| w.text),
+        );
+    }
+    words
+}
+
+#[test]
+fn soniqo_engine_does_not_repeat_words_of_an_utterance_older_than_the_partial_window() {
+    let mut engine = LiveTranscriptEngine::new("soniqo", &[], None);
+
+    let words = stream_unending_soniqo_utterance(&mut engine);
+    let text = words
+        .iter()
+        .map(|word| word.trim())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    assert_eq!(
+        text,
+        "to push and abroad what we achieved losing sanctuaries and they are facing the report"
+    );
+}
