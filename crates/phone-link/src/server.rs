@@ -64,11 +64,18 @@ pub struct PairedPhone {
 
 #[derive(Debug, Clone)]
 pub enum ServerEvent {
-    PhonePaired { name: String, fingerprint: String },
-    RecordingReceived { id: String },
+    PhonePaired {
+        name: String,
+        fingerprint: String,
+    },
+    RecordingReceived {
+        id: String,
+    },
     /// A phone asked what changed: the Mac app should call `publish_notes`,
     /// including notes recorded on the Mac when `include_mac_notes` is set.
-    NotesRequested { include_mac_notes: bool },
+    NotesRequested {
+        include_mac_notes: bool,
+    },
 }
 
 /// A complete recording waiting for, or in, processing on the Mac, or a note
@@ -697,21 +704,34 @@ impl Inner {
     }
 
     fn read_status(&self, id: &str) -> RecordingStatus {
-        if let Some(status) =
-            read_json::<RecordingStatus>(&self.recording_dir(id).join("status.json"))
-                .ok()
-                .flatten()
-        {
-            return status;
-        }
+        let stored = read_json::<RecordingStatus>(&self.recording_dir(id).join("status.json"))
+            .ok()
+            .flatten();
+        let mut status = match stored {
+            // A note waiting for its longer recording (see `NoteJob::Extend`)
+            // keeps its link to the note; what has arrived is in the part file.
+            Some(status)
+                if matches!(
+                    status.state,
+                    RecordingState::Missing | RecordingState::Receiving
+                ) =>
+            {
+                status
+            }
+            Some(status) => return status,
+            None => RecordingStatus::missing(id),
+        };
         match std::fs::metadata(self.part_path(id)) {
-            Ok(metadata) => RecordingStatus {
-                state: RecordingState::Receiving,
-                received_bytes: metadata.len(),
-                ..RecordingStatus::missing(id)
-            },
-            Err(_) => RecordingStatus::missing(id),
+            Ok(metadata) => {
+                status.state = RecordingState::Receiving;
+                status.received_bytes = metadata.len();
+            }
+            Err(_) => {
+                status.state = RecordingState::Missing;
+                status.received_bytes = 0;
+            }
         }
+        status
     }
 
     fn write_status(&self, id: &str, status: &RecordingStatus) -> Result<(), Error> {
@@ -957,6 +977,15 @@ async fn request_job(
         .filter(|path| path.exists());
 
     match (status.state, &job) {
+        (_, NoteJob::Extend { .. }) => {
+            return match extend_recording(&inner, &id, status, inbox_audio, job.clone()) {
+                Ok(status) => {
+                    drop(guard);
+                    Json(status).into_response()
+                }
+                Err(response) => response,
+            };
+        }
         (RecordingState::Missing, _) => return json_error(StatusCode::CONFLICT, "no_audio"),
         (RecordingState::Processing, _) => return json_error(StatusCode::CONFLICT, "busy"),
         (RecordingState::Queued, _) if status.job.is_some() => {
@@ -1043,6 +1072,44 @@ async fn request_job(
     drop(guard);
     inner.emit(ServerEvent::RecordingReceived { id });
     Json(status).into_response()
+}
+
+/// More was recorded on the phone: whatever the Mac has of the shorter
+/// recording goes, and the phone sends the longer file from the start. A note
+/// the Mac already made stays linked to it, with an Extend job, so it is made
+/// again instead of a second note. Asking twice changes nothing.
+fn extend_recording(
+    inner: &Inner,
+    id: &str,
+    status: RecordingStatus,
+    inbox_audio: Option<PathBuf>,
+    job: NoteJob,
+) -> Result<RecordingStatus, Response> {
+    match status.state {
+        RecordingState::Processing => return Err(json_error(StatusCode::CONFLICT, "busy")),
+        RecordingState::Queued if status.job.is_some() => {
+            return Err(json_error(StatusCode::CONFLICT, "busy"));
+        }
+        RecordingState::Missing => return Ok(status),
+        _ => {}
+    }
+    let _ = std::fs::remove_file(inner.part_path(id));
+    if let Some(path) = inbox_audio {
+        let _ = std::fs::remove_file(path);
+    }
+    let waiting = RecordingStatus {
+        state: RecordingState::Missing,
+        received_bytes: 0,
+        job: status.session_id.is_some().then_some(job),
+        session_id: status.session_id,
+        updated_at_ms: now_ms(),
+        ..RecordingStatus::missing(id)
+    };
+    if let Err(error) = inner.write_status(id, &waiting) {
+        tracing::error!(%error, "could not make room for the longer recording");
+        return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "save_failed"));
+    }
+    Ok(waiting)
 }
 
 /// Keeps the phone's problem log (it sends the whole log each time).
@@ -1228,10 +1295,20 @@ async fn complete(
         size: request.size,
         sha256: digest,
     };
+    // A longer recording for a note the Mac made keeps that note and the
+    // Extend job, so the note is made again rather than a new one.
+    let (session_id, job) = match status.job {
+        Some(job @ NoteJob::Extend { .. }) if status.session_id.is_some() => {
+            (status.session_id.clone(), Some(job))
+        }
+        _ => (None, None),
+    };
     let queued = RecordingStatus {
         state: RecordingState::Queued,
         received_bytes: request.size,
         updated_at_ms: now_ms(),
+        session_id,
+        job,
         ..RecordingStatus::missing(&id)
     };
     let saved = (|| -> Result<(), Error> {

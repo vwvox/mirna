@@ -78,7 +78,9 @@ fn publish_all(server: &PhoneLinkServer, dir: &str, include_mac_notes: bool) {
             recording_id: None,
             session_id: "stub-mac-meeting".into(),
             title: "Meeting recorded on the stub Mac".into(),
-            summary_md: Some("- This note was recorded on the Mac.\n- Only its text is on the phone.".into()),
+            summary_md: Some(
+                "- This note was recorded on the Mac.\n- Only its text is on the phone.".into(),
+            ),
             transcripts: vec![NoteTranscript {
                 id: "stub-mac-meeting-t1".into(),
                 started_at_ms: now - 3_600_000,
@@ -137,8 +139,12 @@ async fn main() {
                     .map(|m| m.len())
                     .unwrap_or(0);
                 println!(
-                    "RECEIVED {id} {size} bytes title={:?} started_at={:?} notes={:?}",
-                    item.meta.title, item.meta.started_at, item.meta.notes_md
+                    "RECEIVED {id} {size} bytes title={:?} started_at={:?} notes={:?} job={:?} note={:?}",
+                    item.meta.title,
+                    item.meta.started_at,
+                    item.meta.notes_md,
+                    item.job,
+                    item.status.session_id
                 );
                 let server = server.clone();
                 tokio::spawn(async move {

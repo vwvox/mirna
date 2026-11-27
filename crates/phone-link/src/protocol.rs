@@ -104,6 +104,13 @@ pub enum NoteJob {
         #[serde(default = "yes")]
         update_summary: bool,
     },
+    /// More was recorded onto the phone's recording. The Mac drops the copy
+    /// it has, the phone sends the longer file from the start, and the note
+    /// is made again from it (same note, transcript and summary redone).
+    Extend {
+        #[serde(default = "yes")]
+        update_summary: bool,
+    },
 }
 
 fn yes() -> bool {
@@ -117,6 +124,7 @@ impl NoteJob {
                 matches!(engine.as_str(), "auto" | "parakeet" | "qwen3")
             }
             NoteJob::Trim { keep_ms, .. } => *keep_ms >= 1_000,
+            NoteJob::Extend { .. } => true,
         }
     }
 }

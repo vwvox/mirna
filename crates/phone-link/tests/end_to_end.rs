@@ -472,8 +472,14 @@ fn trims_a_wav_in_place_even_when_its_header_undercounts() {
     assert_eq!(trimmed.data_bytes, 128_000);
     let bytes = std::fs::read(&path).unwrap();
     assert_eq!(bytes.len(), 44 + 128_000);
-    assert_eq!(u32::from_le_bytes(bytes[40..44].try_into().unwrap()), 128_000);
-    assert_eq!(u32::from_le_bytes(bytes[4..8].try_into().unwrap()), 36 + 128_000);
+    assert_eq!(
+        u32::from_le_bytes(bytes[40..44].try_into().unwrap()),
+        128_000
+    );
+    assert_eq!(
+        u32::from_le_bytes(bytes[4..8].try_into().unwrap()),
+        36 + 128_000
+    );
     assert_eq!(&bytes[44..44 + 100], &audio[44..44 + 100]);
 
     // Keeping more than there is changes nothing but the header.
@@ -482,6 +488,107 @@ fn trims_a_wav_in_place_even_when_its_header_undercounts() {
 
     std::fs::write(&path, b"not a wav at all").unwrap();
     assert!(phone_link::trim_wav_file(&path, 1_000).is_err());
+}
+
+#[tokio::test]
+async fn a_longer_recording_replaces_the_one_the_mac_made_a_note_of() {
+    let mac = start_mac().await;
+    let client = paired_phone(&mac, "Phone A").await;
+    let id = "0b5a4c1e-0000-4000-8000-0000000000cc";
+    let extend = NoteJob::Extend {
+        update_summary: true,
+    };
+
+    // The Mac has nothing yet: there's nothing to drop, the phone just sends.
+    let status = client.note_job(id, &extend).await.unwrap();
+    assert_eq!(status.state, RecordingState::Missing);
+    assert_eq!(status.job, None);
+
+    send_recording(&client, id, &wav(2_000)).await;
+    mac.server
+        .update_status(
+            id,
+            StatusUpdate::Processing {
+                stage: "transcribing".into(),
+                session_id: Some("session-1".into()),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(conflict(client.note_job(id, &extend).await), "409 busy");
+    mac.server
+        .update_status(
+            id,
+            StatusUpdate::Done {
+                session_id: "session-1".into(),
+                title: Some("Standup".into()),
+                summary_md: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    // More was recorded on the phone: the Mac waits for the longer file and
+    // keeps its note. Asking twice changes nothing.
+    let status = client.note_job(id, &extend).await.unwrap();
+    assert_eq!(status.state, RecordingState::Missing);
+    assert_eq!(status.session_id.as_deref(), Some("session-1"));
+    assert_eq!(status.job, Some(extend.clone()));
+    let again = client.note_job(id, &extend).await.unwrap();
+    assert_eq!(again.job, Some(extend.clone()));
+    assert!(mac.server.inbox().unwrap().is_empty());
+
+    // It arrives in pieces, like any recording, then goes back to that note.
+    let longer = wav(5_000);
+    let (first, rest) = longer.split_at(1_000);
+    client
+        .upload_chunk(id, 0, Bytes::copy_from_slice(first))
+        .await
+        .unwrap();
+    let status = client.status(id).await.unwrap();
+    assert_eq!(status.state, RecordingState::Receiving);
+    assert_eq!(status.received_bytes, 1_000);
+    assert_eq!(status.session_id.as_deref(), Some("session-1"));
+    client
+        .upload_chunk(id, 1_000, Bytes::copy_from_slice(rest))
+        .await
+        .unwrap();
+    let status = client
+        .complete(
+            id,
+            &CompleteRequest {
+                size: longer.len() as u64,
+                sha256: sha256_hex(&longer),
+                meta: RecordingMeta {
+                    ext: "wav".into(),
+                    duration_ms: Some(5_000),
+                    ..Default::default()
+                },
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(status.state, RecordingState::Queued);
+    assert_eq!(status.session_id.as_deref(), Some("session-1"));
+    assert_eq!(status.job, Some(extend.clone()));
+    let item = mac.server.inbox().unwrap().remove(0);
+    assert_eq!(item.job, Some(extend.clone()));
+    assert_eq!(item.status.session_id.as_deref(), Some("session-1"));
+    assert_eq!(std::fs::read(&item.audio_path).unwrap(), longer);
+
+    // A shorter copy still waiting (never a note) is simply dropped.
+    let waiting = "0b5a4c1e-0000-4000-8000-0000000000dd";
+    send_recording(&client, waiting, &wav(1_000)).await;
+    let status = client.note_job(waiting, &extend).await.unwrap();
+    assert_eq!(status.state, RecordingState::Missing);
+    assert_eq!(status.job, None);
+    assert!(
+        mac.server
+            .inbox()
+            .unwrap()
+            .iter()
+            .all(|item| item.id != waiting)
+    );
 }
 
 #[tokio::test]
@@ -506,7 +613,10 @@ async fn phone_asks_for_note_jobs_and_sends_its_log() {
     assert_eq!(status.job, None);
     let item = mac.server.inbox().unwrap().remove(0);
     assert_eq!(item.meta.duration_ms, Some(4_000));
-    assert_eq!(std::fs::metadata(&item.audio_path).unwrap().len(), 44 + 128_000);
+    assert_eq!(
+        std::fs::metadata(&item.audio_path).unwrap().len(),
+        44 + 128_000
+    );
 
     // It will be transcribed anyway, so asking again changes nothing.
     let retranscribe = NoteJob::Retranscribe {
@@ -539,7 +649,10 @@ async fn phone_asks_for_note_jobs_and_sends_its_log() {
         )
         .await
         .unwrap();
-    assert_eq!(conflict(client.note_job(id, &retranscribe).await), "409 busy");
+    assert_eq!(
+        conflict(client.note_job(id, &retranscribe).await),
+        "409 busy"
+    );
 
     // Once it's a note, the job is queued even though the inbox copy is gone.
     mac.server
@@ -559,7 +672,10 @@ async fn phone_asks_for_note_jobs_and_sends_its_log() {
     let item = mac.server.inbox().unwrap().remove(0);
     assert_eq!(item.job, Some(retranscribe.clone()));
     assert!(!item.audio_path.exists());
-    assert_eq!(conflict(client.note_job(id, &retranscribe).await), "409 busy");
+    assert_eq!(
+        conflict(client.note_job(id, &retranscribe).await),
+        "409 busy"
+    );
 
     // A failed job can be tried again; finishing clears it.
     mac.server
@@ -572,7 +688,10 @@ async fn phone_asks_for_note_jobs_and_sends_its_log() {
         )
         .await
         .unwrap();
-    assert_eq!(client.status(id).await.unwrap().job, Some(retranscribe.clone()));
+    assert_eq!(
+        client.status(id).await.unwrap().job,
+        Some(retranscribe.clone())
+    );
     let status = client.retry(id).await.unwrap();
     assert_eq!(status.state, RecordingState::Queued);
     let status = mac

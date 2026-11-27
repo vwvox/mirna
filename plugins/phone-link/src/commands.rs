@@ -57,7 +57,8 @@ pub struct InboxEntry {
 }
 
 /// Work the phone asked for on a note: transcribe again (`engine` is `auto`,
-/// `parakeet` or `qwen3`) or keep only the first `keep_ms` of the recording.
+/// `parakeet` or `qwen3`), keep only the first `keep_ms` of the recording, or
+/// make the note again from a longer recording the phone just sent (`extend`).
 #[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InboxJob {
@@ -67,6 +68,9 @@ pub enum InboxJob {
     },
     Trim {
         keep_ms: f64,
+        update_summary: bool,
+    },
+    Extend {
         update_summary: bool,
     },
 }
@@ -88,6 +92,7 @@ impl From<NoteJob> for InboxJob {
                 keep_ms: keep_ms as f64,
                 update_summary,
             },
+            NoteJob::Extend { update_summary } => InboxJob::Extend { update_summary },
         }
     }
 }
@@ -435,7 +440,10 @@ pub(crate) async fn export_logs<R: tauri::Runtime>(
         .as_ref()
         .map(PhoneLinkServer::phone_diagnostics)
         .unwrap_or_default();
-    let log_dir = app.path().app_log_dir().map_err(|error| error.to_string())?;
+    let log_dir = app
+        .path()
+        .app_log_dir()
+        .map_err(|error| error.to_string())?;
     let version = app.package_info().version.to_string();
     let destination = std::path::PathBuf::from(destination);
     tauri::async_runtime::spawn_blocking(move || {
@@ -457,7 +465,12 @@ pub(crate) fn write_log_export(
     let mut out = std::io::BufWriter::new(std::fs::File::create(destination)?);
     writeln!(out, "# Mirna logs")?;
     writeln!(out, "# app: Mirna for Mac {version}")?;
-    writeln!(out, "# system: {} {}", std::env::consts::OS, std::env::consts::ARCH)?;
+    writeln!(
+        out,
+        "# system: {} {}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    )?;
     writeln!(
         out,
         "# exported: {}",
@@ -502,7 +515,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("app.log"), "mac line\n").unwrap();
         let phone_log = dir.path().join("phone.log");
-        std::fs::write(&phone_log, "# phone: Pixel\n{\"event\":\"recording_saved\"}\n").unwrap();
+        std::fs::write(
+            &phone_log,
+            "# phone: Pixel\n{\"event\":\"recording_saved\"}\n",
+        )
+        .unwrap();
         let destination = dir.path().join("export.txt");
         write_log_export(
             &destination,

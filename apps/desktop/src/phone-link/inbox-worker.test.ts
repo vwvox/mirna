@@ -5,6 +5,7 @@ import type { InboxEntry, InboxJob } from "@anlg/plugin-phone-link";
 const mocks = vi.hoisted(() => ({
   audioPath: vi.fn(),
   audioTrim: vi.fn(),
+  audioImport: vi.fn(),
   isModelDownloaded: vi.fn(),
   updateRecording: vi.fn(),
   execute: vi.fn(),
@@ -19,7 +20,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@anlg/plugin-fs-sync", () => ({
-  commands: { audioPath: mocks.audioPath, audioTrim: mocks.audioTrim },
+  commands: {
+    audioPath: mocks.audioPath,
+    audioTrim: mocks.audioTrim,
+    audioImport: mocks.audioImport,
+  },
 }));
 vi.mock("@anlg/plugin-local-stt", () => ({
   commands: { isModelDownloaded: mocks.isModelDownloaded },
@@ -205,6 +210,61 @@ describe("work the phone asks for on a note", () => {
       type: "failed",
       error:
         "This note has recordings added on the Mac, so it can't be trimmed from the phone yet.",
+    });
+  });
+
+  it("makes the note again from the longer recording the phone sent", async () => {
+    mocks.audioImport.mockResolvedValue({ status: "ok", data: "/s/audio.mp3" });
+    const runBatch = vi.fn().mockResolvedValue(undefined);
+    await processJob(
+      item,
+      { type: "extend", update_summary: true },
+      "session-1",
+      runBatch,
+    );
+
+    // Same note: its audio is replaced by the longer file, not a new note.
+    expect(mocks.audioImport).toHaveBeenCalledWith(
+      "session-1",
+      "/inbox/rec-1/audio.wav",
+    );
+    expect(mocks.catalogLocalSessionAudio).toHaveBeenCalledWith("session-1");
+    expect(runBatch).toHaveBeenCalledWith("/s/audio.mp3", {
+      promotion: { scope: "whole_session" },
+      captureInterval: {
+        startedAtMs: Date.parse("2026-11-24T12:35:16.420Z"),
+        stoppedAtMs: Date.parse("2026-11-24T12:35:16.420Z") + 5_445_900,
+      },
+    });
+    expect(mocks.enhanceAndWait).toHaveBeenCalledWith("session-1");
+    expect(
+      updates()
+        .filter((update) => update.type === "processing")
+        .map((update) => update.stage),
+    ).toEqual(["importing", "transcribing", "summarizing"]);
+    expect(lastUpdate()).toMatchObject({
+      type: "done",
+      session_id: "session-1",
+      summary_md: "# Summary",
+    });
+  });
+
+  it("won't replace a note's audio that has a recording added on the Mac", async () => {
+    mocks.execute.mockResolvedValue([{ id: "phone" }, { id: "mac" }]);
+    const runBatch = vi.fn();
+    await processJob(
+      item,
+      { type: "extend", update_summary: true },
+      "session-1",
+      runBatch,
+    );
+    expect(mocks.audioImport).not.toHaveBeenCalled();
+    expect(runBatch).not.toHaveBeenCalled();
+    expect(lastUpdate()).toMatchObject({
+      type: "failed",
+      error:
+        "This note has a recording added on the Mac, so what you recorded on the phone can't be added to it yet.",
+      session_id: "session-1",
     });
   });
 });

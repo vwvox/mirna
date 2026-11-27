@@ -123,9 +123,10 @@ state: string; stage: string | null; session_id: string | null;
 job: InboxJob | null }
 /**
  * Work the phone asked for on a note: transcribe again (`engine` is `auto`,
- * `parakeet` or `qwen3`) or keep only the first `keep_ms` of the recording.
+ * `parakeet` or `qwen3`), keep only the first `keep_ms` of the recording, or
+ * make the note again from a longer recording the phone just sent (`extend`).
  */
-export type InboxJob = { type: "retranscribe"; engine: string; update_summary: boolean } | { type: "trim"; keep_ms: number; update_summary: boolean }
+export type InboxJob = { type: "retranscribe"; engine: string; update_summary: boolean } | { type: "trim"; keep_ms: number; update_summary: boolean } | { type: "extend"; update_summary: boolean }
 /**
  * A phone recording that became a note on this Mac.
  */

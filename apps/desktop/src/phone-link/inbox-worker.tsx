@@ -167,7 +167,7 @@ function RunPhoneRecording({
         .finally(() => {
           runningRecordings.delete(item.id);
           sessionsByRecording.delete(item.id);
-          if (item.job?.type === "trim") {
+          if (item.job?.type === "trim" || item.job?.type === "extend") {
             reloadSessionAudio(queryClient, sessionId);
           }
           void queryClient.invalidateQueries({
@@ -302,16 +302,22 @@ const ENGINES: Record<
   qwen3: { provider: "soniqo", model: "soniqo-qwen3-small", name: "Qwen3-ASR" },
 };
 
-// Work the phone asked for on a note it already has: transcribe it again, or
-// cut the end of the recording. Then the summary is written again (or marked
-// out of date), and the phone downloads the new text.
+// Work the phone asked for on a note it already has: transcribe it again, cut
+// the end of the recording, or take the longer recording after more was
+// recorded on the phone. Then the summary is written again (or marked out of
+// date), and the phone downloads the new text.
 export async function processJob(
   item: InboxEntry,
   job: InboxJob,
   sessionId: string,
   runBatch: ReturnType<typeof useRunBatch>,
 ) {
-  let stage = job.type === "trim" ? "trimming" : "transcribing";
+  let stage =
+    job.type === "trim"
+      ? "trimming"
+      : job.type === "extend"
+        ? "importing"
+        : "transcribing";
   const setStage = async (next: string) => {
     stage = next;
     await reportUpdate(item.id, {
@@ -325,6 +331,10 @@ export async function processJob(
     await setStage(stage);
     if (job.type === "retranscribe") {
       await retranscribe(item, job.engine, sessionId, runBatch);
+    } else if (job.type === "extend") {
+      await takeLongerRecording(item, sessionId, runBatch, () =>
+        setStage("transcribing"),
+      );
     } else {
       await trimNote(sessionId, job.keep_ms);
     }
@@ -363,7 +373,9 @@ export async function processJob(
             ? "Transcription was stopped on the Mac."
             : job.type === "trim"
               ? "The Mac couldn't trim this recording."
-              : "The Mac couldn't transcribe this recording again.",
+              : job.type === "extend"
+                ? "The Mac couldn't add what you recorded to this note."
+                : "The Mac couldn't transcribe this recording again.",
       session_id: sessionId,
     });
   }
@@ -398,6 +410,50 @@ async function retranscribe(
     ...(choice ? { provider: choice.provider, model: choice.model } : {}),
     captureInterval:
       captureIntervalOf(item) ?? (await existingCaptureInterval(sessionId)),
+  });
+}
+
+/**
+ * The phone recorded more onto this note's recording and sent the whole,
+ * longer file. It replaces the note's audio, and the note is transcribed
+ * from it again. A recording added to the note on this Mac lives in the same
+ * audio file, so the phone's copy can't replace it: that case is refused.
+ */
+async function takeLongerRecording(
+  item: InboxEntry,
+  sessionId: string,
+  runBatch: ReturnType<typeof useRunBatch>,
+  onTranscribing: () => Promise<void>,
+) {
+  const transcripts = await liveQueryClient.execute<{ id: string }>(
+    `SELECT id FROM transcripts WHERE session_id = ? AND deleted_at IS NULL`,
+    [sessionId],
+  );
+  if (transcripts.length > 1) {
+    throw new JobProblem(
+      "This note has a recording added on the Mac, so what you recorded on the phone can't be added to it yet.",
+    );
+  }
+  const importedPath = await enqueueSessionAudioOperation(
+    sessionId,
+    async () => {
+      const result = await fsSyncCommands.audioImport(
+        sessionId,
+        item.audio_path,
+      );
+      if (result.status === "error") throw new Error(result.error);
+      try {
+        await catalogLocalSessionAudio(sessionId);
+      } catch (error) {
+        console.error("[phone-link] could not catalog the audio", error);
+      }
+      return result.data;
+    },
+  );
+  await onTranscribing();
+  await runBatch(importedPath, {
+    promotion: { scope: "whole_session" },
+    captureInterval: captureIntervalOf(item),
   });
 }
 
