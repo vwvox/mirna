@@ -19,6 +19,8 @@ export type NoteActionsSheetProps = {
   onRetranscribe?: () => void;
   /** Cut the end off the recording (when there is one). */
   onTrim?: () => void;
+  /** Record onto the end of this phone's recording (when it can). */
+  onRecordMore?: () => void;
   visible: boolean;
 };
 
@@ -34,6 +36,7 @@ export function NoteActionsSheet({
   onVersionHistory,
   onRetranscribe,
   onTrim,
+  onRecordMore,
   visible,
 }: NoteActionsSheetProps) {
   const styles = useStyles();
@@ -122,6 +125,19 @@ export function NoteActionsSheet({
             >
               <Ionicons name="refresh-outline" size={20} color={Colors.ink} />
               <Text style={styles.actionLabel}>Transcribe again on Mac</Text>
+            </Pressable>
+          )}
+          {!listening && onRecordMore && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => select(onRecordMore)}
+              style={({ pressed }) => [
+                styles.action,
+                pressed && styles.actionPressed,
+              ]}
+            >
+              <Ionicons name="mic-outline" size={20} color={Colors.ink} />
+              <Text style={styles.actionLabel}>Record more</Text>
             </Pressable>
           )}
           {!listening && onTrim && (

@@ -37,6 +37,27 @@ WHERE session.deleted_at IS NULL
   )
 `;
 
+// "Record more" writes onto a note's cataloged recording. Cut off before it
+// was saved, the file is longer than its catalog row says.
+const GROWN_RECORDINGS_SQL = `
+SELECT attachment.session_id AS id, attachment.size_bytes
+FROM session_attachments AS attachment
+JOIN sessions AS session
+  ON session.id = attachment.session_id AND session.deleted_at IS NULL
+JOIN attachment_local_state AS local_state
+  ON local_state.attachment_id = attachment.id AND local_state.availability = 'present'
+WHERE attachment.source_type = 'session_audio'
+  AND attachment.source_id = 'primary'
+  AND attachment.deleted_at IS NULL
+  AND attachment.filename = 'audio.wav'
+  AND (
+    ? IS NULL
+    OR session.owner_user_id = ?
+    OR session.owner_user_id IS NULL
+    OR session.owner_user_id = '00000000-0000-0000-0000-000000000000'
+  )
+`;
+
 void clearStaleMeetingRecordingActivities().catch((error) => {
   captureOperationalError(error, {
     operation: "recording_live_activity_cleanup",
@@ -99,6 +120,44 @@ export async function recoverInterruptedRecordings(
         operation: "recording_recovery",
         level: "warning",
         tags: { stage: "repair_or_catalog" },
+      });
+    }
+  }
+
+  const grown = await execute<{ id: string; size_bytes: number }>(
+    GROWN_RECORDINGS_SQL,
+    [accountUserId, accountUserId],
+  );
+  for (const recording of grown) {
+    if (isCapturingSession(recording.id)) continue;
+    const file = new File(
+      Paths.document,
+      "sessions",
+      recording.id,
+      "audio.wav",
+    );
+    try {
+      if (!file.exists || file.size <= Number(recording.size_bytes)) continue;
+      const durationMs = repairInterruptedWav(file);
+      if (durationMs === null) continue;
+      await catalogSessionAudio(recording.id, {
+        source: "recording",
+        filename: "audio.wav",
+        contentType: "audio/wav",
+        resendToMac: true,
+      });
+      recoveredSessionIds.push(recording.id);
+      recoveredDurationsMs.push(durationMs);
+      logDiagnostic("recording_recovered", {
+        minutes: Math.round(durationMs / 60_000),
+        bytes: file.size ?? null,
+        added_to_earlier: true,
+      });
+    } catch (error) {
+      captureOperationalError(error, {
+        operation: "recording_recovery",
+        level: "warning",
+        tags: { stage: "repair_or_catalog_more" },
       });
     }
   }

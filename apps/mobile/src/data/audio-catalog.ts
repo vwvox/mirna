@@ -7,6 +7,8 @@ import { executeTransaction, useLiveQuery } from "@/db";
 import { logDiagnostic, logDiagnosticError } from "@/lib/diagnostics";
 import { id, nowIso } from "@/lib/ids";
 import { fileSha256 } from "@/mac-link/bridge";
+import { macLinkAfterRecordingMore } from "@/mac-link/model";
+import { loadMacLinkStatus } from "@/mac-link/status";
 
 import {
   mapSessionAudioRows,
@@ -117,6 +119,11 @@ export async function catalogSessionAudio(
     filename: string;
     contentType: string;
     signal?: AbortSignal;
+    /**
+     * More was recorded onto a recording the Mac may already have: it stays
+     * linked to the Mac's note and goes to the Mac again.
+     */
+    resendToMac?: boolean;
   },
 ): Promise<void> {
   const attachmentId = `session-audio:${sessionId}`;
@@ -129,6 +136,9 @@ export async function catalogSessionAudio(
     file.filename,
   );
   const verified = await verifyFile(localFile, file.signal);
+  const macLink = file.resendToMac
+    ? macLinkAfterRecordingMore(await loadMacLinkStatus(sessionId), now)
+    : null;
 
   await executeTransaction([
     {
@@ -166,6 +176,16 @@ export async function catalogSessionAudio(
       `,
       params: [transferJobId, attachmentId, attachmentId],
     },
+    ...(macLink
+      ? [
+          {
+            sql: `UPDATE session_attachments
+              SET metadata_json = json_set(COALESCE(metadata_json, '{}'), '$.mac_link', json(?))
+              WHERE id = ? AND deleted_at IS NULL`,
+            params: [JSON.stringify(macLink), attachmentId],
+          },
+        ]
+      : []),
   ]);
   requestMobileAttachmentUploads();
 }

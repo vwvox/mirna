@@ -25,7 +25,12 @@ export type MacLinkStatus = {
   /** When the Mac last changed this note after it first came back. */
   updated_on_mac_at?: string | null;
   /** Work the phone asked the Mac for on this note, while it's under way. */
-  job?: "retranscribe" | "trim" | null;
+  job?: "retranscribe" | "trim" | "extend" | null;
+  /**
+   * More was recorded after the Mac had (some of) this recording: the Mac
+   * drops what it has and takes the longer file. Progress updates clear it.
+   */
+  resend?: boolean;
   /** What the phone last took from the Mac, to spot later changes. */
   synced?: {
     title?: string | null;
@@ -42,6 +47,26 @@ export function keepSyncedFields(status: MacLinkStatus) {
       ? { updated_on_mac_at: status.updated_on_mac_at }
       : {}),
     ...(status.synced ? { synced: status.synced } : {}),
+  };
+}
+
+/**
+ * A note's recording after more was added to it on the phone: waiting to go
+ * to the Mac again, still linked to the Mac's note, with what it last took
+ * from the Mac kept so that changes there still show.
+ */
+export function macLinkAfterRecordingMore(
+  previous: MacLinkStatus,
+  now: string,
+): MacLinkStatus {
+  return {
+    ...keepSyncedFields(previous),
+    state: "waiting",
+    resend: true,
+    ...(previous.mac_session_id
+      ? { mac_session_id: previous.mac_session_id }
+      : {}),
+    updated_at: now,
   };
 }
 

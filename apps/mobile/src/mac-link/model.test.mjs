@@ -9,6 +9,7 @@ import {
   isBackingOff,
   isHomeNetwork,
   keepSyncedFields,
+  macLinkAfterRecordingMore,
   macOnlyRecordings,
   needsMacContact,
   parseMacLink,
@@ -254,4 +255,36 @@ test("says what happens after asking the Mac to work on a note", async () => {
     noteJobMessage("mac_too_old", "retranscribe", "Studio").title,
     "Update Mirna on Studio",
   );
+});
+
+test("recording more sends the note's recording to the Mac again, keeping its note", () => {
+  const done = {
+    state: "done",
+    mac_session_id: "mac-1",
+    sent_bytes: 900,
+    total_bytes: 900,
+    error: null,
+    job: null,
+    synced: { title: "Standup", summary_hash: "abc" },
+    mac_recordings: [],
+    updated_on_mac_at: "2026-11-26T10:00:00.000Z",
+  };
+  const next = macLinkAfterRecordingMore(done, "2026-11-27T09:00:00.000Z");
+  assert.deepEqual(next, {
+    state: "waiting",
+    resend: true,
+    mac_session_id: "mac-1",
+    synced: { title: "Standup", summary_hash: "abc" },
+    mac_recordings: [],
+    updated_on_mac_at: "2026-11-26T10:00:00.000Z",
+    updated_at: "2026-11-27T09:00:00.000Z",
+  });
+  // It needs the Mac again, so the phone keeps trying to send it.
+  assert.equal(needsMacContact(next, "auto"), true);
+  // Never sent before: nothing to keep but the request to send it.
+  assert.deepEqual(macLinkAfterRecordingMore({ state: "waiting" }, "now"), {
+    state: "waiting",
+    resend: true,
+    updated_at: "now",
+  });
 });

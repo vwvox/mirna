@@ -25,6 +25,7 @@ import { ActionButtonCard } from "@/components/action-button-card";
 import { MirnaWordmark } from "@/components/mirna-wordmark";
 import { SearchPalette } from "@/components/search-palette";
 import { SessionCard, useSessionCardDetails } from "@/components/session-card";
+import { StartOrReturnButton } from "@/components/start-or-return-button";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import {
@@ -367,21 +368,7 @@ export default function HomeScreen() {
             buttonHidden ? "no-hide-descendants" : "auto"
           }
         >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void createAndOpen(true)}
-            style={({ pressed }) => [
-              styles.startButton,
-              pressed && styles.startButtonPressed,
-            ]}
-          >
-            <Ionicons
-              name="mic-outline"
-              size={22}
-              color={Colors.primaryForeground}
-            />
-            <Text style={styles.startLabel}>Start recording</Text>
-          </Pressable>
+          <StartOrReturnButton onStart={() => void createAndOpen(true)} />
         </Animated.View>
       </View>
       {searching && (
@@ -662,25 +649,8 @@ const useStyles = createStyleHook((Colors) => ({
     borderTopColor: Colors.border,
     backgroundColor: Colors.background,
   },
-  startButton: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    borderRadius: 28,
-    borderCurve: CornerCurve.squircle,
-    backgroundColor: Colors.primary,
-  },
   startButtonPressed: {
     opacity: 0.75,
-  },
-  startLabel: {
-    fontFamily: FontFamily.text,
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "600",
-    color: Colors.primaryForeground,
   },
   empty: {
     flex: 1,

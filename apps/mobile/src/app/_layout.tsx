@@ -10,6 +10,7 @@ import {
   getMobileCaptureActive,
   subscribeMobileCapture,
 } from "@/audio/capture-lifecycle";
+import { RecorderProvider } from "@/audio/recorder-provider";
 import { recoverInterruptedRecordings } from "@/audio/recover-recordings";
 import { requiresPro } from "@/auth/companion";
 import { AuthProvider, useAuth } from "@/auth/context";
@@ -91,7 +92,7 @@ function Screens({ accountUserId }: { accountUserId: string | null }) {
   });
 
   return (
-    <>
+    <RecorderProvider>
       <QuickActionLifecycle accountUserId={accountUserId} />
       <MacLinkLifecycle />
       <Stack
@@ -100,7 +101,7 @@ function Screens({ accountUserId }: { accountUserId: string | null }) {
           contentStyle: { backgroundColor: Colors.paper },
         }}
       />
-    </>
+    </RecorderProvider>
   );
 }
 

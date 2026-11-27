@@ -26,26 +26,37 @@ registerHooks({
       export class File {
         exists = false;
         bytes = new Uint8Array(0);
-        constructor(directory, filename) { this.path = directory.path + "/" + filename; globalThis.wavWriterFiles.set(this.path, this); }
+        constructor(directory, filename) {
+          const path = directory.path + "/" + filename;
+          // The same path is the same file, as on disk.
+          const existing = globalThis.wavWriterFiles.get(path);
+          if (existing) return existing;
+          this.path = path;
+          globalThis.wavWriterFiles.set(this.path, this);
+        }
         get size() { return this.bytes.length; }
         create() { this.exists = true; }
-        delete() { this.exists = false; }
+        delete() { this.exists = false; this.bytes = new Uint8Array(0); }
         open() {
           const file = this;
+          file.openHandles = (file.openHandles ?? 0) + 1;
           return { offset: 0, writeBytes(bytes) {
             if (file.failWrite) throw Error("Disk write failed");
             const result = new Uint8Array(Math.max(file.bytes.length, this.offset + bytes.length));
             result.set(file.bytes); result.set(bytes, this.offset); file.bytes = result; this.offset += bytes.length;
-          }, close() {} };
+          }, readBytes(length) {
+            const bytes = file.bytes.slice(this.offset, this.offset + length);
+            this.offset += bytes.length;
+            return bytes;
+          }, close() { file.openHandles -= 1; } };
         }
       }
     `,
     };
   },
 });
-const { SessionWavWriter, continueInNextPart } = await import(
-  "./session-wav-writer.ts"
-);
+const { SessionWavWriter, continueInNextPart } =
+  await import("./session-wav-writer.ts");
 
 test("elapsed recording time comes from captured PCM and matches the finalized WAV", () => {
   for (const [sampleRate, channels] of [
@@ -127,7 +138,10 @@ test("a part switch puts every buffer in exactly one part, in order", async () =
   const values = [...first.slice(44), ...second.slice(44)].filter(
     (_, index) => index % 3200 === 0,
   );
-  assert.deepEqual(values, Array.from({ length: 12 }, (_, i) => i + 1));
+  assert.deepEqual(
+    values,
+    Array.from({ length: 12 }, (_, i) => i + 1),
+  );
   assert.equal(previous.durationMs + writer.durationMs, 12 * 100);
 });
 
@@ -141,7 +155,10 @@ test("a part switch that can't open the next file leaves recording where it was"
     return open.call(this);
   };
   try {
-    assert.throws(() => continueInNextPart(writer, "unopenable"), /No space left/);
+    assert.throws(
+      () => continueInNextPart(writer, "unopenable"),
+      /No space left/,
+    );
   } finally {
     File.prototype.open = open;
   }
@@ -154,7 +171,10 @@ test("a part switch hands back a failed finalize instead of throwing", () => {
   const writer = new SessionWavWriter("bad-header");
   writer.append(new ArrayBuffer(3200), 16000, 1);
   writer.file.failWrite = true;
-  const { next, finalizeError } = continueInNextPart(writer, "after-bad-header");
+  const { next, finalizeError } = continueInNextPart(
+    writer,
+    "after-bad-header",
+  );
   assert.match(String(finalizeError), /Disk write failed/);
   next.append(new ArrayBuffer(3200), 16000, 1);
   assert.equal(next.durationMs, 100);
@@ -167,5 +187,89 @@ test("reports its size and whether it is finalized", () => {
   assert.equal(writer.isFinalized, false);
   writer.finalize();
   assert.equal(writer.isFinalized, true);
-  assert.equal(writer.sizeBytes, files.get("/test/sessions/size/audio.wav").size);
+  assert.equal(
+    writer.sizeBytes,
+    files.get("/test/sessions/size/audio.wav").size,
+  );
+});
+
+test("recording more goes on the end of the note's recording", () => {
+  const first = new SessionWavWriter("more");
+  const before = new Uint8Array(3200).fill(1);
+  first.append(before.buffer, 16000, 1);
+  first.finalize();
+
+  const more = new SessionWavWriter("more", { append: true });
+  assert.equal(more.appended, true);
+  assert.equal(more.durationMs, 100);
+  assert.equal(more.addedMs, 0);
+  const after = new Uint8Array(1600).fill(2);
+  more.append(after.buffer, 16000, 1);
+  // The timer shows only this recording; the file holds both.
+  assert.equal(more.addedMs, 50);
+  assert.equal(more.durationMs, 150);
+
+  const file = more.finalize();
+  const header = new DataView(file.bytes.buffer);
+  assert.equal(header.getUint32(40, true), 4800);
+  assert.equal(header.getUint32(4, true), 36 + 4800);
+  assert.equal(file.size, 44 + 4800);
+  assert.deepEqual(file.bytes.slice(44, 44 + 3200), before);
+  assert.deepEqual(file.bytes.slice(44 + 3200), after);
+});
+
+test("recording more counts the audio from the file, not a stale header", () => {
+  const first = new SessionWavWriter("cut-off");
+  first.append(new ArrayBuffer(3200), 16000, 1);
+  first.finalize();
+  // Cut off before: the header says only half of what is there.
+  const stored = files.get("/test/sessions/cut-off/audio.wav");
+  new DataView(stored.bytes.buffer).setUint32(40, 1600, true);
+
+  const more = new SessionWavWriter("cut-off", { append: true });
+  assert.equal(more.durationMs, 100);
+  more.append(new ArrayBuffer(3200), 16000, 1);
+  more.finalize();
+  assert.equal(new DataView(stored.bytes.buffer).getUint32(40, true), 6400);
+  assert.equal(stored.size, 44 + 6400);
+});
+
+test("recording more needs a recording it can add to", () => {
+  assert.throws(
+    () => new SessionWavWriter("nothing-yet", { append: true }),
+    /no recording to add to/,
+  );
+  const notWav = files.get("/test/sessions/nothing-yet/audio.wav");
+  notWav.exists = true;
+  notWav.bytes = new Uint8Array(200).fill(7);
+  assert.throws(
+    () => new SessionWavWriter("nothing-yet", { append: true }),
+    /can't be added to/,
+  );
+  assert.equal(notWav.openHandles, 0);
+  assert.equal(notWav.size, 200);
+});
+
+test("a start that fails while recording more keeps the earlier recording", () => {
+  const first = new SessionWavWriter("keep-earlier");
+  first.append(new ArrayBuffer(3200), 16000, 1);
+  first.finalize();
+  const more = new SessionWavWriter("keep-earlier", { append: true });
+  more.closeAndDiscardEmpty();
+  const stored = files.get("/test/sessions/keep-earlier/audio.wav");
+  assert.equal(stored.exists, true);
+  assert.equal(stored.size, 3244);
+  assert.equal(new DataView(stored.bytes.buffer).getUint32(40, true), 3200);
+});
+
+test("a stream in another format can't be added to the recording", () => {
+  const first = new SessionWavWriter("other-format");
+  first.append(new ArrayBuffer(3200), 16000, 1);
+  first.finalize();
+  const more = new SessionWavWriter("other-format", { append: true });
+  assert.throws(
+    () => more.append(new ArrayBuffer(9600), 48000, 1),
+    /format changed/,
+  );
+  assert.equal(more.addedMs, 0);
 });

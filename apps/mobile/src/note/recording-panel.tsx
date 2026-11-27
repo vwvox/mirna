@@ -12,15 +12,13 @@ import {
 
 import { useLiveUpdatesPrompt } from "@/audio/live-updates";
 import { RECORDING_ALERTS } from "@/audio/long-recording";
+import type { Recorder } from "@/audio/recorder-provider";
 import {
   describeElapsed,
   formatElapsed,
   type RecorderPhase,
 } from "@/audio/recorder-status";
-import type {
-  RecorderFailure,
-  useSessionRecorder,
-} from "@/audio/use-session-recorder";
+import type { RecorderFailure } from "@/audio/use-session-recorder";
 import { LevelStrip } from "@/components/dancing-sticks";
 import { ListeningSheet } from "@/components/listening-sheet";
 import {
@@ -36,8 +34,6 @@ import { useMountEffect } from "@/lib/use-mount-effect";
 import type { NoteDraft } from "@/note/note-draft";
 import { useNoteDraft } from "@/note/use-note-draft";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
-
-type Recorder = ReturnType<typeof useSessionRecorder>;
 
 function statusText(
   phase: RecorderPhase,
@@ -114,7 +110,7 @@ export function RecordingPanel({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back to notes"
-          accessibilityHint="Stops and saves the recording"
+          accessibilityHint="The recording keeps going"
           hitSlop={4}
           onPress={onBack}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
@@ -158,7 +154,7 @@ export function RecordingPanel({
           <LevelStrip levels={recorder.levels} paused={!recording} />
         </View>
 
-        {(notice || part > 1) && (
+        {(notice || part > 1 || recorder.addingToRecording) && (
           <View style={styles.notices}>
             {notice && (
               <View accessibilityLiveRegion="polite" style={styles.prompt}>
@@ -186,10 +182,16 @@ export function RecordingPanel({
                 )}
               </View>
             )}
-            {part > 1 && (
+            {part > 1 ? (
               <Text style={styles.partLine}>
                 Part {part} · earlier parts are in their own notes
               </Text>
+            ) : (
+              recorder.addingToRecording && (
+                <Text style={styles.partLine}>
+                  Adding to this note’s recording
+                </Text>
+              )
             )}
           </View>
         )}
@@ -292,8 +294,8 @@ export function RecordingPanel({
                     color={Colors.muted}
                   />
                   <Text style={styles.lockText}>
-                    Keeps recording with the screen off. The audio stays on
-                    this phone until it reaches your Mac.
+                    Keeps recording with the screen off. The audio stays on this
+                    phone until it reaches your Mac.
                   </Text>
                 </View>
               )
@@ -384,9 +386,7 @@ function TitleField({
 
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>
-        Title
-      </Text>
+      <Text style={styles.label}>Title</Text>
       <TextInput
         accessibilityLabel="Title"
         defaultValue={initialTitle}

@@ -55,7 +55,12 @@ export type NoteJob =
       engine: "auto" | "parakeet" | "qwen3";
       update_summary: boolean;
     }
-  | { type: "trim"; keep_ms: number; update_summary: boolean };
+  | { type: "trim"; keep_ms: number; update_summary: boolean }
+  /**
+   * More was recorded on the phone: the Mac drops its copy, takes the longer
+   * file and makes the note again from it.
+   */
+  | { type: "extend"; update_summary: boolean };
 
 export type RemoteStatus = {
   id: string;

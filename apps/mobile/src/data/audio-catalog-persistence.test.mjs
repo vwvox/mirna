@@ -21,6 +21,12 @@ const mocks = {
   "react-native": `export const AppState = { currentState: 'background' };`,
   // Native checksums; the size changes as a trimmed file would.
   "@/mac-link/bridge": `export async function fileSha256() { return {sha256: globalThis.nativeSha ?? 'a'.repeat(64), size_bytes: globalThis.nativeSize ?? 44}; }`,
+  "@/mac-link/status": `export async function loadMacLinkStatus(sessionId) {
+    const row = globalThis.audioCatalogPersistence.prepare(
+      "SELECT json_extract(metadata_json, '$.mac_link') AS mac_link FROM session_attachments WHERE id = ?",
+    ).get('session-audio:' + sessionId);
+    return row?.mac_link ? JSON.parse(row.mac_link) : { state: 'waiting' };
+  }`,
 };
 const hooks = registerHooks({
   resolve(specifier, context, next) {
@@ -32,6 +38,11 @@ const hooks = registerHooks({
     if (specifier === "./audio-catalog-model")
       return {
         url: new URL("./audio-catalog-model.ts", import.meta.url).href,
+        shortCircuit: true,
+      };
+    if (specifier === "@/mac-link/model")
+      return {
+        url: new URL("../mac-link/model.ts", import.meta.url).href,
         shortCircuit: true,
       };
     return next(specifier, context);
@@ -132,4 +143,51 @@ test("a trimmed recording gets its new size and checksum, and keeps its way to t
   assert.equal(metadata.mac_link.state, "done");
   assert.equal(metadata.mac_link.mac_session_id, "mac-1");
   assert.equal(metadata.transcript_status, "complete");
+});
+
+test("recording more keeps the note linked to the Mac's and sends it again", async () => {
+  db.exec("INSERT INTO sessions (id) VALUES ('more')");
+  await recordSessionCaptureStart("more");
+  await catalogSessionAudio("more", {
+    source: "recording",
+    filename: "audio.wav",
+    contentType: "audio/wav",
+  });
+  const capture = db
+    .prepare(
+      "SELECT json_extract(metadata_json, '$.capture_started_at_ms') AS time FROM session_attachments WHERE session_id = 'more'",
+    )
+    .get().time;
+  db.exec(`UPDATE session_attachments SET metadata_json = json_set(metadata_json,
+    '$.mac_link', json('{"state":"done","mac_session_id":"mac-1","synced":{"title":"Standup"}}'),
+    '$.transcript_status', 'complete') WHERE session_id = 'more'`);
+
+  globalThis.nativeSha = "c".repeat(64);
+  globalThis.nativeSize = 64_044;
+  try {
+    await catalogSessionAudio("more", {
+      source: "recording",
+      filename: "audio.wav",
+      contentType: "audio/wav",
+      resendToMac: true,
+    });
+  } finally {
+    delete globalThis.nativeSha;
+    delete globalThis.nativeSize;
+  }
+  const row = db
+    .prepare(
+      "SELECT size_bytes, sha256, metadata_json FROM session_attachments WHERE session_id = 'more'",
+    )
+    .get();
+  assert.equal(row.size_bytes, 64_044);
+  assert.equal(row.sha256, "c".repeat(64));
+  const metadata = JSON.parse(row.metadata_json);
+  assert.equal(metadata.mac_link.state, "waiting");
+  assert.equal(metadata.mac_link.resend, true);
+  assert.equal(metadata.mac_link.mac_session_id, "mac-1");
+  assert.deepEqual(metadata.mac_link.synced, { title: "Standup" });
+  // Still dated when the first recording started.
+  assert.equal(metadata.capture_started_at_ms, capture);
+  assert.equal(metadata.transcript_status, "processing");
 });

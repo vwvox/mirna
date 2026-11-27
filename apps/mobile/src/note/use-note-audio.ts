@@ -16,7 +16,12 @@ import { env } from "@/lib/env";
 import { captureOperationalError } from "@/lib/error-reporting";
 import { useMountEffect } from "@/lib/use-mount-effect";
 
-export function useNoteAudio(sessionId: string, hasTranscript: boolean) {
+export function useNoteAudio(
+  sessionId: string,
+  hasTranscript: boolean,
+  /** More is being recorded into the file: the player lets go of it. */
+  recordingInto = false,
+) {
   const auth = useAuth();
   const audio = useSessionAudio(sessionId);
   const controllerRef = useRef<AbortController | null>(null);
@@ -122,7 +127,10 @@ export function useNoteAudio(sessionId: string, hasTranscript: boolean) {
     : null;
   const availableLocally =
     audio.data?.availableLocally === true && file?.exists === true;
-  const player = useRecordingPlayer(availableLocally && file ? file.uri : null);
+  // Loaded again once recording more ends, so it plays the whole recording.
+  const player = useRecordingPlayer(
+    availableLocally && file && !recordingInto ? file.uri : null,
+  );
   return {
     ...audio,
     file,

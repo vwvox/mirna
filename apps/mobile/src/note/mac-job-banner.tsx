@@ -8,8 +8,9 @@ import { useMacLinkStatus } from "@/mac-link/status";
 import { createStyleHook, useColors } from "@/settings/theme-provider";
 
 /**
- * While the Mac works on a note again (transcribing it again, or trimming
- * it), one line saying so; and what went wrong if it couldn't.
+ * While the Mac works on a note again (transcribing it again, trimming it,
+ * or adding what was recorded since), one line saying so; and what went
+ * wrong if it couldn't.
  */
 export function MacJobBanner({ sessionId }: { sessionId: string }) {
   const styles = useStyles();
@@ -19,7 +20,7 @@ export function MacJobBanner({ sessionId }: { sessionId: string }) {
   const retry = useMutation({
     mutationFn: () => retryRecordingOnMac(sessionId),
   });
-  if (!status?.job || !mac) return null;
+  if (!(status?.job || status?.resend) || !mac) return null;
   const macName = mac.mac_name || "your Mac";
 
   if (status.state === "failed") {
@@ -29,7 +30,9 @@ export function MacJobBanner({ sessionId }: { sessionId: string }) {
           {status.error ??
             (status.job === "trim"
               ? `${macName} couldn't trim this recording.`
-              : `${macName} couldn't transcribe this again.`)}
+              : status.job === "extend" || status.resend
+                ? `${macName} couldn't add what you recorded to this note.`
+                : `${macName} couldn't transcribe this again.`)}
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -52,7 +55,9 @@ export function MacJobBanner({ sessionId }: { sessionId: string }) {
         ? `Waiting for ${macName}…`
         : status.job === "trim"
           ? `Trimming on ${macName}…`
-          : `Transcribing again on ${macName}…`;
+          : status.job === "extend"
+            ? `Adding what you recorded on ${macName}…`
+            : `Transcribing again on ${macName}…`;
   if (!["on_mac", "transcribing", "summarizing"].includes(status.state)) {
     return null;
   }

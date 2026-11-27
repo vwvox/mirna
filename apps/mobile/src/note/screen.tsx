@@ -13,7 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useSessionRecorder } from "@/audio/use-session-recorder";
+import {
+  hasRecordingInProgress,
+  isRecordingInto,
+  useRecorder,
+} from "@/audio/recorder-provider";
 import { FolderPickerSheet } from "@/components/folder-picker-sheet";
 import { NoteActionsSheet } from "@/components/note-actions-sheet";
 import { NoteConflictBanner } from "@/components/note-conflict-banner";
@@ -33,6 +37,7 @@ import {
 import { captureAnalytics } from "@/lib/analytics";
 import { confirmDestructive } from "@/lib/confirm";
 import { captureOperationalError } from "@/lib/error-reporting";
+import { showToast } from "@/lib/toast";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useMountEffect } from "@/lib/use-mount-effect";
 import { usePairedMac } from "@/mac-link/pairing";
@@ -66,7 +71,13 @@ export function NoteScreen({
   const { data, isLoading } = useSessionDetail(id);
   const noteAttachments = useNoteAttachments(id);
   const transcriptState = useSessionHasTranscript(id);
-  const audio = useNoteAudio(id, transcriptState.data === true);
+  const recorder = useRecorder();
+  const recordingHere = isRecordingInto(recorder, id);
+  const audio = useNoteAudio(
+    id,
+    transcriptState.data === true,
+    recordingHere && recorder.addingToRecording,
+  );
   const {
     edit: onEdit,
     flush,
@@ -77,7 +88,11 @@ export function NoteScreen({
     onRestored: handleRestored,
   } = useNoteDraft(id, data);
   const [selection, setSelection] = useState<SessionViewSelection | null>(null);
-  const [listening, setListening] = useState(autoListen);
+  // Opened to record: the recording screen shows while the recorder starts.
+  // Another recording already going keeps this a plain note.
+  const [awaitingStart, setAwaitingStart] = useState(
+    () => autoListen && !hasRecordingInProgress(recorder),
+  );
   const [editorFocused, setEditorFocused] = useState(false);
   const [sheet, setSheet] = useState<
     "actions" | "folders" | "versions" | "retranscribe" | "trim" | null
@@ -95,17 +110,32 @@ export function NoteScreen({
   const closeSheet = (name: typeof sheet) =>
     setSheet((current) => (current === name ? null : current));
   const keyboardVisible = useKeyboardVisible();
-  const recorder = useSessionRecorder(id, listening);
   const hasRecordingHistory =
     Boolean(audio.data) || transcriptState.data === true;
-  // After 3 hours a recording carries on in a new note; once saved, it ends
-  // on that note.
+  // After 3 hours a recording carries on in a new note. While this note is
+  // open it shows that part; once saved, the recording ends on that note.
+  const partOfThis =
+    recorder.noteId === id &&
+    recorder.sessionId !== null &&
+    recorder.sessionId !== id &&
+    hasRecordingInProgress(recorder);
+  const [followingPart, setFollowingPart] = useState(false);
+  if (partOfThis && !followingPart) setFollowingPart(true);
   const lastPartId =
-    recorder.phase === "saved" && recorder.sessionId !== id
+    followingPart &&
+    recorder.noteId === id &&
+    recorder.phase === "saved" &&
+    recorder.sessionId !== id
       ? recorder.sessionId
       : null;
   const active =
-    (listening && recorder.phase !== "saved") || lastPartId !== null;
+    recordingHere || partOfThis || awaitingStart || lastPartId !== null;
+  // Recorded on this phone as WAV and still here: more can go on its end.
+  const canRecordMore =
+    !active &&
+    !hasRecordingInProgress(recorder) &&
+    audio.availableLocally &&
+    Boolean(audio.data?.filename.toLowerCase().endsWith(".wav"));
   const leavingRef = useRef(false);
   const { tabs, current, selectedIndex } = sessionView({
     sessionId: id,
@@ -131,6 +161,11 @@ export function NoteScreen({
 
   useMountEffect(() => {
     captureAnalytics("note_opened", { entry_point: "mobile_note" });
+    if (awaitingStart) {
+      void recorder.start(id).finally(() => setAwaitingStart(false));
+    }
+    // A start that never got the microphone ends with its note.
+    return () => recorder.dismiss(id);
   });
 
   useEffect(() => {
@@ -139,23 +174,27 @@ export function NoteScreen({
     }
   }, [lastPartId, router]);
 
+  // Going back keeps the recording going; the notes list shows it.
   const handleBack = async () => {
     leavingRef.current = true;
     await flush();
-    await recorder.stop("back");
     if (router.canGoBack()) router.back();
     else router.replace("/");
   };
 
   const handleStop = async () => {
     await flush();
-    const result = await recorder.stop("app_button");
-    if (result !== "failed") setListening(false);
+    await recorder.stop("app_button");
   };
 
   const handleRetryRecording = async () => {
-    const result = await recorder.retry();
-    if (result === "saved") setListening(false);
+    await recorder.retry();
+  };
+
+  const handleRecordMore = async () => {
+    if (!canRecordMore) return;
+    await flush();
+    await recorder.start(id, { more: true });
   };
 
   const handleOpenSettings = async () => {
@@ -200,7 +239,7 @@ export function NoteScreen({
       "Delete",
     );
     if (!confirmed) return;
-    await recorder.stop("delete");
+    if (recordingHere) await recorder.stop("delete");
     try {
       await remove(() => deleteSession(id));
       if (router.canGoBack()) router.back();
@@ -250,14 +289,19 @@ export function NoteScreen({
 
   const handleListeningAction = () => {
     if (active) void handleStop();
-    else if (
+    else if (hasRecordingInProgress(recorder)) {
+      showToast({
+        id: "recording-elsewhere",
+        title: "Already recording another note",
+        description: "Stop that recording first, from the notes list.",
+      });
+    } else if (
       !audio.isLoading &&
       !transcriptState.isLoading &&
       !transcriptState.error &&
       !hasRecordingHistory
     ) {
-      setListening(true);
-      void recorder.start();
+      void recorder.start(id);
     }
   };
 
@@ -269,7 +313,7 @@ export function NoteScreen({
   };
 
   // While recording, the note is the recording screen: timer, title, notes.
-  if (active && recorder.sessionId !== id) {
+  if ((partOfThis || lastPartId) && recorder.sessionId) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <PartRecordingPanel
@@ -454,7 +498,13 @@ export function NoteScreen({
       )}
 
       {!active && !keyboardVisible && (
-        <NoteRecordings sessionId={id} audio={audio} />
+        <NoteRecordings
+          sessionId={id}
+          audio={audio}
+          onRecordMore={
+            canRecordMore ? () => void handleRecordMore() : undefined
+          }
+        />
       )}
 
       {showEmptyNoteCta && (
@@ -469,6 +519,7 @@ export function NoteScreen({
         onExport={() => void handleExport()}
         onSelectFolder={() => setSheet("folders")}
         onImportRecording={audio.importRecording}
+        onRecordMore={canRecordMore ? () => void handleRecordMore() : undefined}
         onToggleListening={handleListeningAction}
         onVersionHistory={() => setSheet("versions")}
         onRetranscribe={macHasNote ? () => setSheet("retranscribe") : undefined}

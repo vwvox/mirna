@@ -14,7 +14,7 @@ import { File, Paths } from "expo-file-system";
 
 import { defaultSummaryDocumentId } from "@anlg/utils/session";
 
-import { isRecordingNow } from "@/audio/capture-lifecycle";
+import { isCapturingSession, isRecordingNow } from "@/audio/capture-lifecycle";
 import { execute, executeTransaction } from "@/db";
 import {
   diagnosticsFileUri,
@@ -68,7 +68,7 @@ import {
   saveDiagnosticsSent,
   saveNotesCursor,
 } from "./schedule";
-import { attachmentIdFor, setMacLinkStatus } from "./status";
+import { attachmentIdFor, loadMacLinkStatus, setMacLinkStatus } from "./status";
 
 type PendingRow = {
   session_id: string;
@@ -212,6 +212,8 @@ async function run(trigger: SendTrigger): Promise<SendOutcome> {
   const mode = userAsked ? "auto" : await loadSendMode();
   const rows = await execute<PendingRow>(PENDING_SQL, []);
   const pending = rows.filter((row) => {
+    // More is being recorded onto it: it goes once that is saved.
+    if (isCapturingSession(row.session_id)) return false;
     const local = parseMacLink(row.mac_link);
     // Sync now also retries ones the Mac couldn't transcribe.
     return userAsked ? true : needsMacContact(local, mode);
@@ -309,6 +311,10 @@ export async function retryRecordingOnMac(
   const mac = await loadPairedMac();
   const identity = await loadIdentity();
   if (!mac || !identity) return "not_paired";
+  // A longer recording the Mac couldn't take yet goes again with the sync.
+  if ((await loadMacLinkStatus(sessionId)).resend) {
+    return sendRecordingsToMac("user");
+  }
   // Tried even when the phone doesn't look like it's on Wi-Fi (see run()).
   try {
     await bridge.retry({ identity, mac: targetFor(mac, null) }, sessionId);
@@ -528,6 +534,13 @@ async function advance(
   status: RemoteStatus,
   mode: "auto" | "manual",
 ): Promise<boolean> {
+  if (local.resend) {
+    // Sending only when it's automatic, or when someone tapped Sync now.
+    if (mode !== "auto") return false;
+    const ready = await makeRoomForLongerRecording(connection, row, status);
+    if (!ready) return false;
+    return advance(connection, row, { ...local, resend: false }, ready, mode);
+  }
   const job = status.job?.type ?? null;
   switch (status.state) {
     case "missing":
@@ -562,6 +575,63 @@ async function advance(
     case "done":
       await applyDone(row.session_id, local, status);
       return true;
+  }
+}
+
+/**
+ * More was recorded after the Mac had (some of) this recording. The Mac lets
+ * go of what it has and keeps the link to its note, then the phone sends the
+ * longer file from the start. Returns the Mac's status once it is ready for
+ * the file, or null to try again on a later sync (it is busy with the note).
+ */
+async function makeRoomForLongerRecording(
+  connection: Connection,
+  row: PendingRow,
+  status: RemoteStatus,
+): Promise<RemoteStatus | null> {
+  // Asked already (or the Mac never had any of it): only the file is left.
+  // Progress from here on clears `resend`, so a part that arrives after this
+  // is the longer file's.
+  if (status.state === "missing") {
+    await setMacLinkStatus(row.session_id, {
+      state: "waiting",
+      mac_session_id: status.session_id,
+    });
+    return status;
+  }
+  if (
+    status.state === "processing" ||
+    (status.state === "queued" && status.job)
+  ) {
+    return null;
+  }
+  try {
+    const reply = await bridge.noteJob(connection, row.session_id, {
+      type: "extend",
+      update_summary: true,
+    });
+    logDiagnostic("recording_more_accepted", { state: reply.status.state });
+    await setMacLinkStatus(row.session_id, {
+      state: "waiting",
+      mac_session_id: reply.status.session_id ?? status.session_id,
+    });
+    return reply.status;
+  } catch (error) {
+    const reason = bridge.refusalReason(error);
+    if (reason === "busy" || reason === "not_ready") return null;
+    if (bridge.isUnknownRequest(error)) {
+      // Kept for later: Sync now tries again once the Mac is up to date.
+      await setMacLinkStatus(row.session_id, {
+        state: "failed",
+        resend: true,
+        mac_session_id: status.session_id,
+        error:
+          "Update Mirna on your Mac to add what you recorded to this note.",
+      });
+      logDiagnostic("recording_more_mac_too_old", {}, "warning");
+      return null;
+    }
+    throw error;
   }
 }
 

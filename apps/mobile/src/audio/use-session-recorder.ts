@@ -53,7 +53,6 @@ import {
 import { createSession, deleteSession } from "@/data/session";
 import { generateSummaryAfterTranscription } from "@/data/summarize";
 import { execute } from "@/db";
-import { sendRecordingsToMac } from "@/mac-link/sender";
 import { captureAnalytics } from "@/lib/analytics";
 import {
   logDiagnostic,
@@ -67,6 +66,7 @@ import {
   endMeetingRecordingActivity,
   startMeetingRecordingActivity,
 } from "@/live-activity/meeting-recording-activity";
+import { sendRecordingsToMac } from "@/mac-link/sender";
 
 const STREAM_SAMPLE_RATE = 16_000;
 const STREAM_CHANNELS = 1;
@@ -108,10 +108,12 @@ async function loadPartSource(sessionId: string) {
   return rows[0] ?? null;
 }
 
-export function useSessionRecorder(
-  sessionId: string,
-  enabled: boolean,
-): {
+/**
+ * The app's one recorder. It lives above the screens (see RecorderProvider),
+ * so a recording carries on while you look at other notes; only Stop, the
+ * notification or the system ends it.
+ */
+export function useSessionRecorder(): {
   phase: RecorderPhase;
   failure: RecorderFailure | null;
   amplitude: number;
@@ -123,19 +125,32 @@ export function useSessionRecorder(
   liveTranscript: string;
   /** Pause and resume are available (Android). */
   canPause: boolean;
+  /** The note the recording started in; null before the first one. */
+  noteId: string | null;
   /**
-   * The note being recorded into: this screen's note, or after 3 hours the
-   * note for a later part.
+   * The note being recorded into: the one it started in, or after 3 hours
+   * the note for a later part.
    */
-  sessionId: string;
+  sessionId: string | null;
   /** The part being recorded, from 1. */
   part: number;
+  /** This recording goes on the end of the note's earlier one. */
+  addingToRecording: boolean;
   notice: RecorderNotice;
-  start: () => Promise<void>;
+  /**
+   * Records into a note. With `more`, the audio is added to the end of the
+   * note's recording. Does nothing while another recording is going.
+   */
+  start: (sessionId: string, options?: { more?: boolean }) => Promise<void>;
   stop: (source?: StopSource) => Promise<StopResult>;
   pause: () => void;
   resume: () => Promise<void>;
   retry: () => Promise<StopResult>;
+  /**
+   * Forgets this note's recording that never started (no microphone, for
+   * example), once its note is left.
+   */
+  dismiss: (sessionId: string) => void;
   /** Answers a silence alert or the check-in from the app. */
   keepGoing: () => void;
   /** The note title for the recording notification. */
@@ -149,7 +164,11 @@ export function useSessionRecorder(
   const [liveStatus, setLiveStatus] =
     useState<LiveTranscriptionStatus>("connecting");
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [recordingSessionId, setRecordingSessionId] = useState(sessionId);
+  const [noteId, setNoteId] = useState<string | null>(null);
+  const [recordingSessionId, setRecordingSessionId] = useState<string | null>(
+    null,
+  );
+  const [addingToRecording, setAddingToRecording] = useState(false);
   const [part, setPart] = useState(1);
   const [notice, setNoticeState] = useState<RecorderNotice>(null);
   const phaseRef = useRef<RecorderPhase>("idle");
@@ -172,8 +191,13 @@ export function useSessionRecorder(
   const stopRef = useRef<(source: StopSource) => Promise<StopResult>>(
     async () => "noop",
   );
+  // The note asked for, and whether to add to its recording: a start that
+  // waits for the microphone in Settings tries again with these.
+  const requestedRef = useRef<{ sessionId: string; more: boolean } | null>(
+    null,
+  );
   // The part being recorded and what came before it.
-  const sessionRef = useRef(sessionId);
+  const sessionRef = useRef("");
   const partRef = useRef(1);
   const completedPartsMsRef = useRef(0);
   const partSavesRef = useRef(new Set<Promise<void>>());
@@ -183,9 +207,7 @@ export function useSessionRecorder(
   const watchRef = useRef(new LongRecordingWatch());
   const noticeRef = useRef<RecorderNotice>(null);
   const autoPausedRef = useRef(false);
-  const streamStatusRef = useRef<(status: AudioStreamStatus) => void>(
-    () => {},
-  );
+  const streamStatusRef = useRef<(status: AudioStreamStatus) => void>(() => {});
   const alertAnswerRef = useRef<(answer: AudioStreamAlertAnswer) => void>(
     () => {},
   );
@@ -197,7 +219,11 @@ export function useSessionRecorder(
   ) =>
     logDiagnostic(
       event,
-      { session: shortId(sessionRef.current), part: partRef.current, ...detail },
+      {
+        session: shortId(sessionRef.current),
+        part: partRef.current,
+        ...detail,
+      },
       level,
     );
 
@@ -251,8 +277,12 @@ export function useSessionRecorder(
     let posted = false;
     try {
       posted =
-        streamRef.current.showAlert?.(kind, copy.title, copy.text, copy.actions) ??
-        false;
+        streamRef.current.showAlert?.(
+          kind,
+          copy.title,
+          copy.text,
+          copy.actions,
+        ) ?? false;
     } catch (error) {
       captureOperationalError(error, {
         operation: "recording_alert_show",
@@ -335,6 +365,8 @@ export function useSessionRecorder(
           source: "recording",
           filename: "audio.wav",
           contentType: "audio/wav",
+          // The Mac made its note from the shorter recording.
+          resendToMac: writer.appended,
         });
         logDiagnostic("recording_cataloged", {
           session: shortId(session),
@@ -342,6 +374,7 @@ export function useSessionRecorder(
           attempt: attempt + 1,
           ms: Date.now() - startedAt,
           bytes: writer.sizeBytes,
+          added_to_earlier: writer.appended,
         });
       },
       CATALOG_RETRY_DELAYS_MS,
@@ -485,7 +518,7 @@ export function useSessionRecorder(
       }
       const live = liveRef.current;
       const previousPart = partRef.current;
-      completedPartsMsRef.current += writer.durationMs;
+      completedPartsMsRef.current += writer.addedMs;
       writerRef.current = switched.next;
       switchedOver = true;
       liveRef.current = null;
@@ -510,11 +543,15 @@ export function useSessionRecorder(
         switch_ms: Date.now() - startedAt,
       });
       if (switched.finalizeError) {
-        logDiagnosticError("recording_wav_finalize_failed", switched.finalizeError, {
-          session: shortId(fromSession),
-          part: previousPart,
-          stage: "part_switch",
-        });
+        logDiagnosticError(
+          "recording_wav_finalize_failed",
+          switched.finalizeError,
+          {
+            session: shortId(fromSession),
+            part: previousPart,
+            stage: "part_switch",
+          },
+        );
       }
       const save = savePart(fromSession, writer, live, previousPart);
       partSavesRef.current.add(save);
@@ -597,7 +634,8 @@ export function useSessionRecorder(
       },
     );
     liveRef.current?.sendAudio(buffer.data);
-    const recordedMs = completedPartsMsRef.current + writer.durationMs;
+    // Only this recording's time, like the notification's timer.
+    const recordedMs = completedPartsMsRef.current + writer.addedMs;
     durationRef.current = Math.round(recordedMs);
 
     let speech = false;
@@ -633,11 +671,12 @@ export function useSessionRecorder(
   const streamRef = useRef(stream);
   streamRef.current = stream;
 
-  const performStart = async () => {
+  const performStart = async (sessionId: string, more: boolean) => {
     const generation = ++startGenerationRef.current;
     const isCurrent = () =>
       activeRef.current && generation === startGenerationRef.current;
     const startedAt = Date.now();
+    requestedRef.current = { sessionId, more };
     completionTrackedRef.current = false;
     durationRef.current = 0;
     levelsRef.current = [];
@@ -648,7 +687,9 @@ export function useSessionRecorder(
     watchRef.current = new LongRecordingWatch();
     autoPausedRef.current = false;
     setNotice(null);
+    setNoteId(sessionId);
     setRecordingSessionId(sessionId);
+    setAddingToRecording(more);
     setPart(1);
     setDurationMs(0);
     setAmplitude(0);
@@ -659,7 +700,7 @@ export function useSessionRecorder(
     reportedFailureRef.current = null;
     setPhase("starting");
     registerCapture(sessionId);
-    log("recording_start_requested");
+    log("recording_start_requested", { more });
     try {
       let permission = await getRecordingPermissionsAsync();
       if (!permission.granted) {
@@ -714,8 +755,10 @@ export function useSessionRecorder(
         interruptionMode: "doNotMix",
       });
       if (!isCurrent()) return;
-      writerRef.current = new SessionWavWriter(sessionId);
-      await recordSessionCaptureStart(sessionId);
+      writerRef.current = new SessionWavWriter(sessionId, { append: more });
+      // Adding to a recording keeps the note's start time: the Mac dates the
+      // note by it and tells the phone's recording from its own by it.
+      if (!more) await recordSessionCaptureStart(sessionId);
       if (!isCurrent()) return;
       await stream.start();
       if (!isCurrent()) {
@@ -774,17 +817,30 @@ export function useSessionRecorder(
     }
   };
 
-  const start = (): Promise<void> => {
+  const start = (
+    sessionId: string,
+    options: { more?: boolean } = {},
+  ): Promise<void> => {
     const currentOperation = startRef.current;
     if (currentOperation) return currentOperation;
     if (
-      !["idle", "unavailable", "interrupted", "error"].includes(
+      !["idle", "saved", "unavailable", "interrupted", "error"].includes(
         phaseRef.current,
       )
     ) {
       return Promise.resolve();
     }
-    const operation = performStart();
+    // A recording that couldn't be saved yet is kept for its own note's
+    // Try again; another note can't start over it.
+    if (writerRef.current && sessionRef.current !== sessionId) {
+      log(
+        "recording_start_refused",
+        { reason: "unsaved_recording" },
+        "warning",
+      );
+      return Promise.resolve();
+    }
+    const operation = performStart(sessionId, options.more === true);
     startRef.current = operation;
     const clearOperation = () => {
       if (startRef.current === operation) startRef.current = null;
@@ -793,10 +849,23 @@ export function useSessionRecorder(
     return operation;
   };
 
+  /** Starts again what was asked for last, after a permission or error. */
+  const startAgain = (): Promise<void> => {
+    const requested = requestedRef.current;
+    if (!requested) return Promise.resolve();
+    return start(requested.sessionId, { more: requested.more });
+  };
+
+  const dismiss = (sessionId: string) => {
+    if (requestedRef.current?.sessionId !== sessionId) return;
+    if (!["unavailable", "error"].includes(phaseRef.current)) return;
+    if (writerRef.current || startRef.current) return;
+    requestedRef.current = null;
+    setPhase("idle");
+  };
+
   useMountEffect(() => {
     activeRef.current = true;
-    if (!enabled) return;
-    void start();
   });
 
   // Also covers Pause, Resume and Stop & save in the notifications, which
@@ -825,9 +894,8 @@ export function useSessionRecorder(
       "audioStreamStatus",
       (status) => streamStatusRef.current(status),
     );
-    const alertSubscription = stream.addListener(
-      "audioStreamAlert",
-      (answer) => alertAnswerRef.current(answer),
+    const alertSubscription = stream.addListener("audioStreamAlert", (answer) =>
+      alertAnswerRef.current(answer),
     );
     return () => {
       statusSubscription.remove();
@@ -842,12 +910,14 @@ export function useSessionRecorder(
       previousState = nextState;
       if (!returned) return;
       if (phaseRef.current === "unavailable") {
-        void start();
+        void startAgain();
       } else if (isCapturePhase(phaseRef.current)) {
         // Live Updates may just have been allowed in Settings. Android
         // applies that when the notification is posted again.
         try {
-          streamRef.current.setNotificationTitle?.(notificationTitleRef.current);
+          streamRef.current.setNotificationTitle?.(
+            notificationTitleRef.current,
+          );
         } catch {}
       }
     });
@@ -1045,7 +1115,11 @@ export function useSessionRecorder(
     const kind = noticeRef.current;
     if (kind !== "silence" && kind !== "check_in") return;
     watchRef.current.someoneIsThere();
-    log("recording_alert_answered", { kind, answer: "keep_going", from: "app" });
+    log("recording_alert_answered", {
+      kind,
+      answer: "keep_going",
+      from: "app",
+    });
     try {
       streamRef.current.clearAlert?.();
     } catch {}
@@ -1074,21 +1148,24 @@ export function useSessionRecorder(
       return stop("retry");
     }
     if (["unavailable", "interrupted", "error"].includes(phaseRef.current)) {
-      await start();
+      await startAgain();
     }
     return "noop";
   };
 
   stopRef.current = stop;
+  // Only when the app itself goes away (signing out, for example): leaving a
+  // note no longer ends its recording.
   useMountEffect(() => () => {
     activeRef.current = false;
     startGenerationRef.current += 1;
     clearTimeout(titleTimerRef.current);
+    const requested = requestedRef.current?.sessionId;
     const release = () => {
       unregisterCapture(sessionRef.current);
-      // A start cut short by leaving the screen never reaches a later phase.
+      // A start cut short never reaches a later phase.
       setSessionRecording(sessionRef.current, false);
-      setSessionRecording(sessionId, false);
+      if (requested) setSessionRecording(requested, false);
     };
     void stopRef.current("left_screen").then(release, release);
   });
@@ -1102,14 +1179,17 @@ export function useSessionRecorder(
     liveStatus,
     liveTranscript,
     canPause,
+    noteId,
     sessionId: recordingSessionId,
     part,
+    addingToRecording,
     notice,
     start,
     stop,
     pause,
     resume,
     retry,
+    dismiss,
     keepGoing,
     setNotificationTitle,
   };
