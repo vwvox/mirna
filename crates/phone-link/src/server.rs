@@ -12,6 +12,11 @@
 //! inbox/<id>/status.json   where the Mac is with it
 //! notes.json               text of the notes those recordings became, for
 //!                          the phones to download (never the audio)
+//! courses.json             the Mac's courses, for phones to file lessons in
+//! clips/<note>/<clip>.mp3  short teacher clips of lessons, written by the Mac
+//!                          app, for the phones to play in reviews
+//! reviews/<note>/<run>.json reviews played on a phone, until the Mac app
+//!                          has counted them
 //! diagnostics/<phone>.log  each phone's problem log, as it last sent it
 //! ```
 
@@ -37,9 +42,10 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 use crate::protocol::{
-    ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
-    NoteJob, NoteSnapshot, PairRequest, PairResponse, RecordingMeta, RecordingState,
-    RecordingStatus, StatusesRequest, is_valid_recording_id,
+    ChunkResponse, CompleteRequest, CourseInfo, ErrorBody, MacInfo, NoteChangesRequest,
+    NoteChangesResponse, NoteJob, NoteSnapshot, PairRequest, PairResponse, RecordingMeta,
+    RecordingState, RecordingStatus, ReviewsAccepted, ReviewsUpload, StatusesRequest,
+    is_valid_path_id, is_valid_recording_id,
 };
 use crate::{
     AUDIO_EXTENSIONS, Error, Identity, MAX_CHUNK_BYTES, MAX_DIAGNOSTICS_BYTES, MAX_RECORDING_BYTES,
@@ -76,7 +82,25 @@ pub enum ServerEvent {
     NotesRequested {
         include_mac_notes: bool,
     },
+    /// A phone sent reviews it played: the Mac app should count them
+    /// (`pending_reviews`) and then `remove_review` each.
+    ReviewsReceived {
+        session_id: String,
+    },
 }
+
+/// A review a phone played, waiting for the Mac app to count it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingReview {
+    pub session_id: String,
+    pub id: String,
+    /// The run as the phone sent it, JSON.
+    pub run_json: String,
+}
+
+/// Largest review a phone may send, and how many at once.
+const MAX_REVIEW_BYTES: usize = 64 * 1024;
+const MAX_REVIEWS_PER_UPLOAD: usize = 20;
 
 /// A complete recording waiting for, or in, processing on the Mac, or a note
 /// the phone asked the Mac to work on again (`job`). For a job the audio is
@@ -169,6 +193,7 @@ struct Inner {
     notes: Mutex<NotesFile>,
     notes_published: tokio::sync::Notify,
     notes_refresh_wait_ms: AtomicU64,
+    courses: Mutex<Vec<CourseInfo>>,
 }
 
 #[derive(Clone)]
@@ -197,6 +222,10 @@ impl PhoneLinkServer {
             .ok()
             .flatten()
             .unwrap_or_default();
+        let courses = read_json::<Vec<CourseInfo>>(&dir.join("courses.json"))
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         Ok(Self {
             inner: Arc::new(Inner {
                 dir,
@@ -210,8 +239,80 @@ impl PhoneLinkServer {
                 notes: Mutex::new(notes),
                 notes_published: tokio::sync::Notify::new(),
                 notes_refresh_wait_ms: AtomicU64::new(NOTES_REFRESH_WAIT.as_millis() as u64),
+                courses: Mutex::new(courses),
             }),
         })
+    }
+
+    /// The courses phones can file a lesson in, sent with every answer about
+    /// note changes.
+    pub fn publish_courses(&self, courses: Vec<CourseInfo>) -> Result<(), Error> {
+        let mut stored = self
+            .inner
+            .courses
+            .lock()
+            .map_err(|_| Error::Io("courses lock poisoned".into()))?;
+        if *stored != courses {
+            write_json(&self.inner.dir.join("courses.json"), &courses)?;
+            *stored = courses;
+        }
+        Ok(())
+    }
+
+    /// Where the Mac app writes a lesson's clips for the phones.
+    pub fn clips_dir(&self, session_id: &str) -> Option<PathBuf> {
+        is_valid_path_id(session_id).then(|| self.inner.dir.join("clips").join(session_id))
+    }
+
+    /// Reviews phones sent that the Mac app hasn't counted yet.
+    pub fn pending_reviews(&self) -> Vec<PendingReview> {
+        let mut pending = Vec::new();
+        let Ok(notes) = std::fs::read_dir(self.inner.dir.join("reviews")) else {
+            return pending;
+        };
+        for note in notes.flatten() {
+            let Some(session_id) = note.file_name().to_str().map(str::to_string) else {
+                continue;
+            };
+            let Ok(runs) = std::fs::read_dir(note.path()) else {
+                continue;
+            };
+            for run in runs.flatten() {
+                let path = run.path();
+                let Some(id) = path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .filter(|stem| is_valid_path_id(stem))
+                    .map(str::to_string)
+                else {
+                    continue;
+                };
+                if let Ok(run_json) = std::fs::read_to_string(&path) {
+                    pending.push(PendingReview {
+                        session_id: session_id.clone(),
+                        id,
+                        run_json,
+                    });
+                }
+            }
+        }
+        pending.sort_by(|a, b| (&a.session_id, &a.id).cmp(&(&b.session_id, &b.id)));
+        pending
+    }
+
+    /// Forgets a phone review once the Mac app has counted it.
+    pub fn remove_review(&self, session_id: &str, id: &str) -> Result<(), Error> {
+        if !is_valid_path_id(session_id) || !is_valid_path_id(id) {
+            return Ok(());
+        }
+        let dir = self.inner.dir.join("reviews").join(session_id);
+        match std::fs::remove_file(dir.join(format!("{id}.json"))) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        let _ = std::fs::remove_dir(dir);
+        Ok(())
     }
 
     /// How long a phone's request for note changes waits for `publish_notes`.
@@ -567,6 +668,8 @@ impl PhoneLinkServer {
             .route("/v1/recordings/{id}/retry", post(retry))
             .route("/v1/recordings/{id}/job", post(request_job))
             .route("/v1/notes/changes", post(note_changes))
+            .route("/v1/notes/{session_id}/clips/{clip_id}", get(note_clip))
+            .route("/v1/notes/{session_id}/reviews", post(receive_reviews))
             .route(
                 "/v1/diagnostics",
                 put(receive_diagnostics).layer(DefaultBodyLimit::max(MAX_DIAGNOSTICS_BYTES)),
@@ -597,11 +700,17 @@ impl Inner {
         since: u64,
         include_mac_notes: bool,
     ) -> NoteChangesResponse {
+        let courses = self
+            .courses
+            .lock()
+            .map(|courses| courses.clone())
+            .unwrap_or_default();
         let Ok(file) = self.notes.lock() else {
             return NoteChangesResponse {
                 notes: Vec::new(),
                 cursor: since,
                 more: false,
+                courses,
             };
         };
         // A cursor from before notes.json was reset: start over.
@@ -610,13 +719,7 @@ impl Inner {
             .notes
             .values()
             .filter(|stored| {
-                stored.seq > since
-                    && match &stored.note.recording_id {
-                        Some(recording_id) => {
-                            self.owner(recording_id).as_deref() == Some(fingerprint)
-                        }
-                        None => include_mac_notes,
-                    }
+                stored.seq > since && self.visible_to(&stored.note, fingerprint, include_mac_notes)
             })
             .collect();
         mine.sort_by_key(|stored| stored.seq);
@@ -631,7 +734,29 @@ impl Inner {
             notes: mine.into_iter().map(|stored| stored.note.clone()).collect(),
             cursor,
             more,
+            courses,
         }
+    }
+
+    /// A phone sees the notes its own recordings became, lessons recorded on
+    /// the Mac, and other notes recorded on the Mac when it asks for them.
+    fn visible_to(&self, note: &NoteSnapshot, fingerprint: &str, include_mac_notes: bool) -> bool {
+        match &note.recording_id {
+            Some(recording_id) => self.owner(recording_id).as_deref() == Some(fingerprint),
+            None => include_mac_notes || note.lesson.is_some(),
+        }
+    }
+
+    /// The published note `session_id`, if this phone may see it.
+    fn published_note_for(&self, session_id: &str, fingerprint: &str) -> Option<NoteSnapshot> {
+        let file = self.notes.lock().ok()?;
+        file.notes
+            .values()
+            .find(|stored| {
+                stored.note.session_id == session_id
+                    && self.visible_to(&stored.note, fingerprint, true)
+            })
+            .map(|stored| stored.note.clone())
     }
 
     fn is_paired(&self, fingerprint: &str) -> bool {
@@ -903,6 +1028,99 @@ async fn note_changes(
         .into_response()
 }
 
+/// One of a lesson's clips, for a review on the phone. Only clips the Mac
+/// published with a note the phone may see.
+async fn note_clip(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    UrlPath((session_id, clip_id)): UrlPath<(String, String)>,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    if !is_valid_path_id(&session_id) || !is_valid_path_id(&clip_id) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid_id");
+    }
+    let Some(note) = inner.published_note_for(&session_id, &peer.fingerprint) else {
+        return json_error(StatusCode::NOT_FOUND, "unknown_note");
+    };
+    let listed = note
+        .lesson
+        .as_ref()
+        .is_some_and(|lesson| lesson.clips.iter().any(|clip| clip.id == clip_id));
+    if !listed {
+        return json_error(StatusCode::NOT_FOUND, "unknown_clip");
+    }
+    let path = inner
+        .dir
+        .join("clips")
+        .join(&session_id)
+        .join(format!("{clip_id}.mp3"));
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => (
+            [(axum::http::header::CONTENT_TYPE, "audio/mpeg")],
+            Bytes::from(bytes),
+        )
+            .into_response(),
+        Err(_) => json_error(StatusCode::NOT_FOUND, "unknown_clip"),
+    }
+}
+
+/// Reviews a phone played of a lesson. Each is kept until the Mac app has
+/// counted it; one sent again is accepted and changes nothing.
+async fn receive_reviews(
+    State(inner): State<Arc<Inner>>,
+    Extension(peer): Extension<Peer>,
+    UrlPath(session_id): UrlPath<String>,
+    Json(upload): Json<ReviewsUpload>,
+) -> Response {
+    if let Err(response) = require_paired(&inner, &peer) {
+        return response;
+    }
+    if !is_valid_path_id(&session_id) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid_id");
+    }
+    if upload.reviews.len() > MAX_REVIEWS_PER_UPLOAD {
+        return json_error(StatusCode::PAYLOAD_TOO_LARGE, "too_many");
+    }
+    let Some(note) = inner.published_note_for(&session_id, &peer.fingerprint) else {
+        return json_error(StatusCode::NOT_FOUND, "unknown_note");
+    };
+    if note.lesson.is_none() {
+        return json_error(StatusCode::CONFLICT, "not_a_lesson");
+    }
+    let dir = inner.dir.join("reviews").join(&session_id);
+    let mut accepted = Vec::new();
+    let guard = inner.write_lock.lock().await;
+    for review in &upload.reviews {
+        if review.len() > MAX_REVIEW_BYTES {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(review) else {
+            continue;
+        };
+        let Some(id) = value
+            .get("id")
+            .and_then(|id| id.as_str())
+            .filter(|id| is_valid_path_id(id))
+        else {
+            continue;
+        };
+        let path = dir.join(format!("{id}.json"));
+        let saved = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, review));
+        if let Err(error) = saved {
+            tracing::error!(%error, "could not keep a phone review");
+            continue;
+        }
+        accepted.push(id.to_string());
+    }
+    drop(guard);
+    if !accepted.is_empty() {
+        inner.emit(ServerEvent::ReviewsReceived { session_id });
+    }
+    Json(ReviewsAccepted { accepted }).into_response()
+}
+
 /// A recording the Mac couldn't turn into a note goes back in the queue.
 async fn retry(
     State(inner): State<Arc<Inner>>,
@@ -1040,6 +1258,27 @@ async fn request_job(
             inner.emit(ServerEvent::RecordingReceived { id });
             return Json(status).into_response();
         }
+        (RecordingState::Receiving, NoteJob::SetLesson { .. }) => {
+            // The phone sends the lesson tag with the finished recording.
+            drop(guard);
+            return Json(status).into_response();
+        }
+        (RecordingState::Queued | RecordingState::Failed, NoteJob::SetLesson { lesson })
+            if status.session_id.is_none() =>
+        {
+            // Not a note yet: the tag goes with the recording, which becomes
+            // a lesson (or not) when it is made into a note.
+            let Some(mut stored) = stored else {
+                return json_error(StatusCode::CONFLICT, "no_audio");
+            };
+            stored.meta.lesson = lesson.clone();
+            if let Err(error) = write_json(&inner.recording_dir(&id).join("meta.json"), &stored) {
+                tracing::error!(%error, "could not keep the lesson tag");
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, "save_failed");
+            }
+            drop(guard);
+            return Json(status).into_response();
+        }
         (RecordingState::Queued, NoteJob::Retranscribe { .. }) => {
             // It hasn't been transcribed yet; it will be.
             drop(guard);
@@ -1060,6 +1299,10 @@ async fn request_job(
         }
         (RecordingState::Queued, NoteJob::Trim { .. }) => {
             return json_error(StatusCode::CONFLICT, "no_audio");
+        }
+        (RecordingState::Queued, NoteJob::SetLesson { .. }) => {
+            // Waiting to be made again as a note: the lesson change comes after.
+            status.job = Some(job);
         }
     }
     status.stage = None;

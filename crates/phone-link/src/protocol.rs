@@ -36,6 +36,42 @@ pub struct RecordingMeta {
     /// Notes typed on the phone during the recording, as Markdown.
     #[serde(default)]
     pub notes_md: Option<String>,
+    /// Set when the phone said the recording is a lesson.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lesson: Option<LessonTag>,
+}
+
+/// What the phone says about a lesson, so the Mac files it in the course and
+/// writes its study sheet and review without asking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LessonTag {
+    /// The course (a folder on the Mac); a new name starts a new course.
+    pub course: String,
+    /// `language`, `topic` or `maths`.
+    pub subject: String,
+    /// Language codes: the one being learnt and the one it's explained in.
+    pub learning: String,
+    pub explain_in: String,
+    /// What a topic or maths class is about ("Contract law").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_name: Option<String>,
+}
+
+impl LessonTag {
+    pub fn is_valid(&self) -> bool {
+        let short = |value: &str| !value.trim().is_empty() && value.len() <= 16;
+        let course = self.course.trim();
+        !course.is_empty()
+            && course.len() <= 200
+            && !course.contains(['/', '\\'])
+            && matches!(self.subject.as_str(), "language" | "topic" | "maths")
+            && short(&self.learning)
+            && short(&self.explain_in)
+            && self
+                .subject_name
+                .as_ref()
+                .is_none_or(|name| name.len() <= 200)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,6 +147,12 @@ pub enum NoteJob {
         #[serde(default = "yes")]
         update_summary: bool,
     },
+    /// Make the note a lesson with these settings (its sheet and review are
+    /// written), or, with none, a normal note again.
+    SetLesson {
+        #[serde(default)]
+        lesson: Option<LessonTag>,
+    },
 }
 
 fn yes() -> bool {
@@ -125,6 +167,7 @@ impl NoteJob {
             }
             NoteJob::Trim { keep_ms, .. } => *keep_ms >= 1_000,
             NoteJob::Extend { .. } => true,
+            NoteJob::SetLesson { lesson } => lesson.as_ref().is_none_or(LessonTag::is_valid),
         }
     }
 }
@@ -184,8 +227,9 @@ fn empty_json_array() -> String {
 }
 
 /// The text of a note as it is now on the Mac: one that began as a phone
-/// recording, or (when the phone asks for them) one recorded on the Mac.
-/// Audio never goes to the phone.
+/// recording, or (when the phone asks for them, and always for lessons) one
+/// recorded on the Mac. A recording never goes back to the phone; only a
+/// lesson's short teacher clips do, fetched one by one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NoteSnapshot {
     /// The phone's id for the recording it sent, or none for a note that was
@@ -202,6 +246,78 @@ pub struct NoteSnapshot {
     /// When the note was made (RFC 3339), for notes recorded on the Mac.
     #[serde(default)]
     pub created_at: Option<String>,
+    /// Set when the note is a lesson.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lesson: Option<NoteLesson>,
+}
+
+/// A lesson's study sheet and review, as the Mac made them. The sheet and the
+/// plan travel as JSON text in the Mac app's own format; the phone only shows
+/// and plays them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NoteLesson {
+    /// The lesson's class settings (`learning`, `explainIn`, `subject`, …).
+    pub settings_json: String,
+    #[serde(default)]
+    pub course: Option<String>,
+    /// Its place in the course: "Lesson 14".
+    #[serde(default)]
+    pub number: Option<u32>,
+    #[serde(default)]
+    pub sheet_json: Option<String>,
+    #[serde(default)]
+    pub review_json: Option<String>,
+    /// The teacher's clips the sheet and review play, to download by id.
+    #[serde(default)]
+    pub clips: Vec<ClipInfo>,
+    /// Reviews the Mac has counted, oldest first.
+    #[serde(default)]
+    pub reviews: Vec<ReviewSummary>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClipInfo {
+    pub id: String,
+    pub size: u64,
+    /// Lowercase hex SHA-256 of the file.
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewSummary {
+    pub id: String,
+    pub ended_at: String,
+    /// `mac` or `phone`.
+    pub device: String,
+    /// Minutes: 5 or 10.
+    pub length: u32,
+    pub right: u32,
+    pub total: u32,
+}
+
+/// A course on the Mac that a phone can file a lesson in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CourseInfo {
+    pub name: String,
+    pub subject: String,
+    pub learning: String,
+    pub explain_in: String,
+    #[serde(default)]
+    pub subject_name: Option<String>,
+    /// The number the next lesson in it gets.
+    pub next_number: u32,
+}
+
+/// Reviews played on the phone, each the JSON of one run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewsUpload {
+    pub reviews: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewsAccepted {
+    /// The runs the Mac kept (or already had), by id.
+    pub accepted: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,6 +338,17 @@ pub struct NoteChangesResponse {
     /// More changes are waiting: ask again with the new cursor.
     #[serde(default)]
     pub more: bool,
+    /// The Mac's courses, for filing a recording as a lesson.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub courses: Vec<CourseInfo>,
+}
+
+/// Note ids (the Mac's session ids) and clip ids that may appear in a path.
+pub fn is_valid_path_id(id: &str) -> bool {
+    (1..=80).contains(&id.len())
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 /// Recording ids are the phone's session UUIDs. Anything else is refused so an

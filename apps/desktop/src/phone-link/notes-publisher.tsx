@@ -7,6 +7,11 @@ import {
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
 import { liveQueryClient } from "~/db";
+import {
+  countPhoneReviews,
+  lessonForPhone,
+  publishCourses,
+} from "~/phone-link/lessons";
 import { loadSessionContentSnapshot } from "~/session/content-queries";
 
 // Phones download the text of the notes their recordings became: title,
@@ -23,19 +28,34 @@ export function PhoneNotesPublisher() {
           void publishLinkedNotes({
             includeMacNotes: event.payload.include_mac_notes,
           });
+        } else if (event.payload.type === "reviewsReceived") {
+          void countReviewsAndPublish();
         }
       })
       .then((unlisten) => {
         if (cancelled) unlisten();
         else stop = unlisten;
       });
-    void publishLinkedNotes();
+    // Reviews a phone sent while this app was closed.
+    void countReviewsAndPublish();
     return () => {
       cancelled = true;
       stop?.();
     };
   });
   return null;
+}
+
+/** Reviews played on a phone count like ones played here; then the phones hear. */
+async function countReviewsAndPublish() {
+  try {
+    if (await countPhoneReviews()) {
+      publishedMarkers.clear();
+    }
+  } catch (error) {
+    console.error("[phone-link] could not count phone reviews", error);
+  }
+  void publishLinkedNotes();
 }
 
 // What each note looked like when it was last published, so unchanged notes
@@ -52,7 +72,9 @@ export function publishLinkedNotes(
 ): Promise<void> {
   const includeMacNotes = options.includeMacNotes ?? false;
   if (publishing) {
-    again = { includeMacNotes: includeMacNotes || (again?.includeMacNotes ?? false) };
+    again = {
+      includeMacNotes: includeMacNotes || (again?.includeMacNotes ?? false),
+    };
     return publishing;
   }
   publishing = publish(includeMacNotes)
@@ -77,16 +99,24 @@ async function publish(includeMacNotes: boolean) {
   if (linked.status === "error") throw new Error(linked.error);
 
   const targets: Target[] = [...linked.data];
-  if (includeMacNotes) {
-    const linkedIds = new Set(linked.data.map((link) => link.session_id));
-    for (const sessionId of await macNoteIds()) {
-      if (!linkedIds.has(sessionId)) {
-        targets.push({ recording_id: null, session_id: sessionId });
-      }
+  const linkedIds = new Set(linked.data.map((link) => link.session_id));
+  // Lessons always go: reviewing on the phone is the point of them.
+  const macIds = includeMacNotes ? await macNoteIds() : await macLessonIds();
+  for (const sessionId of macIds) {
+    if (!linkedIds.has(sessionId)) {
+      linkedIds.add(sessionId);
+      targets.push({ recording_id: null, session_id: sessionId });
     }
   }
+  try {
+    await publishCourses();
+  } catch (error) {
+    console.error("[phone-link] could not publish courses", error);
+  }
 
-  const markers = await changeMarkers(targets.map((target) => target.session_id));
+  const markers = await changeMarkers(
+    targets.map((target) => target.session_id),
+  );
   const notes: PublishedNote[] = [];
   const nextMarkers = new Map<string, string>();
   for (const target of targets) {
@@ -117,8 +147,10 @@ async function changeMarkers(sessionIds: string[]) {
         COALESCE((SELECT MAX(document.updated_at) || ':' || COUNT(*)
           FROM session_documents AS document
           WHERE document.session_id = session.id
-            AND document.kind IN ('summary', 'template_output')
+            AND document.kind IN ('summary', 'template_output', 'lesson_sheet',
+              'lesson_review', 'lesson_practice')
             AND document.deleted_at IS NULL), '') || '|' ||
+        COALESCE(session.kind, '') || '|' || COALESCE(session.folder_path, '') || '|' ||
         COALESCE((SELECT MAX(transcript.updated_at) || ':' || COUNT(*)
           FROM transcripts AS transcript
           WHERE transcript.session_id = session.id
@@ -131,6 +163,18 @@ async function changeMarkers(sessionIds: string[]) {
     for (const row of rows) markers.set(row.id, row.marker);
   }
   return markers;
+}
+
+/** Lessons recorded on this Mac, newest first. */
+async function macLessonIds(): Promise<string[]> {
+  const rows = await liveQueryClient.execute<{ id: string }>(
+    `SELECT id FROM sessions
+    WHERE deleted_at IS NULL AND kind = 'lesson'
+    ORDER BY created_at DESC
+    LIMIT ${MAC_NOTES_LIMIT}`,
+    [],
+  );
+  return rows.map((row) => row.id);
 }
 
 /** Notes recorded on this Mac that have a summary or a transcript, newest first. */
@@ -161,10 +205,17 @@ async function noteFor(target: Target): Promise<PublishedNote | null> {
     .slice()
     .sort((a, b) => a.position - b.position)
     .find((note) => note.markdown.trim());
+  let lesson: PublishedNote["lesson"] = null;
+  try {
+    lesson = await lessonForPhone(target.session_id);
+  } catch (error) {
+    console.error("[phone-link] could not get the lesson ready", error);
+  }
   return {
     recording_id: target.recording_id,
     session_id: target.session_id,
     created_at: target.recording_id ? null : snapshot.createdAt,
+    lesson,
     title: snapshot.title.trim(),
     summary_md: summary?.markdown.trim() || null,
     transcripts: snapshot.transcripts

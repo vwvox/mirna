@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use anlg_phone_link::protocol::{NoteJob, NoteSnapshot, NoteTranscript, RecordingState};
+use anlg_phone_link::protocol::{
+    ClipInfo, CourseInfo, LessonTag, NoteJob, NoteLesson, NoteSnapshot, NoteTranscript,
+    RecordingState, ReviewSummary, is_valid_path_id,
+};
 use anlg_phone_link::server::{PhoneLinkServer, StatusUpdate};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
@@ -54,6 +57,31 @@ pub struct InboxEntry {
     pub session_id: Option<String>,
     /// Set when the phone asked for more work on a note it already has.
     pub job: Option<InboxJob>,
+    /// Set when the phone said the recording is a lesson.
+    pub lesson: Option<LessonInfo>,
+}
+
+/// A lesson as the phone tagged it: the course to file it in and the class.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct LessonInfo {
+    pub course: String,
+    /// `language`, `topic` or `maths`.
+    pub subject: String,
+    pub learning: String,
+    pub explain_in: String,
+    pub subject_name: Option<String>,
+}
+
+impl From<LessonTag> for LessonInfo {
+    fn from(tag: LessonTag) -> Self {
+        LessonInfo {
+            course: tag.course,
+            subject: tag.subject,
+            learning: tag.learning,
+            explain_in: tag.explain_in,
+            subject_name: tag.subject_name,
+        }
+    }
 }
 
 /// Work the phone asked for on a note: transcribe again (`engine` is `auto`,
@@ -72,6 +100,10 @@ pub enum InboxJob {
     },
     Extend {
         update_summary: bool,
+    },
+    /// Make the note a lesson with these settings, or a normal note with none.
+    SetLesson {
+        lesson: Option<LessonInfo>,
     },
 }
 
@@ -93,6 +125,9 @@ impl From<NoteJob> for InboxJob {
                 update_summary,
             },
             NoteJob::Extend { update_summary } => InboxJob::Extend { update_summary },
+            NoteJob::SetLesson { lesson } => InboxJob::SetLesson {
+                lesson: lesson.map(LessonInfo::from),
+            },
         }
     }
 }
@@ -144,6 +179,109 @@ pub struct PublishedNote {
     pub transcripts: Vec<PublishedTranscript>,
     /// When the note was made, for notes recorded on this Mac.
     pub created_at: Option<String>,
+    /// A lesson's sheet, review and clips.
+    #[serde(default)]
+    pub lesson: Option<PublishedLesson>,
+}
+
+/// A lesson's study sheet and review plan (JSON, in the app's own format),
+/// the clips they play, and the reviews counted so far.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedLesson {
+    pub settings_json: String,
+    pub course: Option<String>,
+    pub number: Option<f64>,
+    pub sheet_json: Option<String>,
+    pub review_json: Option<String>,
+    pub clips: Vec<PublishedClip>,
+    pub reviews: Vec<PublishedReview>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedClip {
+    pub id: String,
+    pub size: f64,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedReview {
+    pub id: String,
+    pub ended_at: String,
+    pub device: String,
+    pub length: f64,
+    pub right: f64,
+    pub total: f64,
+}
+
+/// A course phones can file a lesson in.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PublishedCourse {
+    pub name: String,
+    pub subject: String,
+    pub learning: String,
+    pub explain_in: String,
+    pub subject_name: Option<String>,
+    pub next_number: f64,
+}
+
+/// A stretch of a lesson's recording to cut into a clip for the phones.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct ClipCut {
+    pub id: String,
+    pub start_ms: f64,
+    pub end_ms: f64,
+    /// 0 the mic, 1 the call; none mixes both.
+    pub channel: Option<f64>,
+}
+
+/// A review played on a phone, waiting to be counted.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PhoneReview {
+    pub session_id: String,
+    pub id: String,
+    pub run_json: String,
+}
+
+fn count(value: f64) -> u32 {
+    if value.is_finite() && value > 0.0 {
+        value.round().min(u32::MAX as f64) as u32
+    } else {
+        0
+    }
+}
+
+impl From<PublishedLesson> for NoteLesson {
+    fn from(lesson: PublishedLesson) -> Self {
+        NoteLesson {
+            settings_json: lesson.settings_json,
+            course: lesson.course,
+            number: lesson.number.map(count),
+            sheet_json: lesson.sheet_json,
+            review_json: lesson.review_json,
+            clips: lesson
+                .clips
+                .into_iter()
+                .map(|clip| ClipInfo {
+                    id: clip.id,
+                    size: count(clip.size) as u64,
+                    sha256: clip.sha256,
+                })
+                .collect(),
+            reviews: lesson
+                .reviews
+                .into_iter()
+                .map(|review| ReviewSummary {
+                    id: review.id,
+                    ended_at: review.ended_at,
+                    device: review.device,
+                    length: count(review.length),
+                    right: count(review.right),
+                    total: count(review.total),
+                })
+                .collect(),
+        }
+    }
 }
 
 impl From<PublishedNote> for NoteSnapshot {
@@ -154,6 +292,7 @@ impl From<PublishedNote> for NoteSnapshot {
             title: note.title,
             summary_md: note.summary_md,
             created_at: note.created_at,
+            lesson: note.lesson.map(NoteLesson::from),
             transcripts: note
                 .transcripts
                 .into_iter()
@@ -352,8 +491,131 @@ pub(crate) async fn list_inbox<R: tauri::Runtime>(
             stage: item.status.stage,
             session_id: item.status.session_id,
             job: item.job.map(InboxJob::from),
+            lesson: item.meta.lesson.map(LessonInfo::from),
         })
         .collect())
+}
+
+/// The courses phones can file a recording in as a lesson.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn publish_courses<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    courses: Vec<PublishedCourse>,
+) -> Result<(), String> {
+    let state = state(&app);
+    let courses = courses
+        .into_iter()
+        .map(|course| CourseInfo {
+            name: course.name,
+            subject: course.subject,
+            learning: course.learning,
+            explain_in: course.explain_in,
+            subject_name: course.subject_name,
+            next_number: count(course.next_number).max(1),
+        })
+        .collect();
+    server(&state)?
+        .publish_courses(courses)
+        .map_err(|error| error.to_string())
+}
+
+/// Cuts a lesson's clips for the phones out of its recording, keeping those
+/// already cut and removing ones no longer asked for. Returns every clip now
+/// there.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn export_clips<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    session_id: String,
+    audio_path: String,
+    clips: Vec<ClipCut>,
+) -> Result<Vec<PublishedClip>, String> {
+    let state = state(&app);
+    let dir = server(&state)?
+        .clips_dir(&session_id)
+        .ok_or_else(|| "invalid note id".to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let audio = std::path::PathBuf::from(audio_path);
+        let wanted: std::collections::HashSet<String> =
+            clips.iter().map(|clip| clip.id.clone()).collect();
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let keep = path
+                    .file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|stem| wanted.contains(stem));
+                if !keep {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
+        }
+        let mut done = Vec::new();
+        for clip in clips {
+            if !is_valid_path_id(&clip.id) {
+                continue;
+            }
+            let out = dir.join(format!("{}.mp3", clip.id));
+            let cut = if out.exists() {
+                let size = std::fs::metadata(&out).map(|meta| meta.len()).unwrap_or(0);
+                anlg_phone_link::sha256_file(&out)
+                    .map(|sha256| (size, sha256))
+                    .map_err(|error| error.to_string())
+            } else {
+                crate::clips::cut_clip(
+                    &audio,
+                    count(clip.start_ms) as u64,
+                    count(clip.end_ms) as u64,
+                    clip.channel.map(|side| count(side).min(1) as u8),
+                    &out,
+                )
+            };
+            match cut {
+                Ok((size, sha256)) => done.push(PublishedClip {
+                    id: clip.id,
+                    size: size as f64,
+                    sha256,
+                }),
+                Err(error) => tracing::warn!(%error, clip = %clip.id, "could not cut a clip"),
+            }
+        }
+        Ok(done)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Reviews phones sent that haven't been counted yet.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn list_reviews<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+) -> Result<Vec<PhoneReview>, String> {
+    let state = state(&app);
+    Ok(server(&state)?
+        .pending_reviews()
+        .into_iter()
+        .map(|review| PhoneReview {
+            session_id: review.session_id,
+            id: review.id,
+            run_json: review.run_json,
+        })
+        .collect())
+}
+
+/// Forgets a phone review once it has been counted.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn remove_review<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    session_id: String,
+    id: String,
+) -> Result<(), String> {
+    let state = state(&app);
+    server(&state)?
+        .remove_review(&session_id, &id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

@@ -9,6 +9,10 @@ const COMMANDS: &[&str] = &[
     "list_linked_notes",
     "publish_notes",
     "export_logs",
+    "publish_courses",
+    "export_clips",
+    "list_reviews",
+    "remove_review",
 ];
 
 fn main() {

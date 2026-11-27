@@ -94,6 +94,52 @@ async exportLogs(destination: string) : Promise<Result<string, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+/**
+ * The courses phones can file a recording in as a lesson.
+ */
+async publishCourses(courses: PublishedCourse[]) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|publish_courses", { courses }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Cuts a lesson's clips for the phones out of its recording, keeping those
+ * already cut and removing ones no longer asked for. Returns every clip now
+ * there.
+ */
+async exportClips(sessionId: string, audioPath: string, clips: ClipCut[]) : Promise<Result<PublishedClip[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|export_clips", { sessionId, audioPath, clips }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Reviews phones sent that haven't been counted yet.
+ */
+async listReviews() : Promise<Result<PhoneReview[], string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|list_reviews") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Forgets a phone review once it has been counted.
+ */
+async removeReview(sessionId: string, id: string) : Promise<Result<null, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("plugin:phone-link|remove_review", { sessionId, id }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -112,6 +158,14 @@ phoneLinkEvent: "plugin:phone-link:phone-link-event"
 
 /** user-defined types **/
 
+/**
+ * A stretch of a lesson's recording to cut into a clip for the phones.
+ */
+export type ClipCut = { id: string; start_ms: number; end_ms: number; 
+/**
+ * 0 the mic, 1 the call; none mixes both.
+ */
+channel: number | null }
 export type InboxEntry = { id: string; audio_path: string; title: string | null; started_at: string | null; duration_ms: number | null; notes_md: string | null; phone_name: string; received_at_ms: number; 
 /**
  * `queued` or `processing`.
@@ -120,13 +174,29 @@ state: string; stage: string | null; session_id: string | null;
 /**
  * Set when the phone asked for more work on a note it already has.
  */
-job: InboxJob | null }
+job: InboxJob | null; 
+/**
+ * Set when the phone said the recording is a lesson.
+ */
+lesson: LessonInfo | null }
 /**
  * Work the phone asked for on a note: transcribe again (`engine` is `auto`,
  * `parakeet` or `qwen3`), keep only the first `keep_ms` of the recording, or
  * make the note again from a longer recording the phone just sent (`extend`).
  */
-export type InboxJob = { type: "retranscribe"; engine: string; update_summary: boolean } | { type: "trim"; keep_ms: number; update_summary: boolean } | { type: "extend"; update_summary: boolean }
+export type InboxJob = { type: "retranscribe"; engine: string; update_summary: boolean } | { type: "trim"; keep_ms: number; update_summary: boolean } | { type: "extend"; update_summary: boolean } | 
+/**
+ * Make the note a lesson with these settings, or a normal note with none.
+ */
+{ type: "set_lesson"; lesson: LessonInfo | null }
+/**
+ * A lesson as the phone tagged it: the course to file it in and the class.
+ */
+export type LessonInfo = { course: string; 
+/**
+ * `language`, `topic` or `maths`.
+ */
+subject: string; learning: string; explain_in: string; subject_name: string | null }
 /**
  * A phone recording that became a note on this Mac.
  */
@@ -146,12 +216,31 @@ export type PhoneLinkEvent = { type: "phonePaired"; name: string } | { type: "re
  * A phone asked what changed: publish fresh copies of its notes, and of
  * notes recorded on this Mac when `include_mac_notes` is set.
  */
-{ type: "notesRequested"; include_mac_notes: boolean }
+{ type: "notesRequested"; include_mac_notes: boolean } | 
+/**
+ * A phone sent reviews it played of a lesson: count them
+ * (`list_reviews`), then `remove_review` each.
+ */
+{ type: "reviewsReceived"; session_id: string }
 export type PhoneLinkStatus = { 
 /**
  * Whether the Mac is listening for its phones right now.
  */
 listening: boolean; port: number | null; mac_name: string; addresses: string[]; error: string | null }
+/**
+ * A review played on a phone, waiting to be counted.
+ */
+export type PhoneReview = { session_id: string; id: string; run_json: string }
+export type PublishedClip = { id: string; size: number; sha256: string }
+/**
+ * A course phones can file a lesson in.
+ */
+export type PublishedCourse = { name: string; subject: string; learning: string; explain_in: string; subject_name: string | null; next_number: number }
+/**
+ * A lesson's study sheet and review plan (JSON, in the app's own format),
+ * the clips they play, and the reviews counted so far.
+ */
+export type PublishedLesson = { settings_json: string; course: string | null; number: number | null; sheet_json: string | null; review_json: string | null; clips: PublishedClip[]; reviews: PublishedReview[] }
 /**
  * The current text of a note for the phones: one that began as a phone
  * recording (`recording_id` set) or one recorded on this Mac. Never audio.
@@ -160,7 +249,12 @@ export type PublishedNote = { recording_id: string | null; session_id: string; t
 /**
  * When the note was made, for notes recorded on this Mac.
  */
-created_at: string | null }
+created_at: string | null; 
+/**
+ * A lesson's sheet, review and clips.
+ */
+lesson?: PublishedLesson | null }
+export type PublishedReview = { id: string; ended_at: string; device: string; length: number; right: number; total: number }
 export type PublishedTranscript = { id: string; started_at_ms: number; ended_at_ms: number | null; memo: string; words_json: string; speaker_hints_json: string }
 export type RecordingUpdate = { type: "processing"; stage: string; session_id: string | null } | { type: "done"; session_id: string; title: string | null; summary_md: string | null } | { type: "failed"; error: string; session_id: string | null } | { type: "requeue" }
 

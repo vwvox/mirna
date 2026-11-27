@@ -11,10 +11,13 @@ description = "Receives recordings from the paired Mirna phone app over the loca
 tauri-plugin = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
+hound = { workspace = true }
 specta-typescript = { workspace = true }
 tempfile = { workspace = true }
 
 [dependencies]
+anlg-audio-utils = { workspace = true }
+anlg-mp3 = { workspace = true }
 anlg-phone-link = { workspace = true, features = ["server"] }
 
 chrono = { workspace = true }

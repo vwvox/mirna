@@ -67,7 +67,10 @@ pub struct TrimmedWav {
 pub fn trim_wav_file(path: &std::path::Path, keep_ms: u64) -> std::io::Result<TrimmedWav> {
     use std::io::{Read, Seek, SeekFrom, Write};
     let invalid = |message: &str| std::io::Error::new(std::io::ErrorKind::InvalidData, message);
-    let mut file = std::fs::OpenOptions::new().read(true).write(true).open(path)?;
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)?;
     let file_len = file.metadata()?.len();
     let mut riff = [0u8; 12];
     file.read_exact(&mut riff)?;
@@ -89,10 +92,13 @@ pub fn trim_wav_file(path: &std::path::Path, keep_ms: u64) -> std::io::Result<Tr
         if &header[0..4] == b"fmt " {
             let mut format = [0u8; 16];
             file.read_exact(&mut format)?;
-            byte_rate = Some(u32::from_le_bytes([format[8], format[9], format[10], format[11]]) as u64);
+            byte_rate =
+                Some(u32::from_le_bytes([format[8], format[9], format[10], format[11]]) as u64);
             block_align = (u16::from_le_bytes([format[12], format[13]]) as u64).max(1);
         } else if &header[0..4] == b"data" {
-            let byte_rate = byte_rate.filter(|rate| *rate > 0).ok_or_else(|| invalid("WAV file has no format"))?;
+            let byte_rate = byte_rate
+                .filter(|rate| *rate > 0)
+                .ok_or_else(|| invalid("WAV file has no format"))?;
             // A header written mid-recording may undercount; the file is the truth.
             let available = file_len.saturating_sub(body);
             let wanted = keep_ms.saturating_mul(byte_rate) / 1000;

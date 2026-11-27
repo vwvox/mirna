@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { LanguageModel } from "ai";
 import { useState } from "react";
 
 import { md2json } from "@anlg/editor/markdown";
@@ -12,12 +13,22 @@ import {
   events as phoneLinkEvents,
   type InboxEntry,
   type InboxJob,
+  type LessonInfo,
   type RecordingUpdate,
 } from "@anlg/plugin-phone-link";
 import { useMountEffect } from "@anlg/ui/hooks/use-mount-effect";
 
+import { useLanguageModel } from "~/ai/hooks";
 import { reloadSessionAudio } from "~/audio-player/reload";
 import { liveQueryClient } from "~/db";
+import { requestLessonSheet } from "~/lesson/auto";
+import { loadLessonSession } from "~/lesson/queries";
+import { requestReviewPlan } from "~/lesson/review/auto";
+import {
+  fileAsLesson,
+  nextLessonTitle,
+  unfileLesson,
+} from "~/phone-link/lessons";
 import { publishLinkedNotes } from "~/phone-link/notes-publisher";
 import { getEnhancerService } from "~/services/enhancer";
 import { catalogLocalSessionAudio } from "~/session/attachments";
@@ -150,6 +161,7 @@ function RunPhoneRecording({
 }) {
   const queryClient = useQueryClient();
   const runBatch = useRunBatch(sessionId);
+  const model = useLanguageModel("enhance");
 
   useMountEffect(() => {
     // Defer until after React's mount/cleanup probe. Once started, the work
@@ -158,8 +170,8 @@ function RunPhoneRecording({
       if (runningRecordings.has(item.id)) return;
       runningRecordings.add(item.id);
       const work = item.job
-        ? processJob(item, item.job, sessionId, runBatch)
-        : processRecording(item, sessionId, runBatch);
+        ? processJob(item, item.job, sessionId, runBatch, model)
+        : processRecording(item, sessionId, runBatch, model);
       void work
         .catch((error: unknown) => {
           console.error("[phone-link] processing failed", error);
@@ -191,17 +203,18 @@ async function ensureSession(item: InboxEntry): Promise<string> {
   }
 
   const notes = item.notes_md?.trim();
-  const sessionId = await createSession(
-    item.title?.trim() ?? "",
-    DEFAULT_USER_ID,
-    {
-      raw_md: notes ? JSON.stringify(md2json(notes)) : "",
-    },
-  );
+  // A lesson the phone tagged is filed in its course as the next lesson.
+  const title =
+    item.title?.trim() ||
+    (item.lesson ? await nextLessonTitle(item.lesson) : "");
+  const sessionId = await createSession(title, DEFAULT_USER_ID, {
+    raw_md: notes ? JSON.stringify(md2json(notes)) : "",
+  });
   const startedAt = item.started_at ? new Date(item.started_at) : null;
   if (startedAt && !Number.isNaN(startedAt.getTime())) {
     await updateSession(sessionId, { created_at: startedAt.toISOString() });
   }
+  if (item.lesson) await fileAsLesson(sessionId, item.lesson);
   await reportUpdate(item.id, {
     type: "processing",
     stage: "importing",
@@ -210,10 +223,33 @@ async function ensureSession(item: InboxEntry): Promise<string> {
   return sessionId;
 }
 
+/**
+ * A lesson's sheet and review are written before the phone hears it's done,
+ * so they come back to it in the same sync. Both join a run already going.
+ */
+async function writeLessonForPhone(
+  sessionId: string,
+  model: LanguageModel | null,
+  setStage: (stage: string) => Promise<void>,
+) {
+  const lesson = await loadLessonSession(sessionId);
+  if (!lesson.isLesson) return;
+  try {
+    await setStage("writing_sheet");
+    await requestLessonSheet(sessionId, model);
+    await setStage("planning_review");
+    await requestReviewPlan(sessionId, model);
+  } catch (error) {
+    // The note is safe; the sheet can be written again on the Mac.
+    console.error("[phone-link] lesson write-up failed", error);
+  }
+}
+
 async function processRecording(
   item: InboxEntry,
   sessionId: string,
   runBatch: ReturnType<typeof useRunBatch>,
+  model: LanguageModel | null,
 ) {
   let stage = "importing";
   const setStage = async (next: string) => {
@@ -262,6 +298,7 @@ async function processRecording(
         console.error("[phone-link] summary failed", error);
       }
     }
+    await writeLessonForPhone(sessionId, model, setStage);
 
     const { title, summary } = await readNote(sessionId);
     await reportUpdate(item.id, {
@@ -311,7 +348,12 @@ export async function processJob(
   job: InboxJob,
   sessionId: string,
   runBatch: ReturnType<typeof useRunBatch>,
+  model: LanguageModel | null = null,
 ) {
+  if (job.type === "set_lesson") {
+    await setLessonJob(item, job.lesson, sessionId, model);
+    return;
+  }
   let stage =
     job.type === "trim"
       ? "trimming"
@@ -348,6 +390,7 @@ export async function processJob(
         console.error("[phone-link] summary failed", error);
         await markSummaryOutdated(sessionId);
       }
+      await writeLessonForPhone(sessionId, model, setStage);
     } else {
       await markSummaryOutdated(sessionId);
     }
@@ -376,6 +419,49 @@ export async function processJob(
               : job.type === "extend"
                 ? "The Mac couldn't add what you recorded to this note."
                 : "The Mac couldn't transcribe this recording again.",
+      session_id: sessionId,
+    });
+  }
+}
+
+/** The phone made a note a lesson, or a normal note again. */
+async function setLessonJob(
+  item: InboxEntry,
+  lesson: LessonInfo | null,
+  sessionId: string,
+  model: LanguageModel | null,
+) {
+  const setStage = (stage: string) =>
+    reportUpdate(item.id, {
+      type: "processing",
+      stage,
+      session_id: sessionId,
+    });
+  try {
+    if (lesson) {
+      await fileAsLesson(sessionId, lesson);
+      await setStage("writing_sheet");
+      await requestLessonSheet(sessionId, model, { force: true });
+      await setStage("planning_review");
+      await requestReviewPlan(sessionId, model);
+    } else {
+      await unfileLesson(sessionId);
+    }
+    const { title, summary } = await readNote(sessionId);
+    await reportUpdate(item.id, {
+      type: "done",
+      session_id: sessionId,
+      title,
+      summary_md: summary,
+    });
+    void publishLinkedNotes();
+  } catch (error) {
+    console.error("[phone-link] could not change the lesson", error);
+    await reportUpdate(item.id, {
+      type: "failed",
+      error: lesson
+        ? "The Mac couldn't make this note a lesson."
+        : "The Mac couldn't make this lesson a normal note.",
       session_id: sessionId,
     });
   }

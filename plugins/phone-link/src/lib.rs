@@ -1,3 +1,4 @@
+mod clips;
 mod commands;
 mod runner;
 
@@ -28,6 +29,10 @@ pub enum PhoneLinkEvent {
     /// notes recorded on this Mac when `include_mac_notes` is set.
     #[serde(rename = "notesRequested")]
     NotesRequested { include_mac_notes: bool },
+    /// A phone sent reviews it played of a lesson: count them
+    /// (`list_reviews`), then `remove_review` each.
+    #[serde(rename = "reviewsReceived")]
+    ReviewsReceived { session_id: String },
 }
 
 fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
@@ -44,6 +49,10 @@ fn make_specta_builder<R: tauri::Runtime>() -> tauri_specta::Builder<R> {
             commands::list_linked_notes::<tauri::Wry>,
             commands::publish_notes::<tauri::Wry>,
             commands::export_logs::<tauri::Wry>,
+            commands::publish_courses::<tauri::Wry>,
+            commands::export_clips::<tauri::Wry>,
+            commands::list_reviews::<tauri::Wry>,
+            commands::remove_review::<tauri::Wry>,
         ])
         .events(tauri_specta::collect_events![PhoneLinkEvent])
         .error_handling(tauri_specta::ErrorHandlingMode::Result)
@@ -85,6 +94,9 @@ pub fn init<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
                         }
                         ServerEvent::NotesRequested { include_mac_notes } => {
                             PhoneLinkEvent::NotesRequested { include_mac_notes }
+                        }
+                        ServerEvent::ReviewsReceived { session_id } => {
+                            PhoneLinkEvent::ReviewsReceived { session_id }
                         }
                     };
                     let _ = event.emit(&handle);

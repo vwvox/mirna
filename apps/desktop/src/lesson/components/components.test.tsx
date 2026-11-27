@@ -29,6 +29,10 @@ vi.mock("../documents", () => ({
   useLessonDocument: () => null,
   updateLessonDocument: vi.fn(),
 }));
+vi.mock("../review/review-button", () => ({
+  ReviewButton: () => null,
+  LastReview: () => null,
+}));
 vi.mock("../queries", () => ({
   useCourseLessons: () => [],
   useCourseSheets: () => new Map(),
@@ -286,7 +290,9 @@ describe("lesson screens", () => {
     render(wrap(<LessonStudySheet sessionId="s1" />));
     expect(screen.getByText("Topic lesson · Contract law")).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Key terms/ })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /Cases and laws/ })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: /Cases and laws/ }),
+    ).toBeTruthy();
     expect(screen.getByText("Is there a contract?")).toBeTruthy();
     expect(screen.getByRole("heading", { name: /Common slips/ })).toBeTruthy();
     expect(

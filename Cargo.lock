@@ -17369,9 +17369,12 @@ dependencies = [
 name = "tauri-plugin-phone-link"
 version = "0.1.0"
 dependencies = [
+ "audio-utils",
  "chrono",
+ "hound",
  "if-addrs",
  "mdns-sd",
+ "mp3",
  "phone-link",
  "qrcode",
  "serde",

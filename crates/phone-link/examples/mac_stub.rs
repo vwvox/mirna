@@ -69,6 +69,7 @@ fn publish_all(server: &PhoneLinkServer, dir: &str, include_mac_notes: bool) {
                 summary_md: Some(summary),
                 transcripts,
                 created_at: None,
+                lesson: None,
             }
         })
         .collect::<Vec<_>>();
@@ -90,6 +91,7 @@ fn publish_all(server: &PhoneLinkServer, dir: &str, include_mac_notes: bool) {
                 speaker_hints_json: "[]".into(),
             }],
             created_at: Some("2026-11-22T15:00:00Z".into()),
+            lesson: None,
         });
     }
     let changed = server.publish_notes(notes).unwrap();
@@ -125,6 +127,12 @@ async fn main() {
     while let Some(event) = rx.recv().await {
         match event {
             ServerEvent::PhonePaired { name, .. } => println!("PAIRED {name}"),
+            ServerEvent::ReviewsReceived { .. } => {
+                for review in server.pending_reviews() {
+                    println!("REVIEW {} {}", review.session_id, review.run_json);
+                    let _ = server.remove_review(&review.session_id, &review.id);
+                }
+            }
             ServerEvent::NotesRequested { include_mac_notes } => {
                 publish_all(&server, &dir, include_mac_notes)
             }

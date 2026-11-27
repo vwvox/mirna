@@ -87,6 +87,7 @@ const item: InboxEntry = {
   stage: null,
   session_id: "session-1",
   job: null,
+  lesson: null,
 };
 
 function updates() {

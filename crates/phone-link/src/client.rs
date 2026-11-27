@@ -15,8 +15,28 @@ use crate::Error;
 use crate::identity::{Identity, is_fingerprint};
 use crate::protocol::{
     ChunkResponse, CompleteRequest, ErrorBody, MacInfo, NoteChangesRequest, NoteChangesResponse,
-    NoteJob, PairRequest, PairResponse, RecordingStatus, StatusesRequest,
+    NoteJob, PairRequest, PairResponse, RecordingStatus, ReviewsAccepted, ReviewsUpload,
+    StatusesRequest, is_valid_path_id,
 };
+
+fn error_of(status: StatusCode, bytes: &[u8]) -> Error {
+    let error = serde_json::from_slice::<ErrorBody>(bytes).ok();
+    let message = error
+        .as_ref()
+        .map(|body| body.error.clone())
+        .unwrap_or_else(|| status.to_string());
+    match (status, message.as_str()) {
+        (StatusCode::UNAUTHORIZED, _) => Error::NotPaired,
+        (StatusCode::CONFLICT, "already_received") => Error::AlreadyReceived,
+        (StatusCode::CONFLICT, "offset_mismatch") => Error::OffsetMismatch {
+            received_bytes: error.and_then(|body| body.received_bytes).unwrap_or(0),
+        },
+        _ => Error::Http {
+            status: status.as_u16(),
+            message,
+        },
+    }
+}
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(6);
@@ -129,6 +149,40 @@ impl Client {
         .await
     }
 
+    /// One of a lesson's teacher clips, as MP3 bytes.
+    pub async fn download_clip(&self, session_id: &str, clip_id: &str) -> Result<Bytes, Error> {
+        if !is_valid_path_id(session_id) || !is_valid_path_id(clip_id) {
+            return Err(Error::Protocol("invalid clip id".into()));
+        }
+        let path = format!("/v1/notes/{session_id}/clips/{clip_id}");
+        let (status, bytes) =
+            tokio::time::timeout(REQUEST_TIMEOUT, self.send(Method::GET, &path, None))
+                .await
+                .map_err(|_| Error::Unreachable)??;
+        if status.is_success() {
+            return Ok(bytes);
+        }
+        Err(error_of(status, &bytes))
+    }
+
+    /// Sends reviews played on this phone (each the JSON of one run).
+    pub async fn send_reviews(
+        &self,
+        session_id: &str,
+        reviews: Vec<String>,
+    ) -> Result<ReviewsAccepted, Error> {
+        if !is_valid_path_id(session_id) {
+            return Err(Error::Protocol("invalid note id".into()));
+        }
+        let body = serde_json::to_vec(&ReviewsUpload { reviews })?;
+        self.call(
+            Method::POST,
+            &format!("/v1/notes/{session_id}/reviews"),
+            Some(body.into()),
+        )
+        .await
+    }
+
     /// Sends this phone's problem log, replacing the copy the Mac has.
     pub async fn upload_diagnostics(&self, log: Bytes) -> Result<(), Error> {
         let _: serde_json::Value = self.call(Method::PUT, "/v1/diagnostics", Some(log)).await?;
@@ -179,22 +233,7 @@ impl Client {
         if status.is_success() {
             return serde_json::from_slice(&bytes).map_err(Error::from);
         }
-        let error = serde_json::from_slice::<ErrorBody>(&bytes).ok();
-        let message = error
-            .as_ref()
-            .map(|body| body.error.clone())
-            .unwrap_or_else(|| status.to_string());
-        Err(match (status, message.as_str()) {
-            (StatusCode::UNAUTHORIZED, _) => Error::NotPaired,
-            (StatusCode::CONFLICT, "already_received") => Error::AlreadyReceived,
-            (StatusCode::CONFLICT, "offset_mismatch") => Error::OffsetMismatch {
-                received_bytes: error.and_then(|body| body.received_bytes).unwrap_or(0),
-            },
-            _ => Error::Http {
-                status: status.as_u16(),
-                message,
-            },
-        })
+        Err(error_of(status, &bytes))
     }
 
     async fn send(

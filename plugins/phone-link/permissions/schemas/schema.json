@@ -307,6 +307,18 @@
           "markdownDescription": "Denies the cancel_pairing command without any pre-configured scope."
         },
         {
+          "description": "Enables the export_clips command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-export-clips",
+          "markdownDescription": "Enables the export_clips command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the export_clips command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-export-clips",
+          "markdownDescription": "Denies the export_clips command without any pre-configured scope."
+        },
+        {
           "description": "Enables the export_logs command without any pre-configured scope.",
           "type": "string",
           "const": "allow-export-logs",
@@ -367,6 +379,30 @@
           "markdownDescription": "Denies the list_phones command without any pre-configured scope."
         },
         {
+          "description": "Enables the list_reviews command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-list-reviews",
+          "markdownDescription": "Enables the list_reviews command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the list_reviews command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-list-reviews",
+          "markdownDescription": "Denies the list_reviews command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the publish_courses command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-publish-courses",
+          "markdownDescription": "Enables the publish_courses command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the publish_courses command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-publish-courses",
+          "markdownDescription": "Denies the publish_courses command without any pre-configured scope."
+        },
+        {
           "description": "Enables the publish_notes command without any pre-configured scope.",
           "type": "string",
           "const": "allow-publish-notes",
@@ -389,6 +425,18 @@
           "type": "string",
           "const": "deny-remove-phone",
           "markdownDescription": "Denies the remove_phone command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove_review command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-remove-review",
+          "markdownDescription": "Enables the remove_review command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove_review command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-remove-review",
+          "markdownDescription": "Denies the remove_review command without any pre-configured scope."
         },
         {
           "description": "Enables the start_pairing command without any pre-configured scope.",
@@ -415,10 +463,10 @@
           "markdownDescription": "Denies the update_recording command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`\n- `allow-export-logs`",
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`\n- `allow-export-logs`\n- `allow-publish-courses`\n- `allow-export-clips`\n- `allow-list-reviews`\n- `allow-remove-review`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`\n- `allow-export-logs`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-get-status`\n- `allow-start-pairing`\n- `allow-cancel-pairing`\n- `allow-list-phones`\n- `allow-remove-phone`\n- `allow-list-inbox`\n- `allow-update-recording`\n- `allow-list-linked-notes`\n- `allow-publish-notes`\n- `allow-export-logs`\n- `allow-publish-courses`\n- `allow-export-clips`\n- `allow-list-reviews`\n- `allow-remove-review`"
         }
       ]
     }

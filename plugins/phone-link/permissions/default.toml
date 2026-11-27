@@ -11,4 +11,8 @@ permissions = [
   "allow-list-linked-notes",
   "allow-publish-notes",
   "allow-export-logs",
+  "allow-publish-courses",
+  "allow-export-clips",
+  "allow-list-reviews",
+  "allow-remove-review",
 ]

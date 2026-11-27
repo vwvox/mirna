@@ -181,6 +181,7 @@ async fn pairs_uploads_and_reports_progress() {
                     duration_ms: Some(7_800),
                     ext: "wav".into(),
                     notes_md: Some("- ask about budget".into()),
+                    lesson: None,
                 },
             },
         )
@@ -247,6 +248,7 @@ async fn pairs_uploads_and_reports_progress() {
     let note = NoteSnapshot {
         recording_id: Some(id.into()),
         created_at: None,
+        lesson: None,
         session_id: "session-1".into(),
         title: "Standup with Ana".into(),
         summary_md: Some("# Standup\n- Budget approved".into()),
@@ -303,6 +305,7 @@ async fn pairs_uploads_and_reports_progress() {
         session_id: "mac-session".into(),
         title: "Zoom with the team".into(),
         created_at: Some("2026-11-22T15:00:00Z".into()),
+        lesson: None,
         summary_md: Some("- Shipping next week".into()),
         transcripts: Vec::new(),
     };
@@ -741,4 +744,151 @@ async fn phone_asks_for_note_jobs_and_sends_its_log() {
     let text = std::fs::read_to_string(&logs[0].path).unwrap();
     assert!(text.starts_with("# phone: Phone A\n"));
     assert!(text.contains("second") && !text.contains("first"));
+}
+
+#[tokio::test]
+async fn lessons_travel_with_clips_courses_and_reviews() {
+    use phone_link::protocol::{ClipInfo, CourseInfo, NoteLesson};
+
+    let mac = start_mac().await;
+    mac.server.set_notes_refresh_wait(Duration::ZERO);
+    let client = paired_phone(&mac, "Pixel").await;
+    let session_id = "11111111-2222-4333-8444-555555555555";
+    let other_id = "99999999-2222-4333-8444-555555555555";
+    let lesson = NoteSnapshot {
+        recording_id: None,
+        session_id: session_id.into(),
+        title: "Lesson 14".into(),
+        summary_md: None,
+        transcripts: Vec::new(),
+        created_at: Some("2026-11-25T18:00:00Z".into()),
+        lesson: Some(NoteLesson {
+            settings_json: r#"{"learning":"zh","explainIn":"en"}"#.into(),
+            course: Some("Mandarin".into()),
+            number: Some(14),
+            sheet_json: Some("{}".into()),
+            review_json: Some("{}".into()),
+            clips: vec![ClipInfo {
+                id: "c1000-2000-b".into(),
+                size: 3,
+                sha256: sha256_hex(b"mp3"),
+            }],
+            reviews: Vec::new(),
+        }),
+    };
+    let standup = NoteSnapshot {
+        session_id: other_id.into(),
+        title: "Standup".into(),
+        lesson: None,
+        ..lesson.clone()
+    };
+    mac.server
+        .publish_notes(vec![lesson.clone(), standup])
+        .unwrap();
+    mac.server
+        .publish_courses(vec![CourseInfo {
+            name: "Mandarin".into(),
+            subject: "language".into(),
+            learning: "zh".into(),
+            explain_in: "en".into(),
+            subject_name: None,
+            next_number: 15,
+        }])
+        .unwrap();
+
+    // A lesson recorded on the Mac reaches a phone that didn't ask for Mac notes.
+    let changes = client.note_changes(0, false).await.unwrap();
+    assert_eq!(changes.notes.len(), 1);
+    assert_eq!(changes.notes[0].title, "Lesson 14");
+    assert_eq!(changes.courses[0].next_number, 15);
+
+    // Only clips the Mac listed with the note can be fetched.
+    let dir = mac.server.clips_dir(session_id).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("c1000-2000-b.mp3"), b"mp3").unwrap();
+    std::fs::write(dir.join("other.mp3"), b"no").unwrap();
+    assert_eq!(
+        &client
+            .download_clip(session_id, "c1000-2000-b")
+            .await
+            .unwrap()[..],
+        b"mp3"
+    );
+    assert!(client.download_clip(session_id, "other").await.is_err());
+    assert!(
+        client
+            .download_clip(other_id, "c1000-2000-b")
+            .await
+            .is_err()
+    );
+    assert!(client.download_clip(session_id, "../c1000").await.is_err());
+    assert!(mac.server.clips_dir("../up").is_none());
+
+    // Reviews are kept until the Mac app counts them; sending twice is harmless.
+    let run = r#"{"id":"run-1","results":[]}"#.to_string();
+    let accepted = client
+        .send_reviews(session_id, vec![run.clone(), "not json".into()])
+        .await
+        .unwrap();
+    assert_eq!(accepted.accepted, vec!["run-1".to_string()]);
+    client
+        .send_reviews(session_id, vec![run.clone()])
+        .await
+        .unwrap();
+    let pending = mac.server.pending_reviews();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].session_id, session_id);
+    assert_eq!(pending[0].run_json, run);
+    assert!(mac.events.lock().unwrap().iter().any(|event| matches!(
+        event,
+        ServerEvent::ReviewsReceived { session_id: id } if id == session_id
+    )));
+    mac.server.remove_review(session_id, "run-1").unwrap();
+    assert!(mac.server.pending_reviews().is_empty());
+    // A note that isn't a lesson takes no reviews.
+    assert!(client.send_reviews(other_id, vec![run]).await.is_err());
+}
+
+#[tokio::test]
+async fn a_recording_waiting_on_the_mac_can_be_made_a_lesson() {
+    use phone_link::protocol::LessonTag;
+
+    let mac = start_mac().await;
+    let client = paired_phone(&mac, "Pixel").await;
+    let id = "0b5a4c1e-0000-4000-8000-000000000042";
+    send_recording(&client, id, &wav(2_000)).await;
+    let tag = LessonTag {
+        course: "Mandarin".into(),
+        subject: "language".into(),
+        learning: "zh".into(),
+        explain_in: "en".into(),
+        subject_name: None,
+    };
+    client
+        .note_job(
+            id,
+            &NoteJob::SetLesson {
+                lesson: Some(tag.clone()),
+            },
+        )
+        .await
+        .unwrap();
+    let item = mac
+        .server
+        .inbox()
+        .unwrap()
+        .into_iter()
+        .find(|item| item.id == id)
+        .unwrap();
+    assert_eq!(item.meta.lesson, Some(tag.clone()));
+    assert!(item.job.is_none());
+
+    // A tag the Mac can't use is refused.
+    let bad = NoteJob::SetLesson {
+        lesson: Some(LessonTag {
+            course: "../Mandarin".into(),
+            ..tag
+        }),
+    };
+    assert_eq!(conflict(client.note_job(id, &bad).await), "400 invalid_job");
 }
