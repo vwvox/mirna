@@ -39,6 +39,7 @@ import {
   PlayButton,
   RailPanel,
   Section,
+  sheetTable,
   usePlayAt,
 } from "./sheet-parts";
 import { openCourse } from "./sidebar-courses";
@@ -129,9 +130,9 @@ function KeyTerms({
         </Trans>
       }
     >
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-[620px] border-collapse text-sm">
-          <thead className="bg-muted/50 text-muted-foreground text-left text-xs">
+      <div className={sheetTable.frame}>
+        <table className={sheetTable.table}>
+          <thead className={sheetTable.head}>
             <tr>
               <th scope="col" className="px-4 py-2 font-medium">
                 <Trans>Term</Trans>
@@ -139,7 +140,10 @@ function KeyTerms({
               <th scope="col" className="px-3 py-2 font-medium">
                 <Trans>In the teacher's words</Trans>
               </th>
-              <th scope="col" className="px-3 py-2 font-medium">
+              <th
+                scope="col"
+                className={cn(["px-3 py-2 font-medium", sheetTable.playColumn])}
+              >
                 <Trans>Explained at</Trans>
               </th>
               <th scope="col" className="px-3 py-2 text-center font-medium">
@@ -147,16 +151,29 @@ function KeyTerms({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={sheetTable.body}>
             {sheet.keyTerms.map((item) => {
               const earlier = firstLessonOf.get(item.term);
               const id = practiceCardId("term", item.term);
               return (
-                <tr key={item.term} className="border-t align-top">
-                  <td className="text-mirna-serra dark:text-mirna-moss px-4 py-3 text-base font-bold whitespace-nowrap">
+                <tr
+                  key={item.term}
+                  className={cn(["align-top", sheetTable.row])}
+                >
+                  <td
+                    className={cn([
+                      "text-mirna-serra dark:text-mirna-moss min-w-32 px-4 py-3 text-base font-bold",
+                      sheetTable.first,
+                    ])}
+                  >
                     {item.term}
                   </td>
-                  <td className="px-3 py-3 leading-relaxed">
+                  <td
+                    className={cn([
+                      "px-3 py-3 leading-relaxed",
+                      sheetTable.below,
+                    ])}
+                  >
                     {item.definition}
                     {item.isNew ? (
                       <Badge tone="new">
@@ -172,7 +189,7 @@ function KeyTerms({
                       </Badge>
                     )}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className={cn(["px-3 py-3", sheetTable.play])}>
                     {item.heardAtMs !== null ? (
                       <PlayButton
                         label={t`Hear ${item.term} explained`}
@@ -183,11 +200,14 @@ function KeyTerms({
                       />
                     ) : null}
                   </td>
-                  <td className="px-3 py-3 text-center">
+                  <td
+                    className={cn(["px-3 py-3 text-center", sheetTable.card])}
+                  >
                     <input
                       type="checkbox"
                       className="accent-mirna-serra size-4"
                       aria-label={t`Make a card for ${item.term}`}
+                      title={t`Make a card for ${item.term}`}
                       checked={cards.isOn(id)}
                       onChange={(event) => cards.set(id, event.target.checked)}
                     />
@@ -202,7 +222,13 @@ function KeyTerms({
   );
 }
 
-function Ideas({ sessionId, sheet }: { sessionId: string; sheet: LessonSheet }) {
+function Ideas({
+  sessionId,
+  sheet,
+}: {
+  sessionId: string;
+  sheet: LessonSheet;
+}) {
   const { t } = useLingui();
   const { canPlay, playFrom, isMomentPlaying } = usePlayAt(sessionId);
   if (sheet.ideas.length === 0) return null;
@@ -326,7 +352,9 @@ function Sources({
               {labels[source.kind]}
             </span>
             <div className="flex flex-col gap-0.5">
-              <b className={cn(["text-sm", source.kind === "case" && "italic"])}>
+              <b
+                className={cn(["text-sm", source.kind === "case" && "italic"])}
+              >
                 {source.name}
                 {source.year ? (
                   <span className="text-muted-foreground ml-1.5 font-normal not-italic">
@@ -374,7 +402,7 @@ function StepList({
         >
           <span
             aria-hidden="true"
-            className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss flex size-6 items-center justify-center rounded-pill text-xs font-bold"
+            className="bg-mirna-moss text-mirna-serra dark:bg-mirna-serra/40 dark:text-mirna-moss rounded-pill flex size-6 items-center justify-center text-xs font-bold"
           >
             {index + 1}
           </span>
@@ -421,7 +449,8 @@ export function QuantityText({
   let last = 0;
   for (const match of text.matchAll(QUANTITY)) {
     const start = match.index ?? 0;
-    if (start > last) parts.push({ text: text.slice(last, start), bold: false });
+    if (start > last)
+      parts.push({ text: text.slice(last, start), bold: false });
     parts.push({ text: match[0], bold: true });
     last = start + match[0].length;
   }
@@ -494,7 +523,7 @@ function CheckYourself({
             <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
               <span
                 aria-hidden="true"
-                className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-orange-100 text-xs font-bold text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
+                className="rounded-pill flex size-6 shrink-0 items-center justify-center bg-orange-100 text-xs font-bold text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
               >
                 ?
               </span>
@@ -552,7 +581,7 @@ function Formulas({
         )
       }
     >
-      <div id="lesson-formulas" className="grid gap-3 sm:grid-cols-2">
+      <div id="lesson-formulas" className="grid gap-3 @xl:grid-cols-2">
         {formulas.map((formula) => (
           <FormulaCard
             key={formula.name}
@@ -577,7 +606,8 @@ function FormulaCard({
   const [editing, setEditing] = useState<string | null>(null);
   const [broken, setBroken] = useState(false);
   const save = useMutation({
-    mutationFn: (latex: string) => setFormulaFix(sessionId, formula.name, latex),
+    mutationFn: (latex: string) =>
+      setFormulaFix(sessionId, formula.name, latex),
     onSuccess: () => setEditing(null),
     onError: () => toast.error(t`Couldn't save that.`),
   });
@@ -622,7 +652,7 @@ function FormulaCard({
         </p>
       ) : null}
       {editing !== null ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @xl:grid-cols-2">
           <label className="text-muted-foreground flex flex-col gap-1.5 text-xs font-semibold">
             LaTeX
             <textarea
@@ -797,7 +827,7 @@ function Problems({ sheet }: { sheet: LessonSheet }) {
             <div className="flex items-start gap-3">
               <span
                 aria-hidden="true"
-                className="flex size-6 shrink-0 items-center justify-center rounded-pill bg-orange-100 text-xs font-bold text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
+                className="rounded-pill flex size-6 shrink-0 items-center justify-center bg-orange-100 text-xs font-bold text-orange-900 dark:bg-orange-900/40 dark:text-orange-100"
               >
                 {index + 1}
               </span>
@@ -938,7 +968,9 @@ export function SubjectCoursePanel({
             <Trans>formulas across {lessons} lessons, on one page.</Trans>
           )
         ) : lessons === 1 ? (
-          <Trans>key terms from 1 lesson, each linked to where it was explained.</Trans>
+          <Trans>
+            key terms from 1 lesson, each linked to where it was explained.
+          </Trans>
         ) : (
           <Trans>
             key terms across {lessons} lessons, each linked to where it was

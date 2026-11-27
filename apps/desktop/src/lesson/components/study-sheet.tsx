@@ -6,6 +6,7 @@ import { ArrowsClockwise, DownloadSimple } from "@anlg/ui/components/icons";
 import { Button } from "@anlg/ui/components/ui/button";
 import { Spinner } from "@anlg/ui/components/ui/spinner";
 import { toast } from "@anlg/ui/components/ui/toast";
+import { cn } from "@anlg/utils";
 
 import { requestLessonSheet, useLessonSheetStatus } from "../auto";
 import { useLessonDocument } from "../documents";
@@ -32,7 +33,6 @@ import { lessonSubject, parseLessonPractice } from "../schema";
 import type { LessonSettings, LessonSheet } from "../types";
 import { useLessonTranscript } from "../use-lesson-segments";
 import { LessonPracticeDialog } from "./practice-dialog";
-import { openCourse } from "./sidebar-courses";
 import {
   Badge,
   Banner,
@@ -44,9 +44,11 @@ import {
   PlayButton,
   RailPanel,
   Section,
+  sheetTable,
   usePlayAt,
   useSheetClipTracker,
 } from "./sheet-parts";
+import { openCourse } from "./sidebar-courses";
 import {
   FormulaCheckPanel,
   SubjectCoursePanel,
@@ -269,8 +271,9 @@ export function LessonStudySheet({ sessionId }: { sessionId: string }) {
               </div>
             </header>
 
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="flex min-w-0 flex-col gap-8">
+            {/* Beside the sheet only when the note's pane has room for both. */}
+            <div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="@container flex min-w-0 flex-col gap-8">
                 <p className="font-brand text-xl leading-relaxed">
                   {sheet.summary}
                 </p>
@@ -298,7 +301,7 @@ export function LessonStudySheet({ sessionId }: { sessionId: string }) {
               </div>
               <aside
                 aria-label={t`Lesson at a glance`}
-                className="flex flex-col gap-3.5 lg:sticky lg:top-2 lg:self-start"
+                className="flex flex-col gap-3.5 @4xl:sticky @4xl:top-2 @4xl:self-start"
               >
                 {isSubjectSheet ? (
                   <FormulaCheckPanel sessionId={sessionId} sheet={sheet} />
@@ -457,9 +460,9 @@ function Words({
       sheet.vocabulary.some((item) => hasHan(item.term)) ? (
         <ToneLegend />
       ) : null}
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="w-full min-w-[620px] border-collapse text-sm">
-          <thead className="bg-muted/50 text-muted-foreground text-left text-xs">
+      <div className={sheetTable.frame}>
+        <table className={sheetTable.table}>
+          <thead className={sheetTable.head}>
             <tr>
               <th scope="col" className="px-4 py-2 font-medium">
                 <Trans>Word</Trans>
@@ -477,7 +480,10 @@ function Words({
               <th scope="col" className="px-3 py-2 font-medium">
                 <Trans>Meaning</Trans>
               </th>
-              <th scope="col" className="px-3 py-2 font-medium">
+              <th
+                scope="col"
+                className={cn(["px-3 py-2 font-medium", sheetTable.playColumn])}
+              >
                 <Trans>Teacher says it</Trans>
               </th>
               <th scope="col" className="px-3 py-2 text-center font-medium">
@@ -485,17 +491,18 @@ function Words({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className={sheetTable.body}>
             {sheet.vocabulary.map((item) => {
               const earlier = firstLessonOf.get(item.term);
               return (
-                <tr key={item.term} className="border-t">
+                <tr key={item.term} className={sheetTable.row}>
                   <td
-                    className={
+                    className={cn([
                       usesPinyin(language) && hasHan(item.term)
                         ? "px-4 py-2 text-2xl"
-                        : "px-4 py-2 text-lg font-semibold"
-                    }
+                        : "px-4 py-2 text-lg font-semibold",
+                      sheetTable.first,
+                    ])}
                   >
                     <WordTerm
                       term={item.term}
@@ -504,14 +511,21 @@ function Words({
                     />
                   </td>
                   {showReading ? (
-                    <td className="px-3 py-2">{item.reading}</td>
+                    <td className={cn(["px-3 py-2", sheetTable.below])}>
+                      {item.reading}
+                    </td>
                   ) : null}
                   {showType ? (
-                    <td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">
+                    <td
+                      className={cn([
+                        "text-muted-foreground px-3 py-2 text-xs whitespace-nowrap",
+                        sheetTable.below,
+                      ])}
+                    >
                       {item.note}
                     </td>
                   ) : null}
-                  <td className="px-3 py-2">
+                  <td className={cn(["px-3 py-2", sheetTable.below])}>
                     {item.meaning}
                     {item.isNew ? (
                       <Badge tone="new">
@@ -527,7 +541,7 @@ function Words({
                       </Badge>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className={cn(["px-3 py-2", sheetTable.play])}>
                     <PlayButton
                       label={t`Play the teacher saying ${item.term}`}
                       time={item.heardAtMs}
@@ -536,11 +550,14 @@ function Words({
                       onClick={() => playTerm(item.term, item.heardAtMs)}
                     />
                   </td>
-                  <td className="px-3 py-2 text-center">
+                  <td
+                    className={cn(["px-3 py-2 text-center", sheetTable.card])}
+                  >
                     <input
                       type="checkbox"
                       className="accent-mirna-serra size-4"
                       aria-label={t`Make a card for ${item.term}`}
+                      title={t`Make a card for ${item.term}`}
                       checked={!skipped.has(item.term)}
                       onChange={(event) =>
                         void setWordCard(
@@ -603,7 +620,7 @@ function Patterns({
         )
       }
     >
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 @xl:grid-cols-2">
         {sheet.patterns.map((pattern, index) => (
           <div
             key={`${pattern.pattern}-${index}`}
@@ -792,9 +809,7 @@ function TakeElsewhere({
     onError: () => toast.error(t`Couldn't save the file.`),
   });
   if (sheet.vocabulary.length === 0) return null;
-  const formats: [VocabularyExportFormat, string][] = [
-    ["anki", t`Anki deck`],
-  ];
+  const formats: [VocabularyExportFormat, string][] = [["anki", t`Anki deck`]];
   if (usesPinyin(language)) formats.push(["pleco", t`Pleco flashcards`]);
   return (
     <RailPanel title={t`Take it elsewhere`}>

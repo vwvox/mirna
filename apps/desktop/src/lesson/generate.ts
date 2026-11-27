@@ -218,15 +218,54 @@ export function formatLessonTranscript(
   let length = 0;
   for (const segment of segments) {
     if (!segment.text.trim()) continue;
-    const line = `[${formatClock(segment.start_ms)}] ${speakerName(segment, roleOf)}: ${segment.text.trim()}`;
-    length += line.length + 1;
-    if (length > MAX_TRANSCRIPT_CHARS) {
-      lines.push("[transcript cut here for length]");
-      break;
+    const speaker = speakerName(segment, roleOf);
+    for (const piece of timedPieces(segment)) {
+      const line = `[${formatClock(piece.startMs)}] ${speaker}: ${piece.text}`;
+      length += line.length + 1;
+      if (length > MAX_TRANSCRIPT_CHARS) {
+        lines.push("[transcript cut here for length]");
+        return lines.join("\n");
+      }
+      lines.push(line);
     }
-    lines.push(line);
   }
   return lines.join("\n");
+}
+
+// A turn can run for minutes, as in a lecture. With one time for all of it the
+// AI could only give that time for anything said in it (a 4-minute talk got
+// every term at 00:00 or 00:59), so long turns are cut at sentence ends about
+// every 20 s, each piece with its own time.
+const PIECE_MS = 20_000;
+const SENTENCE_END = /[.!?。！？…]["'”’)\]]?$/u;
+
+function timedPieces(
+  segment: RenderedTranscriptSegment,
+): Array<{ startMs: number; text: string }> {
+  const { words } = segment;
+  if (words.length === 0 || segment.end_ms - segment.start_ms <= PIECE_MS) {
+    return [{ startMs: segment.start_ms, text: segment.text.trim() }];
+  }
+  const pieces: Array<{ startMs: number; text: string }> = [];
+  let startMs = segment.start_ms;
+  let text = "";
+  for (const [index, word] of words.entries()) {
+    if (!text.trim()) startMs = word.start_ms;
+    text += word.text;
+    const lasted = word.end_ms - startMs;
+    const last = index === words.length - 1;
+    if (
+      !last &&
+      text.trim() &&
+      ((lasted >= PIECE_MS && SENTENCE_END.test(word.text.trim())) ||
+        lasted >= PIECE_MS * 2)
+    ) {
+      pieces.push({ startMs, text: text.trim() });
+      text = "";
+    }
+  }
+  if (text.trim()) pieces.push({ startMs, text: text.trim() });
+  return pieces;
 }
 
 export function computeTalkStats(

@@ -117,6 +117,39 @@ describe("study sheet", () => {
     expect(text).toBe("[01:01] Teacher: 都好吃。\n[01:03] Student: 都好吃");
   });
 
+  it("gives a long talk a time about every 20 s, at sentence ends", () => {
+    // A minute of the teacher talking, a sentence every 8 s, as one turn.
+    const words: Array<[string, number, number]> = [];
+    for (let second = 0; second < 64; second += 2) {
+      const ends = second % 8 === 6;
+      words.push([
+        `${second === 0 ? "" : " "}w${second}${ends ? "." : ""}`,
+        second * 1_000,
+        second * 1_000 + 2_000,
+      ]);
+    }
+    const lines = formatLessonTranscript([
+      segment("RemoteParty", words),
+      segment("DirectMic", [["Okay.", 70_000, 70_400]]),
+    ])
+      .split("\n")
+      .slice(0, -1);
+    expect(lines.map((line) => line.slice(0, 7))).toEqual([
+      "[00:00]",
+      "[00:24]",
+      "[00:48]",
+    ]);
+    expect(lines[0]).toBe(
+      "[00:00] Teacher: w0 w2 w4 w6. w8 w10 w12 w14. w16 w18 w20 w22.",
+    );
+    // Nothing is lost or doubled between the pieces.
+    expect(
+      lines
+        .map((line) => line.replace(/^\[\d\d:\d\d\] Teacher: /, ""))
+        .join(" "),
+    ).toBe(words.map(([text]) => text).join(""));
+  });
+
   it("measures who talked from the channels", () => {
     expect(
       computeTalkStats([
@@ -139,7 +172,9 @@ describe("study sheet", () => {
 
   it("asks for the reading each script needs, and articles where nouns have them", () => {
     const spanish = lessonSheetSystemPrompt("es", "en");
-    expect(spanish).toContain("Leave it empty: Spanish is written in Latin letters.");
+    expect(spanish).toContain(
+      "Leave it empty: Spanish is written in Latin letters.",
+    );
     expect(spanish).toContain("with their article");
     expect(spanish).toContain("la cocina, el mercado");
     const japanese = lessonSheetSystemPrompt("ja", "en");
@@ -185,7 +220,13 @@ describe("study sheet", () => {
             note: "",
             heardAt: "12:49",
           },
-          { term: "饺子", reading: "jiǎozi", meaning: "dup", note: "", heardAt: "" },
+          {
+            term: "饺子",
+            reading: "jiǎozi",
+            meaning: "dup",
+            note: "",
+            heardAt: "",
+          },
           { term: "也", reading: "yě", meaning: "also", note: "", heardAt: "" },
         ],
         patterns: [],

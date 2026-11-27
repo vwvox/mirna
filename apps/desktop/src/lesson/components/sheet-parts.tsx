@@ -146,6 +146,27 @@ export function useSheetClipTracker() {
   }, [wavesurfer]);
 }
 
+/**
+ * A study sheet table keeps its columns while it has room and turns each row
+ * into a small card when it doesn't: the first cell with its play button and
+ * card box beside it, the other cells below. It goes by its own width, since the
+ * sheet sits beside the notes list and the rail in a window of any size.
+ */
+export const sheetTable = {
+  frame: "@container overflow-x-auto rounded-xl border",
+  table: "w-full border-collapse text-sm @max-xl:block",
+  head: "bg-muted/50 text-muted-foreground text-left text-xs @max-xl:hidden",
+  body: "@max-xl:block",
+  row: "border-t @max-xl:grid @max-xl:grid-cols-[minmax(0,1fr)_auto_auto] @max-xl:items-center @max-xl:gap-x-3 @max-xl:gap-y-1.5 @max-xl:px-4 @max-xl:py-3 @max-xl:first:border-t-0",
+  first: "@max-xl:p-0",
+  below: "@max-xl:col-span-3 @max-xl:p-0",
+  play: "@max-xl:col-start-2 @max-xl:row-start-1 @max-xl:p-0",
+  card: "@max-xl:col-start-3 @max-xl:row-start-1 @max-xl:p-0",
+  // Wide enough for a play button with its time, which WebKit's table
+  // layout otherwise measures short and cuts off.
+  playColumn: "w-28",
+};
+
 export function PlayButton({
   label,
   time,
@@ -173,16 +194,17 @@ export function PlayButton({
       disabled={disabled}
       onClick={onClick}
       className={cn([
-        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 text-xs font-medium disabled:opacity-40",
+        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2 text-xs font-medium whitespace-nowrap disabled:opacity-40",
         playing
           ? "bg-mirna-serra border-mirna-serra dark:bg-mirna-moss dark:text-mirna-serra text-white"
           : "text-mirna-serra hover:bg-accent dark:text-mirna-moss",
       ])}
     >
+      {/* A narrow table column squeezed the icon to nothing without shrink-0. */}
       {playing ? (
-        <Pause className="size-3" weight="bold" />
+        <Pause className="size-3 shrink-0" weight="bold" />
       ) : (
-        <Play className="size-3" weight="bold" />
+        <Play className="size-3 shrink-0" weight="bold" />
       )}
       {text ? <span>{text}</span> : null}
       {time !== undefined && time !== null ? (
