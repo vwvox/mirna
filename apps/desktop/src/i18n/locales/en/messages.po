@@ -4521,6 +4521,10 @@ msgstr "Last used {0}"
 msgid "Law"
 msgstr "Law"
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Law evening class"
+msgstr "Law evening class"
+
 #: src/settings/dictation-engine.tsx
 msgid "Learn from your corrections"
 msgstr "Learn from your corrections"
@@ -8277,6 +8281,10 @@ msgstr "Starting…"
 #: src/lesson/components/new-lesson-dialog.tsx
 msgid "Statistics"
 msgstr "Statistics"
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Statistics 101"
+msgstr "Statistics 101"
 
 #: src/lesson/components/new-lesson-dialog.tsx
 msgid "Statistics, physics…"

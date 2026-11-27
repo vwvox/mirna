@@ -4521,6 +4521,10 @@ msgstr ""
 msgid "Law"
 msgstr ""
 
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Law evening class"
+msgstr ""
+
 #: src/settings/dictation-engine.tsx
 msgid "Learn from your corrections"
 msgstr ""
@@ -8276,6 +8280,10 @@ msgstr ""
 
 #: src/lesson/components/new-lesson-dialog.tsx
 msgid "Statistics"
+msgstr ""
+
+#: src/lesson/components/new-lesson-dialog.tsx
+msgid "Statistics 101"
 msgstr ""
 
 #: src/lesson/components/new-lesson-dialog.tsx
